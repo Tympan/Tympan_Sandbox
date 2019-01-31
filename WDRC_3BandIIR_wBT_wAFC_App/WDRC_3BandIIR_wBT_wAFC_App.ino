@@ -139,9 +139,6 @@ SerialManager serialManager(audioHardware,N_CHAN_MAX,expCompLim,ampSweepTester,f
 //routine to setup the hardware
 void setupTympanHardware(void) {
   BOTH_SERIAL.println("Setting up Tympan Audio Board...");
-  #if (USE_BT_SERIAL)
-    BT_SERIAL.println("Setting up Tympan Audio Board...");
-  #endif
   audioHardware.enable(); // activate AIC
 
   //enable the Tympman to detect whether something was plugged inot the pink mic jack
@@ -181,11 +178,12 @@ void setupAudioProcessing(void) {
   preFilter.setHighpass(0,40.0);
 
   //setup processing based on the DSL and GHA prescriptions
-  if (current_dsl_config == DSL_PRESET_A) {
-    setupFromDSLandGHAandAFC(dsl, gha, afc, N_CHAN_MAX, audio_settings);
-  } else if (current_dsl_config == DSL_PRESET_B) {
-    setupFromDSLandGHAandAFC(dsl_fullon, gha_fullon, afc_fullon, N_CHAN_MAX, audio_settings);
-  }
+  setDSLConfiguration(current_dsl_config);
+  //if (current_dsl_config == DSL_PRESET_A) {
+  //  setupFromDSLandGHAandAFC(dsl, gha, afc, N_CHAN_MAX, audio_settings);
+  //} else if (current_dsl_config == DSL_PRESET_B) {
+  //  setupFromDSLandGHAandAFC(dsl_fullon, gha_fullon, afc_fullon, N_CHAN_MAX, audio_settings);
+  //}
 }
 
 void setupFromDSLandGHAandAFC(const BTNRH_WDRC::CHA_DSL &this_dsl, const BTNRH_WDRC::CHA_WDRC &this_gha,
@@ -244,17 +242,19 @@ void setupFromDSLandGHAandAFC(const BTNRH_WDRC::CHA_DSL &this_dsl, const BTNRH_W
 //}
 
 void setDSLConfiguration(int preset_ind) {
-  current_dsl_config = preset_ind;
-  //if (current_dsl_config==2) current_dsl_config=0;
   switch (preset_ind) {
     case (DSL_PRESET_A):
       current_dsl_config = preset_ind;
       BOTH_SERIAL.println("setDSLConfiguration: Using DSL Preset A");
-      setupFromDSLandGHAandAFC(dsl, gha, afc, N_CHAN_MAX, audio_settings);  break;
+      setupFromDSLandGHAandAFC(dsl, gha, afc, N_CHAN_MAX, audio_settings);
+      audioHardware.setAmberLED(true);  audioHardware.setRedLED(false);
+      break;
     case (DSL_PRESET_B):
       current_dsl_config = preset_ind;
       BOTH_SERIAL.println("setDSLConfiguration: Using DSL Preset B");
-      setupFromDSLandGHAandAFC(dsl_fullon, gha_fullon, afc_fullon, N_CHAN_MAX, audio_settings); break;
+      setupFromDSLandGHAandAFC(dsl_fullon, gha_fullon, afc_fullon, N_CHAN_MAX, audio_settings);
+      audioHardware.setAmberLED(false);  audioHardware.setRedLED(true);
+      break;
   }
 }
 
