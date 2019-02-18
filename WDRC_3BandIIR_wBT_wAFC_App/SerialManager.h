@@ -206,7 +206,7 @@ void SerialManager::respondToByte(char c) {
       // (single quotes are used here, whereas JSON spec requires double quotes.  The app converts ' to " before parsing the JSON string).  
       char jsonConfig[] = "JSON={'pages':["
                       "{'title':'Presets','cards':["
-                          "{'name':'Algorithm','buttons':[{'label': 'A', 'cmd': 'd'},{'label': 'B', 'cmd': 'D'}]},"
+                          "{'name':'Algorithm','buttons':[{'label': 'A', 'cmd': 'd'},{'label': 'B', 'cmd': 'D'}]}"
                       "]},"
                       "{'title':'Tuner','cards':["
                           "{'name':'High Gain', 'buttons':[{'label': '-', 'cmd': '#'},{'label': '+', 'cmd': '3'}]},"
@@ -214,7 +214,7 @@ void SerialManager::respondToByte(char c) {
                           "{'name':'Low Gain', 'buttons':[{'label': '-', 'cmd': '!'},{'label': '+', 'cmd': '1'}]}"
                       "]}"
                     "]}";
-      audioHardware.println(pages);
+      audioHardware.println(jsonConfig);
       break;
     }
     case 'l':
