@@ -93,6 +93,7 @@ void SerialManager::printHelp(void) {
   audioHardware.print("   x,X: Increase or Decrease AFC filter length (currently "); audioHardware.print(feedbackCanceler.getAfl()) ; audioHardware.println(").");
   audioHardware.print("   u,U: Increase or Decrease Cutoff Frequency of HP Prefilter (currently "); audioHardware.print(audioHardware.getHPCutoff_Hz()); audioHardware.println(" Hz).");
   //audioHardware.print("   z,Z: Increase or Decrease AFC N_Coeff_To_Zero (currently "); audioHardware.print(feedbackCanceler.getNCoeffToZero()) ; audioHardware.println(").");  
+  audioHardware.println("   J: Print the JSON config object, for the Tympan Remote app");
   audioHardware.println();
 }
 
@@ -199,6 +200,23 @@ void SerialManager::respondToByte(char c) {
       while (!freqSweepTester_filterbank.available()) {delay(100);};
       audioHardware.println("Press 'h' for help...");
       break;      
+    case 'J':
+    {
+      // Print the layout for the Tympan Remote app, in a JSON-ish string 
+      // (single quotes are used here, whereas JSON spec requires double quotes.  The app converts ' to " before parsing the JSON string).  
+      char jsonConfig[] = "JSON={'pages':["
+                      "{'title':'Presets','cards':["
+                          "{'name':'Algorithm','buttons':[{'label': 'A', 'cmd': 'd'},{'label': 'B', 'cmd': 'D'}]},"
+                      "]},"
+                      "{'title':'Tuner','cards':["
+                          "{'name':'High Gain', 'buttons':[{'label': '-', 'cmd': '#'},{'label': '+', 'cmd': '3'}]},"
+                          "{'name':'Mid Gain', 'buttons':[{'label': '-', 'cmd': '@'},{'label': '+', 'cmd': '2'}]},"
+                          "{'name':'Low Gain', 'buttons':[{'label': '-', 'cmd': '!'},{'label': '+', 'cmd': '1'}]}"
+                      "]}"
+                    "]}";
+      audioHardware.println(pages);
+      break;
+    }
     case 'l':
       audioHardware.println("Command Received: toggle printing of per-band ave signal levels.");
       { bool as_dBSPL = false; togglePrintAveSignalLevels(as_dBSPL); }
@@ -272,7 +290,6 @@ void SerialManager::respondToByte(char c) {
       audioHardware.print("Command received: Decreasing ADC HP Cutoff to "); audioHardware.print(audioHardware.getHPCutoff_Hz());audioHardware.println(" Hz");   
       break;
     }
-
   }
 }
 
