@@ -35,7 +35,7 @@
 //local files
 #include "AudioEffectFeedbackCancel_F32.h"
 #include "AudioEffectAFC_BTNRH_F32.h"
-#include "SerialManager.h"
+#include "SerialManager.h" 
 
 
 // Define the overall setup
@@ -56,7 +56,7 @@ AudioSettings_F32   audio_settings(sample_rate_Hz, audio_block_samples);
 // /////////// Define audio objects...they are configured later
 
 //create audio library objects for handling the audio
-TympanPins                    tympPins(TYMPAN_REV_D);        //TYMPAN_REV_C or TYMPAN_REV_D
+TympanPins                    tympPins(TYMPAN_REV_D3);        //TYMPAN_REV_C or TYMPAN_REV_D
 TympanBase                    audioHardware(tympPins);
 AudioInputI2S_F32             i2s_in(audio_settings);   //Digital audio input from the ADC
 AudioTestSignalGenerator_F32  audioTestGenerator(audio_settings); //keep this to be *after* the creation of the i2s_in object
@@ -247,13 +247,13 @@ void setDSLConfiguration(int preset_ind) {
       current_dsl_config = preset_ind;
       BOTH_SERIAL.println("setDSLConfiguration: Using DSL Preset A");
       setupFromDSLandGHAandAFC(dsl, gha, afc, N_CHAN_MAX, audio_settings);
-      audioHardware.setAmberLED(true);  audioHardware.setRedLED(false);
+      audioHardware.setRedLED(true);  audioHardware.setAmberLED(false);
       break;
     case (DSL_PRESET_B):
       current_dsl_config = preset_ind;
       BOTH_SERIAL.println("setDSLConfiguration: Using DSL Preset B");
       setupFromDSLandGHAandAFC(dsl_fullon, gha_fullon, afc_fullon, N_CHAN_MAX, audio_settings);
-      audioHardware.setAmberLED(false);  audioHardware.setRedLED(true);
+      audioHardware.setRedLED(false);  audioHardware.setAmberLED(true);
       break;
   }
 }
