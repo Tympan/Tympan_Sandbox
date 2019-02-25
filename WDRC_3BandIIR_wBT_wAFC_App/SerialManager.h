@@ -158,20 +158,20 @@ void SerialManager::respondToByte(char c) {
         ampSweepTester.setStepPattern(start_amp_dB, end_amp_dB, step_amp_dB);
         ampSweepTester.setTargetDurPerStep_sec(1.0);
       }
-      audioHardware.println("Command Received: starting test using amplitude sweep...");
+      audioHardware.println("Received: starting test using amplitude sweep...");
       ampSweepTester.begin();
       while (!ampSweepTester.available()) {delay(100);};
       audioHardware.println("Press 'h' for help...");
       break;
     case 'C': case 'c':
-      audioHardware.println("Command Received: toggle printing of memory and CPU usage.");
+      audioHardware.println("Received: toggle printing of memory and CPU usage.");
       togglePrintMemoryAndCPU(); break;
     case 'd':
-      audioHardware.println("Command Received: changing to DSL Preset A");
+      audioHardware.println("Received: changing to Preset A");
       setDSLConfiguration(0);
       break;      
     case 'D':
-      audioHardware.println("Command Received: changing to DSL Preset B");
+      audioHardware.println("Received: changing to Preset B");
       setDSLConfiguration(1);
       break;
     case 'F':
@@ -182,7 +182,7 @@ void SerialManager::respondToByte(char c) {
         freqSweepTester.setStepPattern(start_freq_Hz, end_freq_Hz, step_octave);
         freqSweepTester.setTargetDurPerStep_sec(1.0);
       }
-      audioHardware.println("Command Received: starting test using frequency sweep, end-to-end assessment...");
+      audioHardware.println("Received: starting test using frequency sweep, end-to-end assessment...");
       freqSweepTester.begin();
       while (!freqSweepTester.available()) {delay(100);};
       audioHardware.println("Press 'h' for help...");
@@ -195,7 +195,7 @@ void SerialManager::respondToByte(char c) {
         freqSweepTester_filterbank.setStepPattern(start_freq_Hz, end_freq_Hz, step_octave);
         freqSweepTester_filterbank.setTargetDurPerStep_sec(0.5);
       }
-      audioHardware.println("Command Received: starting test using frequency sweep.  Filterbank assessment...");
+      audioHardware.println("Received: starting test using frequency sweep.  Filterbank assessment...");
       freqSweepTester_filterbank.begin();
       while (!freqSweepTester_filterbank.available()) {delay(100);};
       audioHardware.println("Press 'h' for help...");
@@ -206,80 +206,82 @@ void SerialManager::respondToByte(char c) {
       // (single quotes are used here, whereas JSON spec requires double quotes.  The app converts ' to " before parsing the JSON string).  
       char jsonConfig[] = "JSON={'pages':["
                       "{'title':'Presets','cards':["
-                          "{'name':'Algorithm','buttons':[{'label': 'A', 'cmd': 'd'},{'label': 'B', 'cmd': 'D'}]}"
+                          "{'name':'Algorithm','buttons':[{'label': 'WDRC', 'cmd': 'd'},{'label': 'Linear', 'cmd': 'D'}]}"
                       "]},"
                       "{'title':'Tuner','cards':["
+                          "{'name':'Overall Gain', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
                           "{'name':'High Gain', 'buttons':[{'label': '-', 'cmd': '#'},{'label': '+', 'cmd': '3'}]},"
                           "{'name':'Mid Gain', 'buttons':[{'label': '-', 'cmd': '@'},{'label': '+', 'cmd': '2'}]},"
-                          "{'name':'Low Gain', 'buttons':[{'label': '-', 'cmd': '!'},{'label': '+', 'cmd': '1'}]}"
+                          "{'name':'Low Gain', 'buttons':[{'label': '-', 'cmd': '!'},{'label': '+', 'cmd': '1'}]},"
+                          "{'name':'Feedback Cancelation', 'buttons':[{'label': 'Off', 'cmd': 'P'},{'label': 'On', 'cmd': 'p'}]}"
                       "]}"
                     "]}";
       audioHardware.println(jsonConfig);
       break;
     }
     case 'l':
-      audioHardware.println("Command Received: toggle printing of per-band ave signal levels.");
+      audioHardware.println("Received: toggle printing of per-band ave signal levels.");
       { bool as_dBSPL = false; togglePrintAveSignalLevels(as_dBSPL); }
       break;
     case 'L':
-      audioHardware.println("Command Received: toggle printing of per-band ave signal levels.");
+      audioHardware.println("Received: toggle printing of per-band ave signal levels.");
       { bool as_dBSPL = true; togglePrintAveSignalLevels(as_dBSPL); }
       break;
     case 'p':
-      audioHardware.println("Command Received: enabling adaptive feedback cancelation.");
+      audioHardware.println("Received: enabling feedback cancelation.");
       feedbackCanceler.setEnable(true);
       //feedbackCanceler.resetAFCfilter();
       break;
     case 'P':
-      audioHardware.println("Command Received: disabling adaptive feedback cancelation.");      
+      audioHardware.println("Received: disabling feedback cancelation.");      
       feedbackCanceler.setEnable(false);
       break;
     case 'm':
       old_val = feedbackCanceler.getMu(); new_val = old_val * 2.0;
-      audioHardware.print("Command received: increasing AFC mu to "); audioHardware.println(feedbackCanceler.setMu(new_val),6);
+      audioHardware.print("Received: increasing AFC mu to "); audioHardware.println(feedbackCanceler.setMu(new_val),6);
       break;
     case 'M':
       old_val = feedbackCanceler.getMu(); new_val = old_val / 2.0;
-      audioHardware.print("Command received: decreasing AFC mu to "); audioHardware.println(feedbackCanceler.setMu(new_val),6);
+      audioHardware.print("Received: decreasing AFC mu to "); audioHardware.println(feedbackCanceler.setMu(new_val),6);
       break;
     case 'r':
       old_val = feedbackCanceler.getRho(); new_val = 1.0-((1.0-old_val)/sqrt(2.0));
-      audioHardware.print("Command received: increasing AFC rho to "); audioHardware.println(feedbackCanceler.setRho(new_val),6);
+      audioHardware.print("Received: increasing AFC rho to "); audioHardware.println(feedbackCanceler.setRho(new_val),6);
       break;
     case 'R':
       old_val = feedbackCanceler.getRho(); new_val = 1.0-((1.0-old_val)*sqrt(2.0));
-      audioHardware.print("Command received: increasing AFC rho to "); audioHardware.println(feedbackCanceler.setRho(new_val),6);
+      audioHardware.print("Received: increasing AFC rho to "); audioHardware.println(feedbackCanceler.setRho(new_val),6);
       break;
     case 'e':
       old_val = feedbackCanceler.getEps(); new_val = old_val*sqrt(10.0);
-      audioHardware.print("Command received: increasing AFC eps to "); audioHardware.println(feedbackCanceler.setEps(new_val),6);
+      audioHardware.print("Received: increasing AFC eps to "); audioHardware.println(feedbackCanceler.setEps(new_val),6);
       break;
     case 'E':
       old_val = feedbackCanceler.getEps(); new_val = old_val/sqrt(10.0);
-      audioHardware.print("Command received: increasing AFC eps to "); audioHardware.println(feedbackCanceler.setEps(new_val),6);
+      audioHardware.print("Received: increasing AFC eps to "); audioHardware.println(feedbackCanceler.setEps(new_val),6);
       break;    
     case 'x':
       old_val = feedbackCanceler.getAfl(); new_val = old_val + 5;
-      audioHardware.print("Command received: increasing AFC filter length to "); audioHardware.println(feedbackCanceler.setAfl(new_val));
+      audioHardware.print("Received: increasing AFC filter length to "); audioHardware.println(feedbackCanceler.setAfl(new_val));
       break;    
     case 'X':
       old_val = feedbackCanceler.getAfl(); new_val = old_val - 5;
-      audioHardware.print("Command received: decreasing AFC filter length to "); audioHardware.println(feedbackCanceler.setAfl(new_val));
+      audioHardware.print("Received: decreasing AFC filter length to "); audioHardware.println(feedbackCanceler.setAfl(new_val));
       break;            
 //    case 'z':
 //      old_val = feedbackCanceler.getNCoeffToZero(); new_val = old_val + 5;
-//      audioHardware.print("Command received: increasing AFC N_Coeff_To_Zero to "); audioHardware.println(feedbackCanceler.setNCoeffToZero(new_val));
+//      audioHardware.print("Received: increasing AFC N_Coeff_To_Zero to "); audioHardware.println(feedbackCanceler.setNCoeffToZero(new_val));
 //      break;
 //    case 'Z':
 //      old_val = feedbackCanceler.getNCoeffToZero(); new_val = old_val - 5;
-//      audioHardware.print("Command received: decreasing AFC N_Coeff_To_Zero to "); audioHardware.println(feedbackCanceler.setNCoeffToZero(new_val));      
+//      audioHardware.print("Received: decreasing AFC N_Coeff_To_Zero to "); audioHardware.println(feedbackCanceler.setNCoeffToZero(new_val));      
 //      break;
     case 'u':
     {
       old_val = audioHardware.getHPCutoff_Hz(); new_val = min(old_val*sqrt(2.0), 8000.0); //half-octave steps up
       float fs_Hz = audioHardware.getSampleRate_Hz();
       audioHardware.setHPFonADC(true,new_val,fs_Hz);
-      audioHardware.print("Command received: Increasing ADC HP Cutoff to "); audioHardware.print(audioHardware.getHPCutoff_Hz());audioHardware.println(" Hz");
+      audioHardware.print("Received: Increasing ADC HP Cutoff to "); audioHardware.print(audioHardware.getHPCutoff_Hz());audioHardware.println(" Hz");
     }
       break;
     case 'U':
@@ -287,7 +289,7 @@ void SerialManager::respondToByte(char c) {
       old_val = audioHardware.getHPCutoff_Hz(); new_val = max(old_val/sqrt(2.0), 5.0); //half-octave steps down
       float fs_Hz = audioHardware.getSampleRate_Hz();
       audioHardware.setHPFonADC(true,new_val,fs_Hz);
-      audioHardware.print("Command received: Decreasing ADC HP Cutoff to "); audioHardware.print(audioHardware.getHPCutoff_Hz());audioHardware.println(" Hz");   
+      audioHardware.print("Received: Decreasing ADC HP Cutoff to "); audioHardware.print(audioHardware.getHPCutoff_Hz());audioHardware.println(" Hz");   
       break;
     }
   }

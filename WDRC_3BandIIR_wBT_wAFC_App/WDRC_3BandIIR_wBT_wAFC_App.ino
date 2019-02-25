@@ -56,7 +56,7 @@ AudioSettings_F32   audio_settings(sample_rate_Hz, audio_block_samples);
 // /////////// Define audio objects...they are configured later
 
 //create audio library objects for handling the audio
-TympanPins                    tympPins(TYMPAN_REV_D3);        //TYMPAN_REV_C or TYMPAN_REV_D
+TympanPins                    tympPins(TYMPAN_REV_D3);        //TYMPAN_REV_C or TYMPAN_REV_D (or D1, D2, or D3)
 TympanBase                    audioHardware(tympPins);
 AudioInputI2S_F32             i2s_in(audio_settings);   //Digital audio input from the ADC
 AudioTestSignalGenerator_F32  audioTestGenerator(audio_settings); //keep this to be *after* the creation of the i2s_in object
@@ -150,9 +150,9 @@ void setupTympanHardware(void) {
   //BOTH_SERIAL.print("Setting HP Filter in hardware at "); BOTH_SERIAL.print(audioHardware.getHPCutoff_Hz()); BOTH_SERIAL.println(" Hz.");
 
   //Choose the desired audio input on the Typman...this will be overridden by the serviceMicDetect() in loop() 
-  audioHardware.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the on-board micropphones
+  //audioHardware.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the on-board micropphones
   //audioHardware.inputSelect(TYMPAN_INPUT_JACK_AS_MIC); // use the microphone jack - defaults to mic bias 2.5V
-  //audioHardware.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the microphone jack - defaults to mic bias OFF
+  audioHardware.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the microphone jack - defaults to mic bias OFF
 
   //set volumes
   audioHardware.volume_dB(0.f);  // -63.6 to +24 dB in 0.5dB steps.  uses signed 8-bit
@@ -449,7 +449,7 @@ void serviceMicDetect(unsigned long curTime_millis, unsigned long updatePeriod_m
   if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0; //handle wrap-around of the clock
   if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
 
-    cur_val = audioHardware.updateInputBasedOnMicDetect(); //if mic is plugged in, defaults to TYMPAN_INPUT_JACK_AS_MIC
+    cur_val = audioHardware.updateInputBasedOnMicDetect(TYMPAN_INPUT_JACK_AS_LINEIN); //if mic is plugged in, changes input to mic jack as line-in
     if (cur_val != prev_val) {
       if (cur_val) {
         BOTH_SERIAL.println("serviceMicDetect: detected plug-in microphone!  External mic now active.");

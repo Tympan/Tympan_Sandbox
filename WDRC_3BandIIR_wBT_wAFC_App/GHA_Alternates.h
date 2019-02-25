@@ -16,12 +16,27 @@ BTNRH_WDRC::CHA_DSL dsl_fullon = {5,  // attack (ms)
   3,    //num channels used (must be less than MAX_CHAN constant set in the main program
   {700.0, 2400.0,       1.e4, 1.e4, 1.e4, 1.e4, 1.e4},    // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
   {0.57, 0.57, 0.57,       1.0, 1.0, 1.0, 1.0, 1.0},           // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
-  {40.0, 33.0, 34.0,    34., 34., 34., 34., 34.},   // expansion-end kneepoint.  not relevant when there is no expansion or compression.
-  {15.f, 15.f, 15.f,     20.f, 20.f, 20.f, 20.f, 20.f},   // compression-start gain.  Tweak these values up until it sounds bad!
+  {60.0, 40.0, 45.0,    34., 34., 34., 34., 34.},   // expansion-end kneepoint.  not relevant when there is no expansion or compression.
+  {20.f, 25.f, 30.f,     20.f, 20.f, 20.f, 20.f, 20.f},   // compression-start gain.  Tweak these values up until it sounds bad!
   {1.0, 1.0, 1.0,       1.0, 1.0, 1.0, 1.0, 1.0},           // compression ratio.  Set to 1.0 to defeat.
   {50.0, 50.0, 50.0,    50., 50., 50., 50., 50.},   // compression-start kneepoint (input dB SPL).  not relevant when there is no compression
   {200.0,200.0,200.0,   200.,200.,200.,200.,200.}   // output limiting threshold (comp ratio 10). set to large value to defeat.
 };
+
+////per-band processing parameters...all compression/expansion is defeated.  Just gain is left.
+//BTNRH_WDRC::CHA_DSL dsl_fullon = {5,  // attack (ms)
+//  300,  // release (ms)
+//  115,  //maxdB.  calibration at 1kHz?  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
+//  0,    // 0=left, 1=right...ignored
+//  3,    //num channels used (must be less than MAX_CHAN constant set in the main program
+//  {700.0, 2400.0,       1.e4, 1.e4, 1.e4, 1.e4, 1.e4},    // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
+//  {0.57, 0.57, 0.57,       1.0, 1.0, 1.0, 1.0, 1.0},           // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
+//  {40.0, 33.0, 34.0,    34., 34., 34., 34., 34.},   // expansion-end kneepoint.  not relevant when there is no expansion or compression.
+//  {20.f, 25.f, 30.f,     20.f, 20.f, 20.f, 20.f, 20.f},   // compression-start gain.  Tweak these values up until it sounds bad!
+//  {1.0, 1.0, 1.0,       1.0, 1.0, 1.0, 1.0, 1.0},           // compression ratio.  Set to 1.0 to defeat.
+//  {50.0, 50.0, 50.0,    50., 50., 50., 50., 50.},   // compression-start kneepoint (input dB SPL).  not relevant when there is no compression
+//  {200.0,200.0,200.0,   200.,200.,200.,200.,200.}   // output limiting threshold (comp ratio 10). set to large value to defeat.
+//};
 
 // Here is the broadband limiter for the full-on gain condition.  Only the "bolt" (last value) needs to be iterated.
 BTNRH_WDRC::CHA_WDRC gha_fullon = {5.f, // attack time (ms)
