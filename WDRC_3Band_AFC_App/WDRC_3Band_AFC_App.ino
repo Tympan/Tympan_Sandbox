@@ -42,7 +42,7 @@
 String overall_name = String("Tympan: 3-Band IIR WDRC with Adaptive Feedback Cancelation, App Version");
 const int N_CHAN_MAX = 3;  //number of frequency bands (channels)
 int N_CHAN = N_CHAN_MAX;  //will be changed to user-selected number of channels later
-const float input_gain_dB = 15.0f; //gain on the microphone
+const float input_gain_dB = 5.0f; //gain on the microphone...set to 5 dB for earpieces!
 float vol_knob_gain_dB = 0.0; //will be overridden by volume knob
 int USE_VOLUME_KNOB = 1;  //set to 1 to use volume knob to override the default vol_knob_gain_dB set a few lines below
 
@@ -352,7 +352,7 @@ void setup() {
 
   //End of setup
   printGainSettings();
-  BOTH_SERIAL.println("Setup complete.");
+  BOTH_SERIAL.print("Setup complete:"); BOTH_SERIAL.println(overall_name);
   serialManager.printHelp();
 
 } //end setup()

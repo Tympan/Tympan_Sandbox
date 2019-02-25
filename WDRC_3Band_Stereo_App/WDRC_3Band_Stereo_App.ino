@@ -392,7 +392,7 @@ void setup() {
 
   //End of setup
   printGainSettings();
-  BOTH_SERIAL.println("Setup complete.");
+  BOTH_SERIAL.print("Setup complete:"); BOTH_SERIAL.println(overall_name);
   serialManager.printHelp();
 
 } //end setup()
