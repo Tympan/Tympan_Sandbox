@@ -13,6 +13,8 @@
 #include <SdFat_Gre.h>       //originally from https://github.com/greiman/SdFat  but class names have been modified to prevent collisions with Teensy Audio/SD libraries
 #include <Print.h>
 
+#define bufferLengthBytes 150000
+
 //some constants for the AudioSDWriter
 const int DEFAULT_SDWRITE_BYTES = 512;  //minmum of 512 bytes is most efficient for SD.  Only used for binary writes
 //const uint64_t PRE_ALLOCATE_SIZE = 40ULL << 20;// Preallocate 40MB file.
@@ -268,6 +270,9 @@ class BufferedSDWriter_I16 : public SDWriter
     int getWriteSizeSamples(void) {
       return writeSizeSamples;
     }
+    void resetBuffer(void) {
+      bufferReadInd = 0; bufferWriteInd = 0;
+    }
 
     virtual void copyToWriteBuffer(audio_block_f32_t *audio_blocks[], const int numChan) {
       static unsigned long last_audio_block_id[4];
@@ -522,7 +527,6 @@ class BufferedSDWriter_I16 : public SDWriter
     int32_t bufferWriteInd = 0;
     int32_t bufferReadInd = 0;
     const int nBytesPerSample = 2;
-#define bufferLengthBytes 150000
     int32_t bufferLengthSamples = bufferLengthBytes / nBytesPerSample;
     int32_t bufferEndInd = bufferLengthBytes / nBytesPerSample;
 
@@ -569,6 +573,9 @@ class BufferedSDWriter_F32 : public SDWriter
     }
     int getWriteSizeSamples(void) {
       return writeSizeSamples;
+    }
+    void resetBuffer(void) {
+      bufferReadInd = 0; bufferWriteInd = 0;
     }
 
     //
@@ -630,9 +637,13 @@ class BufferedSDWriter_F32 : public SDWriter
 
   protected:
     int writeSizeSamples = 0;
+    int32_t bufferWriteInd = 0;
+    int32_t bufferReadInd = 0;
     float32_t *write_buffer = 0;
-    int bufferWriteInd = 0;
     const int nBytesPerSample = 4;
+    int32_t bufferLengthSamples = bufferLengthBytes / nBytesPerSample;
+    int32_t bufferEndInd = bufferLengthBytes / nBytesPerSample;
+
 };
 
 #endif

@@ -248,9 +248,9 @@ class AudioSDWriter_F32 : public AudioSDWriter, public AudioStream_F32 {
 
     void stopRecording(void) {
       if (current_SD_state == STATE::RECORDING) {
-        if (serial_ptr) {
-          serial_ptr->println("stopRecording: Closing SD File...");
-        }
+        //if (serial_ptr) {
+        //  serial_ptr->println("stopRecording: Closing SD File...");
+        //}
 
         //close the file
         close();
@@ -259,6 +259,13 @@ class AudioSDWriter_F32 : public AudioSDWriter, public AudioStream_F32 {
         //stop and clear the queues so that they stop accumulating data
         queueL.end();  queueR.end();   //stop accumulating new blocks of audio
         queueL.clear();queueR.clear(); //release any audio blocks that were accumulated.
+
+        //clear the buffer
+        if (buffSDWriterI16) {
+          buffSDWriterI16->resetBuffer();
+        } else if (buffSDWriterF32) {
+          buffSDWriterF32->resetBuffer();
+        }
       }
     }
 
