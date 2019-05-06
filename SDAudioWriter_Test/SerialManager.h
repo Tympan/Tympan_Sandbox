@@ -48,7 +48,8 @@ void SerialManager::printHelp(void) {
   myTympan.println("SerialManager Help: Available Commands:");
   //myTympan.println("   J: Print the JSON config object, for the Tympan Remote app");
   //myTympan.println("    j: Print the button state for the Tympan Remote app");
-  myTympan.println("   C: Toggle printing of CPU and Memory usage");
+  myTympan.println("   c: Start printing of CPU and Memory usage");
+  myTympan.println("   C: Stop printing of CPU and Memory usage");
   myTympan.println("   w: Switch Input to PCB Mics");
   myTympan.println("   W: Switch Input to Headset Mics");
   myTympan.println("   e: Switch Input to LineIn on the Mic Jack");

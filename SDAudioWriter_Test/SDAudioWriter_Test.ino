@@ -334,11 +334,11 @@ void serviceSD(void) {
 
     //print a warning if there has been an SD writing hiccup
     if (PRINT_OVERRUN_WARNING) {
-      if (audioSDWriter.getQueueOverrun() || i2s_in.get_isOutOfMemory()) {
-        float blocksPerSecond = ((float)audio_settings.sample_rate_Hz) / ((float)(audio_settings.audio_block_samples));
-        float approx_time_sec = ((float)audioSDWriter.getNBlocksWritten()) / blocksPerSecond;
+      //if (audioSDWriter.getQueueOverrun() || i2s_in.get_isOutOfMemory()) {
+      if (i2s_in.get_isOutOfMemory()) {
+        float approx_time_sec = ((float)(millis()-audioSDWriter.getStartTimeMillis()))/1000.0;
         if (approx_time_sec > 0.1) {
-          BOTH_SERIAL.print("SD Write Warning: there was a hiccup in the writing.  Approx Time (sec): ");
+          BOTH_SERIAL.print("SD Write Warning: there was a hiccup in the writing.");//  Approx Time (sec): ");
           BOTH_SERIAL.println(approx_time_sec );
         }
       }
@@ -347,8 +347,8 @@ void serviceSD(void) {
     //print timing information to help debug hiccups in the audio.  Are the writes fast enough?  Are there overruns?
     if (PRINT_FULL_SD_TIMING) {
       Serial.print("SD Write Status: ");
-      Serial.print(audioSDWriter.getQueueOverrun()); //zero means no overrun
-      Serial.print(", ");
+      //Serial.print(audioSDWriter.getQueueOverrun()); //zero means no overrun
+      //Serial.print(", ");
       Serial.print(AudioMemoryUsageMax_F32());  //hopefully, is less than MAX_F32_BLOCKS
       Serial.print(", ");
       Serial.print(MAX_F32_BLOCKS);  // max possible memory allocation
@@ -359,7 +359,7 @@ void serviceSD(void) {
       AudioMemoryUsageMaxReset_F32();
     }
 
-    audioSDWriter.clearQueueOverrun();
+    //audioSDWriter.clearQueueOverrun();
     i2s_in.clear_isOutOfMemory();
   } else {
     //no SD recording currently, so no SD action
