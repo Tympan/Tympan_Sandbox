@@ -33,10 +33,10 @@ class AudioSDWriter {
       return numWriteChannels;
     }
 
-    //virtual void prepareSDforRecording(void) = 0;
-    //virtual int startRecording(void) = 0;
-    //virtual int startRecording(char *) = 0;
-    //virtual void stopRecording(void) = 0;
+    virtual void prepareSDforRecording(void) = 0;
+    virtual int startRecording(void) = 0;
+    virtual int startRecording(char *) = 0;
+    virtual void stopRecording(void) = 0;
 
   protected:
     STATE current_SD_state = STATE::UNPREPARED;
@@ -80,25 +80,20 @@ class AudioSDWriter_F32 : public AudioSDWriter, public AudioStream_F32 {
     }
     ~AudioSDWriter_F32(void) {
       stopRecording();
-      //delete buffSDWriterF32;
       delete buffSDWriter;
     }
 
     void setup(void) {
       setWriteDataType(WriteDataType::INT16, &Serial, DEFAULT_SDWRITE_BYTES);
-      //setupQueues();
     }
     void setup(Print *_serial_ptr) {
       setSerial(_serial_ptr);
       setWriteDataType(WriteDataType::INT16, _serial_ptr, DEFAULT_SDWRITE_BYTES);
-      //setupQueues();
     }
     void setup(Print *_serial_ptr, const int _writeSizeBytes) {
       setSerial(_serial_ptr);
       setWriteDataType(WriteDataType::INT16, _serial_ptr, _writeSizeBytes);
-      //setupQueues();
     }
-    //void setupQueues(void) { queueL.end();  queueR.end(); } //disable the queues by defeault
 
     void setSerial(Print *_serial_ptr) {  serial_ptr = _serial_ptr;  }
     void setWriteDataType(WriteDataType type) {
@@ -106,10 +101,6 @@ class AudioSDWriter_F32 : public AudioSDWriter, public AudioStream_F32 {
       int write_nbytes = DEFAULT_SDWRITE_BYTES;
 
       //get info from previous objects
-      //if (buffSDWriterF32) {
-      //  serial_ptr = buffSDWriterF32->getSerial();
-      //  write_nbytes = buffSDWriterF32->getWriteSizeBytes();
-      //} else
       if (buffSDWriter) {
         serial_ptr = buffSDWriter->getSerial();
         write_nbytes = buffSDWriter->getWriteSizeBytes();
@@ -134,38 +125,19 @@ class AudioSDWriter_F32 : public AudioSDWriter, public AudioStream_F32 {
       //}
     }
     void setWriteSizeBytes(const int n) {  //512Bytes is most efficient for SD
-      if (buffSDWriter) {
-        buffSDWriter->setWriteSizeBytes(n);
-      //} else if (buffSDWriterF32) {
-      //  buffSDWriterF32->setWriteSizeBytes(n);
-      }
+      if (buffSDWriter) buffSDWriter->setWriteSizeBytes(n);
     }
     int getWriteSizeBytes(void) {  //512Bytes is most efficient for SD
-      if (buffSDWriter) {
-        return buffSDWriter->getWriteSizeBytes();
-      //} else if (buffSDWriterF32) {
-      //  return buffSDWriterF32->getWriteSizeBytes();
-      } else {
-        return 0;
-      }
+      if (buffSDWriter) return buffSDWriter->getWriteSizeBytes();
+      return 0;
     }
     virtual int setNumWriteChannels(int n) {
-      if (buffSDWriter) {
-        return buffSDWriter->setNChanWAV(n);
-      //} else if (buffSDWriterF32) {
-      //  return buffSDWriterF32->setNChanWAV(n);
-      } else {
-        return n;
-      }
+      if (buffSDWriter) return buffSDWriter->setNChanWAV(n);
+      return n;
     }
     virtual float setSampleRate_Hz(float fs_Hz) {
-      if (buffSDWriter) {
-        return buffSDWriter->setSampleRateWAV(fs_Hz);
-      //} else if (buffSDWriterF32) {
-      //  return buffSDWriterF32->setSampleRateWAV(fs_Hz);
-      } else {
-        return fs_Hz;
-      }
+      if (buffSDWriter) return buffSDWriter->setSampleRateWAV(fs_Hz);
+      return fs_Hz;
     }
     
     void prepareSDforRecording(void) {
@@ -173,9 +145,6 @@ class AudioSDWriter_F32 : public AudioSDWriter, public AudioStream_F32 {
         if (buffSDWriter) {
           buffSDWriter->init(); //part of SDWriter, which is the base for BufferedSDWriter_I16
           if (PRINT_FULL_SD_TIMING) buffSDWriter->enablePrintElapsedWriteTime(); //for debugging.  make sure time is less than (audio_block_samples/sample_rate_Hz * 1e6) = 2900 usec for 128 samples at 44.1 kHz
-        //} else if (buffSDWriterF32) {
-        //  buffSDWriterF32->init();
-        //  if (PRINT_FULL_SD_TIMING) buffSDWriterF32->enablePrintElapsedWriteTime(); //for debugging.  make sure time is less than (audio_block_samples/sample_rate_Hz * 1e6) = 2900 usec for 128 samples at 44.1 kHz
         }
         current_SD_state = STATE::STOPPED;
       }
@@ -228,8 +197,6 @@ class AudioSDWriter_F32 : public AudioSDWriter, public AudioStream_F32 {
           
           //start the queues.  Then, in the serviceSD, the fact that the queues
           //are getting full will begin the writing
-          //queueL.clear(); queueR.clear(); //clear out any previous data
-          //queueL.begin(); queueR.begin();
           buffSDWriter->resetBuffer();
           current_SD_state = STATE::RECORDING;
           setStartTimeMillis();
@@ -260,16 +227,8 @@ class AudioSDWriter_F32 : public AudioSDWriter, public AudioStream_F32 {
         close();
         current_SD_state = STATE::STOPPED;
 
-        //stop and clear the queues so that they stop accumulating data
-        //queueL.end();  queueR.end();   //stop accumulating new blocks of audio
-        //queueL.clear();queueR.clear(); //release any audio blocks that were accumulated.
-
         //clear the buffer
-        if (buffSDWriter) {
-          buffSDWriter->resetBuffer();
-        //} else if (buffSDWriterF32) {
-        //  buffSDWriterF32->resetBuffer();
-        }
+        if (buffSDWriter) buffSDWriter->resetBuffer();
       }
     }
 
@@ -284,136 +243,48 @@ class AudioSDWriter_F32 : public AudioSDWriter, public AudioStream_F32 {
 
       //copy the audio to the bug write buffer
       if (current_SD_state == STATE::RECORDING) {
-        if (buffSDWriter) {
-          buffSDWriter->copyToWriteBuffer(audio_blocks,numWriteChannels);
-        //} else if (buffSDWriterF32) {
-        //  buffSDWriterF32->copyToWriteBuffer(audio_blocks,numWriteChannels);
-        }
+        if (buffSDWriter) buffSDWriter->copyToWriteBuffer(audio_blocks,numWriteChannels);
       }
 
       //release the audio blocks
       for (int Ichan=0; Ichan < numWriteChannels; Ichan++) {
         if (audio_blocks[Ichan]) AudioStream_F32::release(audio_blocks[Ichan]);
-      }  
-         
+      }   
     }
 
     bool isFileOpen(void) {
-      if (buffSDWriter) {
-        return buffSDWriter->isFileOpen();
-      //} else if (buffSDWriterF32) {
-      //  return buffSDWriterF32->isFileOpen();
-      } else {
-        return false;
-      }
+      if (buffSDWriter) return buffSDWriter->isFileOpen();
+      return false;
     }
 
     //this is what pulls data from the queues and sends to SD for writing.
     //should be invoked from loop(), not from an ISR
     int serviceSD(void) {
-      if (buffSDWriter) {
-        return buffSDWriter->writeBufferedData();
-      //} else if (buffSDWriterF32) {
-      //  return buffSDWriterF32->writeBufferedData();
-      } else {
-        return false;
-      }
-      
-      //if (numWriteChannels == 1) {
-      //  return serviceSD_oneChan();
-      //} else if (numWriteChannels == 2) {
-      //  return serviceSD_twoChan();
-      //} else {
-      //  return 0;
-      //}
+      if (buffSDWriter) return buffSDWriter->writeBufferedData();
+      return false;
     }
-    
-//    int serviceSD_oneChan(void) {
-//      int return_val = 0;
-//      //is the SD subsystem ready to write?
-//      if (isFileOpen()) {
-//        //if audio data is ready, write it to SD
-//        if (queueL.available()) {
-//          audio_block_f32_t *foo = queueL.getAudioBlock();
-//          writeOneChannel(foo->data, foo->length);
-//          queueL.freeBuffer();
-//          return_val = 1;
-//
-//          //clear out right channel even if we're not processing it
-//          if (queueR.available()) {
-//            foo = queueR.getAudioBlock(); //do I actually need to get it?  Or can I just freeBuffer() it?
-//            queueR.freeBuffer();
-//          }
-//        }
-//      }
-//      return return_val;
-//    }
-//    int serviceSD_twoChan(void) {
-//      int return_val = 0;
-//      //is the SD subsystem ready to write?
-//      if (isFileOpen()) {
-//        if (queueL.available() && queueR.available()) {
-//          audio_block_f32_t *left = queueL.getAudioBlock(), *right = queueR.getAudioBlock();
-//          interleaveAndWrite(
-//            left->data,    //float32 array for left audio channel
-//            right->data,   //float32 array for right audio channel
-//            left->length); //number of samples in each channel
-//          queueL.freeBuffer(); queueR.freeBuffer();  //free up these blocks now that they are written
-//          return_val = 1;
-//        }
-//      }
-//      return return_val;
-//    }
 
     unsigned long getNBlocksWritten(void) {
-      if (buffSDWriter) {
-        return buffSDWriter->getNBlocksWritten();
-      //} else if (buffSDWriterF32) {
-      //  return buffSDWriterF32->getNBlocksWritten();
-      } else {
-        return 0;
-      }
+      if (buffSDWriter) return buffSDWriter->getNBlocksWritten();
+      return 0;
     }
     
     void resetNBlocksWritten(void) {
-      if (buffSDWriter) {
-        buffSDWriter->resetNBlocksWritten();
-      //} else if (buffSDWriterF32) {
-      //  buffSDWriterF32->resetNBlocksWritten();
-      }
+      if (buffSDWriter) buffSDWriter->resetNBlocksWritten();
     }
-//
-//
-//    bool getQueueOverrun(void) {
-//      return (queueL.getOverrun() || queueR.getOverrun());
-//    }
-//    void clearQueueOverrun(void) {
-//      queueL.clearOverrun();
-//      queueR.clearOverrun();
-//    }
+
   unsigned long getStartTimeMillis(void) { return t_start_millis; };
   unsigned long setStartTimeMillis(void) { return t_start_millis = millis(); };
 
   protected:
     audio_block_f32_t *inputQueueArray[2]; //two input channels
-    //AudioRecordQueue_F32 queueL, queueR;
     BufferedSDWriter *buffSDWriter = 0;
-    //BufferedSDWriter_F32 *buffSDWriterF32 = 0;
     Print *serial_ptr = &Serial;
     unsigned long t_start_millis = 0;
 
     bool openAsWAV(char *fname) {
-      if (buffSDWriter) {
-        return buffSDWriter->openAsWAV(fname);
-      //} else if (buffSDWriterF32) {
-      //  Serial.println("AudioSDWriter: cannot open F32 as WAV...opening as RAW...");
-      //  if (strlen(fname) > 3) {//change the filename exention to RAW
-      //    fname[strlen(fname)-3] = 'R';fname[strlen(fname)-2] = 'A';fname[strlen(fname)-1] = 'W';
-      //  }
-      //  return buffSDWriterF32->open(fname);
-      } else {
-        return false;
-      }
+      if (buffSDWriter) return buffSDWriter->openAsWAV(fname);
+      return false;
     }
     bool open(char *fname) {
       if (buffSDWriter) {
@@ -426,28 +297,6 @@ class AudioSDWriter_F32 : public AudioSDWriter, public AudioStream_F32 {
         return false;
       }
     }
-    
-//    int interleaveAndWrite(float32_t *left, float32_t *right, const int &length) {
-//      if (buffSDWriterI16) {
-//        //Serial.println("AudioSDWriter: interleave via I16...");
-//        return buffSDWriterI16->interleaveAndWrite(left, right, length);
-//      } else if (buffSDWriterF32) {
-//        //Serial.println("AudioSDWriter: interleave via F32...");
-//        return buffSDWriterF32->interleaveAndWrite(left, right, length);
-//      } else {
-//        return 0;
-//      }
-//    }
-//    
-//    int writeOneChannel(float32_t *left, const int &length) {
-//      if (buffSDWriterI16) {
-//        return buffSDWriterI16->writeOneChannel(left, length);
-//      } else if (buffSDWriterF32) {
-//        return buffSDWriterF32->writeOneChannel(left, length);
-//      } else {
-//        return 0;
-//      }
-//    }
 
     int close(void) {
       if (buffSDWriter) {
