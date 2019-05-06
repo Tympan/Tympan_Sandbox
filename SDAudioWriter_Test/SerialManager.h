@@ -13,6 +13,7 @@ extern State_t myState;
 extern const int INPUT_PCBMICS;
 extern const int INPUT_MICJACK;
 extern const int INPUT_LINEIN_SE;
+extern const int INPUT_LINEIN_JACK;
 
 
 //Extern Functions
@@ -50,6 +51,7 @@ void SerialManager::printHelp(void) {
   myTympan.println("   C: Toggle printing of CPU and Memory usage");
   myTympan.println("   w: Switch Input to PCB Mics");
   myTympan.println("   W: Switch Input to Headset Mics");
+  myTympan.println("   e: Switch Input to LineIn on the Mic Jack");
   myTympan.print  ("   i: Input: Increase gain by "); myTympan.print(gainIncrement_dB); myTympan.println(" dB");
   myTympan.print  ("   I: Input: Decrease gain by "); myTympan.print(gainIncrement_dB); myTympan.println(" dB");
   myTympan.println("   p: SD: prepare for recording");
@@ -95,6 +97,11 @@ void SerialManager::respondToByte(char c) {
       setButtonState("configPCB",false);
       setButtonState("configHeadset",true);
       break;
+    case 'e':
+      myTympan.println("Received: Line-In on Jack");
+      setConfiguration(INPUT_LINEIN_JACK);
+      setButtonState("configPCB",false);
+      setButtonState("configHeadset",false);     
     case 'p':
       myTympan.println("Received: prepare SD for recording");
       //prepareSDforRecording();
@@ -152,6 +159,10 @@ void SerialManager::printFullGUIState(void) {
       setButtonState("configPCB",false); delay(10);
       setButtonState("configHeadset",true);
       break;
+    default:
+      setButtonState("configPCB",false); delay(10);
+      setButtonState("configHeadset",false);
+      break;     
   }
 }
 

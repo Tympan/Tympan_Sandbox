@@ -12,7 +12,7 @@
 #include <Tympan_Library.h>
 
 // State constants
-const int INPUT_PCBMICS = 0, INPUT_MICJACK = 1, INPUT_LINEIN_SE = 2;
+const int INPUT_PCBMICS = 0, INPUT_MICJACK = 1, INPUT_LINEIN_SE = 2, INPUT_LINEIN_JACK = 3;
 
 //define state
 #define NO_STATE (-1)
@@ -30,7 +30,7 @@ class State_t {
 
 
 //set the sample rate and block size
-const float sample_rate_Hz = 44117.0f ; //24000 or 44117 (or other frequencies in the table in AudioOutputI2S_F32)
+const float sample_rate_Hz = 96000.0f ; //24000 or 44117 (or other frequencies in the table in AudioOutputI2S_F32)
 const int audio_block_samples = 128;     //do not make bigger than AUDIO_BLOCK_SAMPLES from AudioStream.h (which is 128)  Must be 128 for SD recording.
 AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 
@@ -46,7 +46,7 @@ float output_volume_dB = 0.0; //volume setting of output PGA
 //create audio library objects for handling the audio
 Tympan                        myTympan(TympanRev::D);
 AudioInputI2S_F32             i2s_in(audio_settings);   //Digital audio input from the ADC
-AudioSynthWaveformSine_F32    sine1(audio_settings);
+AudioSynthWaveform_F32        waveform(audio_settings);
 AudioSDWriter_F32             audioSDWriter(audio_settings); //this is stereo by default
 AudioOutputI2S_F32            i2s_out(audio_settings);  //Digital audio output to the DAC.  Should always be last.
 
@@ -56,7 +56,7 @@ AudioConnection_F32           patchcord501(i2s_in, 1, i2s_out, 1);    //Right mi
 
 //Connect to SD logging
 AudioConnection_F32           patchcord600(i2s_in, 0, audioSDWriter, 0);   //connect Raw audio to left channel of SD writer
-AudioConnection_F32           patchcord601(sine1, 0, audioSDWriter, 1);   //connect Raw audio to right channel of SD writer
+AudioConnection_F32           patchcord601(waveform, 0, audioSDWriter, 1);   //connect Raw audio to right channel of SD writer
 
 
 //control display and serial interaction
@@ -110,7 +110,17 @@ void setConfiguration(int config) {
       //Store configuration
       current_config = INPUT_MICJACK;
       break;
+    case INPUT_LINEIN_JACK:
+      //Select Input
+      myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the line-input through holes
 
+      //Set input gain to 0dB
+      input_gain_dB = 0;
+      myTympan.setInputGain_dB(input_gain_dB);
+
+      //Store configuration
+      current_config = INPUT_LINEIN_JACK;
+      break;
     case INPUT_LINEIN_SE:
       //Select Input
       myTympan.inputSelect(TYMPAN_INPUT_LINE_IN); // use the line-input through holes
@@ -157,9 +167,10 @@ void setup() {
   audioSDWriter.setNumWriteChannels(2);             //this is also the defaullt, but you could set it to 2
   //audioSDWriter.setWriteSizeBytes(4*512);  //most efficient in 512 or bigger (always in multiples of 512?)
 
-  //setup sine wav (as a test signal
-  sine1.frequency(1000.0);
-  sine1.amplitude(0.1);
+  //setup saw wav (as a test signal)
+  waveform.oscillatorMode(AudioSynthWaveform_F32::OscillatorMode::OSCILLATOR_MODE_SAW);
+  waveform.frequency(1000.0);
+  waveform.amplitude(0.25);
   
   //End of setup
   BOTH_SERIAL.println("Setup: complete."); serialManager.printHelp();
@@ -275,21 +286,49 @@ void serviceSD(void) {
   static int write_counter = 0;
   static int max_max_bytes_written = 0;
   static int max_bytes_written = 0;
+  static int max_dT_micros = 0;
+  static int max_max_dT_micros = 0;
   int bytes_written = 0;
+  static float max_micros_per_byte = 0;
+  static float max_max_micros_per_byte = 0;
 
-  if ( (bytes_written = audioSDWriter.serviceSD()) > 0 ) {
+  unsigned long dT_micros = micros();
+  bytes_written = audioSDWriter.serviceSD();
+  dT_micros = micros() - dT_micros;
+
+  if ( bytes_written > 0 ) {
     //if we're here, data was written to the SD, so do some checking of the timing...
     write_counter++;
-    max_bytes_written = max(max_bytes_written, bytes_written);
+
+    float micros_per_byte = ((float)dT_micros)/((float)bytes_written);
     
-    if (write_counter > 1000) {
+    max_bytes_written = max(max_bytes_written, bytes_written);
+    max_dT_micros = max((int)max_dT_micros, (int)dT_micros);
+    max_micros_per_byte = max(micros_per_byte,max_micros_per_byte);
+    
+    //if (write_counter > 1000) {
+    if (dT_micros > 1000) {
       max_max_bytes_written = max(max_bytes_written,max_max_bytes_written);
+      max_max_dT_micros = max(max_dT_micros, max_max_dT_micros);
+      max_max_micros_per_byte = max(max_micros_per_byte, max_max_micros_per_byte);
+      
       Serial.print("serviceSD: bytes written = ");
       Serial.print(bytes_written); Serial.print(", ");
       Serial.print(max_bytes_written); Serial.print(", ");
-      Serial.print(max_max_bytes_written); Serial.println();
+      Serial.print(max_max_bytes_written); Serial.print(", ");
+      Serial.print("dT millis = "); 
+      Serial.print((float)dT_micros/1000.0,1); Serial.print(", ");
+      Serial.print((float)max_dT_micros/1000.0,1); Serial.print(", "); 
+      Serial.print((float)max_max_dT_micros/1000.0,1);Serial.print(", "); 
+      //Serial.print("micros per byte = "); 
+      //Serial.print(micros_per_byte,2); Serial.print(", ");
+      //Serial.print(max_micros_per_byte,1); Serial.print(", "); 
+      //Serial.print(max_max_micros_per_byte,1);Serial.print(", ");      
+      Serial.println();
       max_bytes_written = 0;
+      max_dT_micros = 0;
       write_counter = 0;
+      
     }
       
 

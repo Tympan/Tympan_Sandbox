@@ -49,7 +49,7 @@ class SDWriter : public Print
       bool returnVal = open(fname);
       if (isFileOpen()) { //true if file is open
         flag__fileIsWAV = true;
-        file.write(wavHeaderInt16(0),WAVheader_bytes); //initialize assuming zero length
+        file.write(wavHeaderInt16(0), WAVheader_bytes); //initialize assuming zero length
       }
       return returnVal;
     }
@@ -64,7 +64,7 @@ class SDWriter : public Print
 
       file.open(fname, O_RDWR | O_CREAT | O_TRUNC);
       //file.createContiguous(fname, PRE_ALLOCATE_SIZE); //alternative to the line above
-      
+
       return isFileOpen();
     }
 
@@ -75,7 +75,7 @@ class SDWriter : public Print
         //re-write the header with the correct file size
         uint32_t fileSize = file.fileSize();//SdFat_Gre_FatLib version of size();
         file.seekSet(0); //SdFat_Gre_FatLib version of seek();
-        file.write(wavHeaderInt16(fileSize),WAVheader_bytes); //write header with correct length
+        file.write(wavHeaderInt16(fileSize), WAVheader_bytes); //write header with correct length
         file.seekSet(fileSize);
       }
       file.close();
@@ -164,37 +164,46 @@ class SDWriter : public Print
     virtual Print* getSerial(void) {
       return serial_ptr;
     }
-    
-    int setNChanWAV(int nchan) { return WAV_nchan = nchan; };
-    float setSampleRateWAV(float sampleRate_Hz) { return WAV_sampleRate_Hz = sampleRate_Hz; }
-    void setParamsWAV(float sampleRate_Hz,int nchan) { setSampleRateWAV(sampleRate_Hz); setNChanWAV(nchan); }
-   
+
+    int setNChanWAV(int nchan) {
+      return WAV_nchan = nchan;
+    };
+    float setSampleRateWAV(float sampleRate_Hz) {
+      return WAV_sampleRate_Hz = sampleRate_Hz;
+    }
+    void setParamsWAV(float sampleRate_Hz, int nchan) {
+      setSampleRateWAV(sampleRate_Hz);
+      setNChanWAV(nchan);
+    }
+
     //modified from Walter at https://github.com/WMXZ-EU/microSoundRecorder/blob/master/audio_logger_if.h
-    char * wavHeaderInt16(const uint32_t fsize) { return wavHeaderInt16(WAV_sampleRate_Hz, WAV_nchan, fsize);  }
+    char * wavHeaderInt16(const uint32_t fsize) {
+      return wavHeaderInt16(WAV_sampleRate_Hz, WAV_nchan, fsize);
+    }
     char* wavHeaderInt16(const float32_t sampleRate_Hz, const int nchan, const uint32_t fileSize) {
       //const int fileSize = bytesWritten+44;
-      
+
       int fsamp = (int) sampleRate_Hz;
-      int nbits=16;
-      int nbytes=nbits/8;
-      int nsamp=(fileSize-WAVheader_bytes)/(nbytes*nchan);
-      
+      int nbits = 16;
+      int nbytes = nbits / 8;
+      int nsamp = (fileSize - WAVheader_bytes) / (nbytes * nchan);
+
       static char wheader[48]; // 44 for wav
-    
-      strcpy(wheader,"RIFF");
-      strcpy(wheader+8,"WAVE");
-      strcpy(wheader+12,"fmt ");
-      strcpy(wheader+36,"data");
-      *(int32_t*)(wheader+16)= 16;// chunk_size
-      *(int16_t*)(wheader+20)= 1; // PCM 
-      *(int16_t*)(wheader+22)=nchan;// numChannels 
-      *(int32_t*)(wheader+24)= fsamp; // sample rate 
-      *(int32_t*)(wheader+28)= fsamp*nbytes; // byte rate
-      *(int16_t*)(wheader+32)=nchan*nbytes; // block align
-      *(int16_t*)(wheader+34)=nbits; // bits per sample 
-      *(int32_t*)(wheader+40)=nsamp*nchan*nbytes; 
-      *(int32_t*)(wheader+4)=36+nsamp*nchan*nbytes; 
-    
+
+      strcpy(wheader, "RIFF");
+      strcpy(wheader + 8, "WAVE");
+      strcpy(wheader + 12, "fmt ");
+      strcpy(wheader + 36, "data");
+      *(int32_t*)(wheader + 16) = 16; // chunk_size
+      *(int16_t*)(wheader + 20) = 1; // PCM
+      *(int16_t*)(wheader + 22) = nchan; // numChannels
+      *(int32_t*)(wheader + 24) = fsamp; // sample rate
+      *(int32_t*)(wheader + 28) = fsamp * nbytes; // byte rate
+      *(int16_t*)(wheader + 32) = nchan * nbytes; // block align
+      *(int16_t*)(wheader + 34) = nbits; // bits per sample
+      *(int32_t*)(wheader + 40) = nsamp * nchan * nbytes;
+      *(int32_t*)(wheader + 4) = 36 + nsamp * nchan * nbytes;
+
       return wheader;
     }
 
@@ -261,7 +270,7 @@ class BufferedSDWriter_I16 : public SDWriter
     }
 
     virtual void copyToWriteBuffer(audio_block_f32_t *audio_blocks[], const int numChan) {
-      static unsigned long last_audio_block_id = 0;
+      static unsigned long last_audio_block_id[4];
       if (!write_buffer) return;
       if (numChan == 0) return;
 
@@ -270,7 +279,7 @@ class BufferedSDWriter_I16 : public SDWriter
       int nsamps = 0;
       for (int Ichan = 0; Ichan < numChan; Ichan++) {
         if (audio_blocks[Ichan]) { //looking for anything NOT null
-          any_data++; 
+          any_data++;
           nsamps = audio_blocks[Ichan]->length;
           //Serial.print("SDWriter: copyToWriteBuffer: good "); Serial.println(Ichan);
         }
@@ -284,19 +293,23 @@ class BufferedSDWriter_I16 : public SDWriter
         Serial.println(" channels.");
       }
 
-      
-      if (((audio_blocks[0]->id - last_audio_block_id) != 1) && (last_audio_block_id != 0)) {
-        Serial.print("SD Writer: data skip? This ID = ");
-        Serial.print(audio_blocks[0]->id);
-        Serial.print(", Previous ID = ");
-        Serial.println(last_audio_block_id);
+      //check to see if there have been any jumps in the data counters
+      for (int Ichan = 0; Ichan < min(numChan, 2); Ichan++) {
+        if (audio_blocks[Ichan] != NULL) {
+          if (((audio_blocks[Ichan]->id - last_audio_block_id[Ichan]) != 1) && (last_audio_block_id[Ichan] != 0)) {
+            Serial.print("SD Writer: chan ");
+            Serial.print(Ichan);
+            Serial.print(", data skip? This ID = ");
+            Serial.print(audio_blocks[Ichan]->id);
+            Serial.print(", Previous ID = ");
+            Serial.println(last_audio_block_id[Ichan]);
+          }
+          last_audio_block_id[Ichan] = audio_blocks[Ichan]->id;
+        }
       }
-      last_audio_block_id = audio_blocks[0]->id;
-      
-
 
       //how much data will we write
-      int estFinalWriteInd = bufferWriteInd + (numChan*nsamps);
+      int estFinalWriteInd = bufferWriteInd + (numChan * nsamps);
 
       //will we pass by the read index?
       bool flag_moveReadIndexToEndOfWrite = false;
@@ -312,7 +325,7 @@ class BufferedSDWriter_I16 : public SDWriter
         bufferWriteInd = 0;  //reset
 
         //recheck to see if we're going to pass by the read buffer index
-        estFinalWriteInd = bufferWriteInd + (numChan*nsamps);
+        estFinalWriteInd = bufferWriteInd + (numChan * nsamps);
         if ((bufferWriteInd < bufferReadInd) && (estFinalWriteInd > bufferReadInd)) {
           Serial.println("BufferedSDWriter_I16: WARNING: writing past the read index.");
           flag_moveReadIndexToEndOfWrite = true;
@@ -337,24 +350,65 @@ class BufferedSDWriter_I16 : public SDWriter
 
     //write buffered data if enough has accumulated
     virtual int writeBufferedData(void) {
+      const int max_writeSizeSamples = 8*writeSizeSamples;
       if (!write_buffer) return -1;
       int return_val = 0;
-      
+
       //if the write pointer has wrapped around, write the data
       if (bufferWriteInd < bufferReadInd) { //if the buffer has wrapped around
         //Serial.println("BuffSDI16: writing to end of buffer");
-        return_val += write((byte *)(write_buffer+bufferReadInd), 
-            (bufferEndInd-bufferReadInd)*sizeof(write_buffer[0]));
-        bufferReadInd = 0;  //jump back to beginning of buffer
-      }
+        //return_val += write((byte *)(write_buffer+bufferReadInd),
+        //    (bufferEndInd-bufferReadInd)*sizeof(write_buffer[0]));
+        //bufferReadInd = 0;  //jump back to beginning of buffer
 
-      //do we have enough data to write again?  If so, write the whole thing
-      if ((bufferWriteInd - bufferReadInd) >= writeSizeSamples) {   
+        int samplesAvail = bufferEndInd - bufferReadInd;
+        if (samplesAvail > 0) {
+          int samplesToWrite = min(samplesAvail, max_writeSizeSamples);
+          if (samplesToWrite >= writeSizeSamples) {
+            samplesToWrite = ((int)samplesToWrite / writeSizeSamples) * writeSizeSamples; //truncate to nearest whole number
+          }
+          if (samplesToWrite == 0) {
+            Serial.print("SD Writer: writeBuff1: samplesAvail, to Write: ");
+            Serial.print(samplesAvail); Serial.print(", ");
+            Serial.println(samplesToWrite);
+          }
+          return_val += write((byte *)(write_buffer + bufferReadInd), samplesToWrite * sizeof(write_buffer[0]));
+          if (return_val == 0) {
+            Serial.print("SDWriter: writeBuff1: samps to write, bytes written: "); Serial.print(samplesToWrite);
+            Serial.print(", "); Serial.println(return_val);
+          }
+          bufferReadInd += samplesToWrite;  //jump back to beginning of buffer
+          if (bufferReadInd == bufferEndInd) bufferReadInd = 0;
+        } else { 
+          //the read pointer is at the end of the buffer, so loop it back
+          bufferReadInd = 0; 
+        }
+      } else {
+        
+        //do we have enough data to write again?  If so, write the whole thing
+        int samplesAvail = bufferWriteInd - bufferReadInd;
+        if (samplesAvail >= writeSizeSamples) {
           //Serial.println("BuffSDI16: writing buffered data");
           //return_val = write((byte *)(write_buffer+buffer, writeSizeSamples * sizeof(write_buffer[0]));
-          return_val += write((byte *)(write_buffer+bufferReadInd), 
-            (bufferWriteInd-bufferReadInd)*sizeof(write_buffer[0]));
-          bufferReadInd = bufferWriteInd;  //increment to end of where it wrote
+  
+          //return_val += write((byte *)(write_buffer+bufferReadInd),
+          //  (bufferWriteInd-bufferReadInd)*sizeof(write_buffer[0]));
+          //bufferReadInd = bufferWriteInd;  //increment to end of where it wrote
+  
+          int samplesToWrite = min(samplesAvail, max_writeSizeSamples);
+          samplesToWrite = ((int)(samplesToWrite / writeSizeSamples)) * writeSizeSamples; //truncate to nearest whole number
+          if (samplesToWrite == 0) {
+            Serial.print("SD Writer: writeBuff2: samplesAvail, to Write: ");
+            Serial.print(samplesAvail); Serial.print(", ");
+            Serial.println(samplesToWrite);
+          }
+          return_val += write((byte *)(write_buffer + bufferReadInd), samplesToWrite * sizeof(write_buffer[0]));
+          if (return_val == 0) {
+            Serial.print("SDWriter: writeBuff2: samps to write, bytes written: "); Serial.print(samplesToWrite);
+            Serial.print(", "); Serial.println(return_val);
+          }
+          bufferReadInd += samplesToWrite;  //increment to end of where it wrote
+        }
       }
       return return_val;
     }
@@ -388,7 +442,7 @@ class BufferedSDWriter_I16 : public SDWriter
 
       //interleave the data into the buffer
       //Serial.println("BuffSDI16: buffering given F32...");
-      if ( (bufferWriteInd+nsamps) >= bufferLengthSamples) { //is there room?
+      if ( (bufferWriteInd + nsamps) >= bufferLengthSamples) { //is there room?
         bufferEndInd = bufferWriteInd; //save the end point of the written data
         bufferWriteInd = 0;  //reset
       }
@@ -401,18 +455,18 @@ class BufferedSDWriter_I16 : public SDWriter
       //if the write pointer has wrapped around, write the data
       if (bufferWriteInd < bufferReadInd) { //if the buffer has wrapped around
         //Serial.println("BuffSDI16: writing given F32...");
-        return_val = write((byte *)(write_buffer+bufferReadInd), 
-            (bufferEndInd-bufferReadInd)*sizeof(write_buffer[0]));
+        return_val = write((byte *)(write_buffer + bufferReadInd),
+                           (bufferEndInd - bufferReadInd) * sizeof(write_buffer[0]));
         bufferReadInd = 0;  //jump back to beginning of buffer
       }
 
       //do we have enough data to write again?  If so, write the whole thing
-      if ((bufferWriteInd - bufferReadInd) >= writeSizeSamples) {   
-          //Serial.println("BuffSDI16: writing given F32...");
-          //return_val = write((byte *)(write_buffer+buffer, writeSizeSamples * sizeof(write_buffer[0]));
-          return_val = write((byte *)(write_buffer+bufferReadInd), 
-            (bufferWriteInd-bufferReadInd)*sizeof(write_buffer[0]));
-          bufferReadInd = bufferWriteInd;  //increment to end of where it wrote
+      if ((bufferWriteInd - bufferReadInd) >= writeSizeSamples) {
+        //Serial.println("BuffSDI16: writing given F32...");
+        //return_val = write((byte *)(write_buffer+buffer, writeSizeSamples * sizeof(write_buffer[0]));
+        return_val = write((byte *)(write_buffer + bufferReadInd),
+                           (bufferWriteInd - bufferReadInd) * sizeof(write_buffer[0]));
+        bufferReadInd = bufferWriteInd;  //increment to end of where it wrote
       }
       return return_val;
     }
@@ -468,10 +522,10 @@ class BufferedSDWriter_I16 : public SDWriter
     int32_t bufferWriteInd = 0;
     int32_t bufferReadInd = 0;
     const int nBytesPerSample = 2;
-    #define bufferLengthBytes 150000
+#define bufferLengthBytes 150000
     int32_t bufferLengthSamples = bufferLengthBytes / nBytesPerSample;
     int32_t bufferEndInd = bufferLengthBytes / nBytesPerSample;
-    
+
 };
 
 //BufferedSDWriter_F32:  This is a drived class from SDWriter.  This class assumes that
