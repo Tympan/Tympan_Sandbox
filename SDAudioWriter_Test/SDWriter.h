@@ -13,20 +13,22 @@
 #include <SdFat_Gre.h>       //originally from https://github.com/greiman/SdFat  but class names have been modified to prevent collisions with Teensy Audio/SD libraries
 #include <Print.h>
 
-#define bufferLengthBytes 150000
+#define maxBufferLengthBytes 150000
 
 //some constants for the AudioSDWriter
 const int DEFAULT_SDWRITE_BYTES = 512;  //minmum of 512 bytes is most efficient for SD.  Only used for binary writes
 //const uint64_t PRE_ALLOCATE_SIZE = 40ULL << 20;// Preallocate 40MB file.
 
-//SDWriter:  This is a class to make it easier to write blocks of bytes, ints, or floats
-//  to the SD card.  It will write blocks of data of whatever the size, even if it is not
-//  most efficient for the SD card.
+//SDWriter:  This is a class to write blocks of bytes, chars, ints or floats to
+//  the SD card.  It will write blocks of data of whatever the size, even if it is not
+//  most efficient for the SD card.  This is a base class upon which other classes
+//  can inheret.  The derived classes can then do things more smartly, like write
+//  more efficient blocks of 512 bytes.
 //
 //  To handle the interleaving of multiple channels and to handle conversion to the
 //  desired write type (float32 -> int16) and to handle buffering so that the optimal
 //  number of bytes are written at once, use one of the derived classes such as
-//  BufferedSDWriter_I16 or BufferedSDWriter_F32
+//  BufferedSDWriter
 class SDWriter : public Print
 {
   public:
@@ -35,14 +37,10 @@ class SDWriter : public Print
       setSerial(_serial_ptr);
     };
     virtual ~SDWriter() {
-      if (isFileOpen()) {
-        close();
-      }
+      if (isFileOpen()) close();
     }
 
-    void setup(void) {
-      init();
-    }
+    void setup(void) { init(); }
     virtual void init() {
       if (!sd.begin()) sd.errorHalt(serial_ptr, "SDWriter: begin failed");
     }
@@ -58,21 +56,18 @@ class SDWriter : public Print
 
     bool open(char *fname) {
       if (sd.exists(fname)) {  //maybe this isn't necessary when using the O_TRUNC flag below
-        // The SD library writes new data to the end of the
-        // file, so to start a new recording, the old file
-        // must be deleted before new data is written.
+        // The SD library writes new data to the end of the file, so to start
+        //a new recording, the old file must be deleted before new data is written.
         sd.remove(fname);
       }
-
       file.open(fname, O_RDWR | O_CREAT | O_TRUNC);
       //file.createContiguous(fname, PRE_ALLOCATE_SIZE); //alternative to the line above
-
       return isFileOpen();
     }
 
 
     int close(void) {
-      //file.truncate();
+      //file.truncate(); 
       if (flag__fileIsWAV) {
         //re-write the header with the correct file size
         uint32_t fileSize = file.fileSize();//SdFat_Gre_FatLib version of size();
@@ -86,11 +81,8 @@ class SDWriter : public Print
     }
 
     bool isFileOpen(void) {
-      if (file.isOpen()) {
-        return true;
-      } else {
-        return false;
-      }
+      if (file.isOpen()) return true;
+      return false;
     }
 
     //This "write" is for compatibility with the Print interface.  Writing one
@@ -100,17 +92,12 @@ class SDWriter : public Print
       if (file.isOpen()) {
 
         // write all audio bytes (512 bytes is most efficient)
-        if (flagPrintElapsedWriteTime) {
-          usec = 0;
-        }
+        if (flagPrintElapsedWriteTime) { usec = 0; }
         file.write((byte *) (&foo), 1); //write one value
         return_val = 1;
 
         //write elapsed time only to USB serial (because only that is fast enough)
-        if (flagPrintElapsedWriteTime) {
-          Serial.print("SD, us=");
-          Serial.println(usec);
-        }
+        if (flagPrintElapsedWriteTime) { Serial.print("SD, us="); Serial.println(usec); }
       }
       return return_val;
     }
@@ -120,22 +107,16 @@ class SDWriter : public Print
     virtual size_t write(const uint8_t *buff, int nbytes) {
       size_t return_val = 0;
       if (file.isOpen()) {
-
-        // write all audio bytes (512 bytes is most efficient)
-        if (flagPrintElapsedWriteTime) {
-          usec = 0;
-        }
-        file.write((byte *)buff, nbytes);
-        return_val = nbytes;
-        nBlocksWritten++;
+        if (flagPrintElapsedWriteTime) { usec = 0; }
+        file.write((byte *)buff, nbytes); return_val = nbytes;
 
         //write elapsed time only to USB serial (because only that is fast enough)
-        if (flagPrintElapsedWriteTime) {
-          Serial.print("SD, us=");
-          Serial.println(usec);
-        }
+        if (flagPrintElapsedWriteTime) { Serial.print("SD, us="); Serial.println(usec); }
       }
       return return_val;
+    }
+    virtual size_t write(const char *buff, int nchar) { 
+      return write((uint8_t *)buff,nchar); 
     }
 
     //write Int16 buffer.
@@ -148,35 +129,13 @@ class SDWriter : public Print
       return write((const uint8_t *)buff, nsamps * sizeof(buff[0]));
     }
 
-    void enablePrintElapsedWriteTime(void) {
-      flagPrintElapsedWriteTime = true;
-    }
-    void disablePrintElapseWriteTime(void) {
-      flagPrintElapsedWriteTime = false;
-    }
-    unsigned long getNBlocksWritten(void) {
-      return nBlocksWritten;
-    }
-    void resetNBlocksWritten(void) {
-      nBlocksWritten = 0;
-    }
-    virtual void setSerial(Print *ptr) {
-      serial_ptr = ptr;
-    }
-    virtual Print* getSerial(void) {
-      return serial_ptr;
-    }
+    void setPrintElapsedWriteTime(bool flag) { flagPrintElapsedWriteTime = flag; }
+    
+    virtual void setSerial(Print *ptr) {  serial_ptr = ptr; }
+    virtual Print* getSerial(void) { return serial_ptr;  }
 
-    int setNChanWAV(int nchan) {
-      return WAV_nchan = nchan;
-    };
-    float setSampleRateWAV(float sampleRate_Hz) {
-      return WAV_sampleRate_Hz = sampleRate_Hz;
-    }
-    void setParamsWAV(float sampleRate_Hz, int nchan) {
-      setSampleRateWAV(sampleRate_Hz);
-      setNChanWAV(nchan);
-    }
+    int setNChanWAV(int nchan) { return WAV_nchan = nchan;  };
+    float setSampleRateWAV(float sampleRate_Hz) { return WAV_sampleRate_Hz = sampleRate_Hz; }
 
     //modified from Walter at https://github.com/WMXZ-EU/microSoundRecorder/blob/master/audio_logger_if.h
     char * wavHeaderInt16(const uint32_t fsize) {
@@ -208,27 +167,23 @@ class SDWriter : public Print
 
       return wheader;
     }
-
-
+    
   protected:
     //SdFatSdio sd; //slower
     SdFatSdioEX sd; //faster
     SdFile_Gre file;
     boolean flagPrintElapsedWriteTime = false;
     elapsedMicros usec;
-    unsigned long nBlocksWritten = 0;
     Print* serial_ptr = &Serial;
-    //WriteDataType writeDataType = WriteDataType::INT16;
     bool flag__fileIsWAV = false;
     const int WAVheader_bytes = 44;
     float WAV_sampleRate_Hz = 44100.0;
     int WAV_nchan = 2;
-
 };
 
-//BufferedSDWriter_I16:  This is a drived class from SDWriter.  This class assumes that
+//BufferedSDWriter:  This is a drived class from SDWriter.  This class assumes that
 //  you want to write Int16 data to the SD card.  You may give this class data that is
-//  either Int16 or Float32.  This class will also handle interleaving of two input
+//  either Int16 or Float32.  This class will also handle interleaving of several input
 //  channels.  This class will also buffer the data until the optimal (or desired) number
 //  of samples have been accumulated, which makes the SD writing more efficient.
 class BufferedSDWriter : public SDWriter
@@ -244,76 +199,36 @@ class BufferedSDWriter : public SDWriter
       setWriteSizeBytes(_writeSizeBytes);
     };
     ~BufferedSDWriter(void) {
+      delete ptr_zeros;
       delete write_buffer;
     }
 
+    //how many bytes should each write event be?  Set it here
     void setWriteSizeBytes(const int _writeSizeBytes) {
       setWriteSizeSamples(_writeSizeBytes / nBytesPerSample);
     }
     void setWriteSizeSamples(const int _writeSizeSamples) {
-      //ensure even number greater than 0
-      writeSizeSamples = max(2, 2 * int(_writeSizeSamples / 2));
+      writeSizeSamples = max(2, 2 * int(_writeSizeSamples / 2));//ensure even number >= 2
+    }
+    int getWriteSizeBytes(void) { return (getWriteSizeSamples() * nBytesPerSample); }
+    int getWriteSizeSamples(void) { return writeSizeSamples;  }
 
-      //create write buffer
-      if (write_buffer != 0) {
-        delete write_buffer;  //delete the old buffer
-      }
-      //write_buf fer = new int16_t[writeSizeSamples];
+
+    //allocate the buffer for storing all the samples between write events
+    int allocateBuffer(const int _nBytes = maxBufferLengthBytes) {
+      bufferLengthSamples = max(4,min(_nBytes,maxBufferLengthBytes) / nBytesPerSample);
+      if (write_buffer != 0) delete write_buffer;  //delete the old buffer
       write_buffer = new int16_t[bufferLengthSamples];
-
-      //reset the buffer index
-      bufferWriteInd = 0;
+      resetBuffer();
+      return (int)write_buffer;
     }
-    int getWriteSizeBytes(void) {
-      return (getWriteSizeSamples() * nBytesPerSample);
-    }
-    int getWriteSizeSamples(void) {
-      return writeSizeSamples;
-    }
-    void resetBuffer(void) {
-      bufferReadInd = 0; bufferWriteInd = 0;
-    }
+    void resetBuffer(void) { bufferReadInd = 0; bufferWriteInd = 0;  }
+ 
+    //here is how you send data to this class.  this doesn't write any data, it just stores data
+    virtual void copyToWriteBuffer(float32_t *ptr_audio[], const int nsamps, const int numChan) {
+      if (!write_buffer) {if (!allocateBuffer()) return; }; //try to allocate buffer, return if it doesn't work
 
-    virtual void copyToWriteBuffer(audio_block_f32_t *audio_blocks[], const int numChan) {
-      static unsigned long last_audio_block_id[4];
-      if (!write_buffer) return;
-      if (numChan == 0) return;
-
-      //is there any good data?
-      int any_data = 0;
-      int nsamps = 0;
-      for (int Ichan = 0; Ichan < numChan; Ichan++) {
-        if (audio_blocks[Ichan]) { //looking for anything NOT null
-          any_data++;
-          nsamps = audio_blocks[Ichan]->length;
-          //Serial.print("SDWriter: copyToWriteBuffer: good "); Serial.println(Ichan);
-        }
-      }
-      if (any_data == 0) return;  //if there's no data, return;
-      if (any_data < numChan) {
-        Serial.print("SDWriter: copyToWriteBuffer: only got ");
-        Serial.print(any_data);
-        Serial.println(" of ");
-        Serial.print(numChan);
-        Serial.println(" channels.");
-      }
-
-      //check to see if there have been any jumps in the data counters
-      for (int Ichan = 0; Ichan < min(numChan, 2); Ichan++) {
-        if (audio_blocks[Ichan] != NULL) {
-          if (((audio_blocks[Ichan]->id - last_audio_block_id[Ichan]) != 1) && (last_audio_block_id[Ichan] != 0)) {
-            Serial.print("SD Writer: chan ");
-            Serial.print(Ichan);
-            Serial.print(", data skip? This ID = ");
-            Serial.print(audio_blocks[Ichan]->id);
-            Serial.print(", Previous ID = ");
-            Serial.println(last_audio_block_id[Ichan]);
-          }
-          last_audio_block_id[Ichan] = audio_blocks[Ichan]->id;
-        }
-      }
-
-      //how much data will we write
+      //how much data will we write?
       int estFinalWriteInd = bufferWriteInd + (numChan * nsamps);
 
       //will we pass by the read index?
@@ -337,15 +252,19 @@ class BufferedSDWriter : public SDWriter
         }
       }
 
+      //make sure no null arrays
+      for (int Ichan=0; Ichan < numChan; Ichan++) {
+        if (!(ptr_audio[Ichan])) {
+          if (ptr_zeros == NULL) { ptr_zeros = new float32_t[nsamps](); } //creates and initializes to zero
+          ptr_audio[Ichan] = ptr_zeros;
+        }
+      }
+
       //now interleave the data into the buffer
       for (int Isamp = 0; Isamp < nsamps; Isamp++) {
         for (int Ichan = 0; Ichan < numChan; Ichan++) {
-          if (audio_blocks[Ichan]) { //not null
             //convert the F32 to Int16 and interleave
-            write_buffer[bufferWriteInd++] = (int16_t)(audio_blocks[Ichan]->data[Isamp] * 32767.0);
-          } else {
-            write_buffer[bufferWriteInd++] = 0;
-          }
+            write_buffer[bufferWriteInd++] = (int16_t)(ptr_audio[Ichan][Isamp]*32767.0);
         }
       }
 
@@ -527,124 +446,12 @@ class BufferedSDWriter : public SDWriter
     int32_t bufferWriteInd = 0;
     int32_t bufferReadInd = 0;
     const int nBytesPerSample = 2;
-    int32_t bufferLengthSamples = bufferLengthBytes / nBytesPerSample;
-    int32_t bufferEndInd = bufferLengthBytes / nBytesPerSample;
+    int32_t bufferLengthSamples = maxBufferLengthBytes / nBytesPerSample;
+    int32_t bufferEndInd = maxBufferLengthBytes / nBytesPerSample;
+    float32_t *ptr_zeros;
 
 };
 
-////BufferedSDWriter_F32:  This is a drived class from SDWriter.  This class assumes that
-////  you want to write float32 data to the SD card.  This class will handle interleaving
-////  of two input channels.  This class will also buffer the data until the optimal (or
-////  desired) number of samples have been accumulated, which makes the SD writing more efficient.
-//class BufferedSDWriter_F32 : public SDWriter
-//{
-//  public:
-//    BufferedSDWriter_F32() : SDWriter() {
-//      setWriteSizeBytes(DEFAULT_SDWRITE_BYTES);
-//    };
-//    BufferedSDWriter_F32(Print* _serial_ptr) : SDWriter(_serial_ptr) {
-//      setWriteSizeBytes(DEFAULT_SDWRITE_BYTES);
-//    };
-//    BufferedSDWriter_F32(Print* _serial_ptr, const int _writeSizeBytes) : SDWriter(_serial_ptr) {
-//      setWriteSizeBytes(DEFAULT_SDWRITE_BYTES);
-//    };
-//    ~BufferedSDWriter_F32(void) {
-//      delete write_buffer;
-//    }
-//
-//    void setWriteSizeBytes(const int _writeSizeBytes) {
-//      setWriteSizeSamples( _writeSizeBytes * nBytesPerSample);
-//    }
-//    void setWriteSizeSamples(const int _writeSizeSamples) {
-//      //ensure even number greater than 0
-//      writeSizeSamples = max(2, 2 * int(_writeSizeSamples / nBytesPerSample) );
-//
-//      //create write buffer
-//      if (write_buffer != 0) {
-//        delete write_buffer;  //delete the old buffer
-//      }
-//      write_buffer = new float32_t[writeSizeSamples];
-//
-//      //reset the buffer index
-//      bufferWriteInd = 0;
-//    }
-//    int getWriteSizeBytes(void) {
-//      return (getWriteSizeSamples() * nBytesPerSample);
-//    }
-//    int getWriteSizeSamples(void) {
-//      return writeSizeSamples;
-//    }
-//    void resetBuffer(void) {
-//      bufferReadInd = 0; bufferWriteInd = 0;
-//    }
-//
-//    //
-//    virtual void copyToWriteBuffer(audio_block_f32_t *audio_blocks[], const int numChan) {
-//      if (!write_buffer) return;
-//      Serial.print("BufferedSDWriter_F32: copyToBuffer: *** WRITE CODE HERE***");
-//    }
-//
-//    virtual int writeBufferedData(void) {
-//      if (!write_buffer) return -1;
-//      Serial.print("BufferedSDWriter_F32: writeBufferedData: *** WRITE CODE HERE***");
-//      return -1;
-//    }
-//
-//    //write two channels of float32 as float32
-//    virtual int interleaveAndWrite(float32_t *chan1, float32_t *chan2, int nsamps) {
-//      if (write_buffer == 0) return -1;
-//      int return_val = 0;
-//
-//      //interleave the data and write whenever the write buffer is full
-//      for (int Isamp = 0; Isamp < nsamps; Isamp++) {
-//        write_buffer[bufferWriteInd++] = chan1[Isamp];
-//        write_buffer[bufferWriteInd++] = chan2[Isamp];
-//
-//        //do we have enough data to write our block to SD?
-//        if (bufferWriteInd >= writeSizeSamples) {
-//          return_val = write((byte *)write_buffer, writeSizeSamples * sizeof(write_buffer[0]));
-//          bufferWriteInd = 0;  //jump back to beginning of buffer
-//        }
-//      }
-//      return return_val;
-//    }
-//
-//    //write one channel of float32 as float32
-//    virtual int writeOneChannel(float32_t *chan1, int nsamps) {
-//      if (write_buffer == 0) return -1;
-//      int return_val = 0;
-//
-//      if (nsamps == writeSizeSamples) {
-//        //special case where everything is the right size...it'll be fast!
-//        return write((byte *)chan1, writeSizeSamples * sizeof(chan1[0]));
-//      } else {
-//        //do the buffering and write when the buffer is full
-//
-//        for (int Isamp = 0; Isamp < nsamps; Isamp++) {
-//          //convert the F32 to Int16 and interleave
-//          write_buffer[bufferWriteInd++] = chan1[Isamp];
-//
-//          //do we have enough data to write our block to SD?
-//          if (bufferWriteInd >= writeSizeSamples) {
-//            return_val = write((byte *)write_buffer, writeSizeSamples * sizeof(write_buffer[0]));
-//            bufferWriteInd = 0;  //jump back to beginning of buffer
-//          }
-//        }
-//        return return_val;
-//      }
-//      return return_val;
-//    }
-//
-//  protected:
-//    int writeSizeSamples = 0;
-//    int32_t bufferWriteInd = 0;
-//    int32_t bufferReadInd = 0;
-//    float32_t *write_buffer = 0;
-//    const int nBytesPerSample = 4;
-//    int32_t bufferLengthSamples = bufferLengthBytes / nBytesPerSample;
-//    int32_t bufferEndInd = bufferLengthBytes / nBytesPerSample;
-//
-//};
 
 #endif
 
