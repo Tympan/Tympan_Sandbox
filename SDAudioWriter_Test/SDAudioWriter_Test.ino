@@ -11,11 +11,9 @@
 // Include all the of the needed libraries
 #include <Tympan_Library.h>
 
-// State constants
-const int INPUT_PCBMICS = 0, INPUT_MICJACK = 1, INPUT_LINEIN_SE = 2, INPUT_LINEIN_JACK = 3;
-
 //define state
 #define NO_STATE (-1)
+const int INPUT_PCBMICS = 0, INPUT_MICJACK = 1, INPUT_LINEIN_SE = 2, INPUT_LINEIN_JACK = 3;
 class State_t {
   public:
     int input_source = NO_STATE;
@@ -24,10 +22,6 @@ class State_t {
 //local files
 #include "AudioSDWriter.h"
 #include "SerialManager.h"
-
-//definitions for memory for SD writing
-#define MAX_F32_BLOCKS (60)      //Can't seem to use more than 192, so you could set it to 192.  Won't run at all if much above 400.  
-
 
 //set the sample rate and block size
 const float sample_rate_Hz = 96000.0f ; //24000 or 44117 (or other frequencies in the table in AudioOutputI2S_F32)
@@ -38,13 +32,12 @@ AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 String overall_name = String("Tympan: SD Audio Writer Tester");
 float default_input_gain_dB = 5.0f; //gain on the microphone
 float input_gain_dB = default_input_gain_dB;
-float vol_knob_gain_dB = 0.0; //will be overridden by volume knob, if used
-float output_volume_dB = 0.0; //volume setting of output PGA
+#define MAX_AUDIO_MEM 60
 
 // /////////// Define audio objects...they are configured later
 
 //create audio library objects for handling the audio
-Tympan                        myTympan(TympanRev::D);
+Tympan                        myTympan(TympanRev::D4);
 AudioInputI2S_F32             i2s_in(audio_settings);   //Digital audio input from the ADC
 AudioSynthWaveform_F32        waveform(audio_settings);
 AudioSDWriter_F32             audioSDWriter(audio_settings); //this is stereo by default
@@ -56,106 +49,71 @@ AudioConnection_F32           patchcord501(i2s_in, 1, i2s_out, 1);    //Right mi
 
 //Connect to SD logging
 AudioConnection_F32           patchcord600(i2s_in, 0, audioSDWriter, 0);   //connect Raw audio to left channel of SD writer
-AudioConnection_F32           patchcord601(waveform, 0, audioSDWriter, 1);   //connect Raw audio to right channel of SD writer
+AudioConnection_F32           patchcord601(i2s_in, 1, audioSDWriter, 1);   //connect Raw audio to right channel of SD writer
+//AudioConnection_F32           patchcord601(waveform, 0, audioSDWriter, 1);   //connect waveform audio to right channel of SD writer
 
 
 //control display and serial interaction
 bool enable_printCPUandMemory = false;
-void togglePrintMemoryAndCPU(void) {
-  enable_printCPUandMemory = !enable_printCPUandMemory;
-}; //"extern" let's be it accessible outside
-void setPrintMemoryAndCPU(bool state) {
-  enable_printCPUandMemory = state;
-};
-bool enable_printAveSignalLevels = false;
-bool printAveSignalLevels_as_dBSPL = false;
-void togglePrintAveSignalLevels(bool as_dBSPL) {
-  enable_printAveSignalLevels = !enable_printAveSignalLevels;
-  printAveSignalLevels_as_dBSPL = as_dBSPL;
-};
+void togglePrintMemoryAndCPU(void) {  enable_printCPUandMemory = !enable_printCPUandMemory; }; 
+void setPrintMemoryAndCPU(bool state) { enable_printCPUandMemory = state;};
 SerialManager serialManager;
 #define BOTH_SERIAL myTympan
 
 //keep track of state
 State_t myState;
 
-int current_config = 0;
 void setConfiguration(int config) {
-
-  //myTympan.volume_dB(-60.0); delay(50);  //mute the output audio
   myState.input_source = config;
 
   switch (config) {
     case INPUT_PCBMICS:
-      //Select Input
+      //Select Input and set gain
       myTympan.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the on-board microphones
-
-      //Set input gain to 0dB
       input_gain_dB = 15;
       myTympan.setInputGain_dB(input_gain_dB);
-
-      //Store configuration
-      current_config = INPUT_PCBMICS;
       break;
 
     case INPUT_MICJACK:
-      //Select Input
+      //Select Input and set gain
       myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_MIC); // use the mic jack
-      myTympan.setEnableStereoExtMicBias(true);
-
-      //Set input gain to 0dB
+      myTympan.setEnableStereoExtMicBias(true);  //put the mic bias on both channels
       input_gain_dB = default_input_gain_dB;
       myTympan.setInputGain_dB(input_gain_dB);
-
-      //Store configuration
-      current_config = INPUT_MICJACK;
       break;
+      
     case INPUT_LINEIN_JACK:
-      //Select Input
+      //Select Input and set gain
       myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the line-input through holes
-
-      //Set input gain to 0dB
       input_gain_dB = 0;
       myTympan.setInputGain_dB(input_gain_dB);
-
-      //Store configuration
-      current_config = INPUT_LINEIN_JACK;
       break;
+      
     case INPUT_LINEIN_SE:
-      //Select Input
+      //Select Input and set gain
       myTympan.inputSelect(TYMPAN_INPUT_LINE_IN); // use the line-input through holes
-
-      //Set input gain to 0dB
       input_gain_dB = default_input_gain_dB;
       myTympan.setInputGain_dB(input_gain_dB);
-
-      //Store configuration
-      current_config = INPUT_LINEIN_SE;
       break;
   }
-
-  //bring the output volume back up
-  //delay(50);  myTympan.volume_dB(output_volume_dB);  // output amp: -63.6 to +24 dB in 0.5dB steps.  uses signed 8-bit
-}
+ }
 
 // ///////////////// Main setup() and loop() as required for all Arduino programs
 
 // define the setup() function, the function that is called once when the device is booting
 void setup() {
   delay(100);
-
   myTympan.beginBothSerial(); delay(1000);
   BOTH_SERIAL.print(overall_name); BOTH_SERIAL.println(": setup():...");
   BOTH_SERIAL.print("Sample Rate (Hz): "); BOTH_SERIAL.println(audio_settings.sample_rate_Hz);
   BOTH_SERIAL.print("Audio Block Size (samples): "); BOTH_SERIAL.println(audio_settings.audio_block_samples);
 
-  //allocate the audio memory
-  AudioMemory_F32(MAX_F32_BLOCKS, audio_settings); //I can only seem to allocate 400 blocks
-  BOTH_SERIAL.println("Setup: memory allocated.");
+  //allocate the dynamically re-allocatable audio memory
+  AudioMemory_F32(MAX_AUDIO_MEM, audio_settings); 
 
   //activate the Tympan audio hardware
   myTympan.enable();        // activate AIC
-  myTympan.volume_dB(output_volume_dB);  // output amp: -63.6 to +24 dB in 0.5dB steps.  uses signed 8-bit
+  myTympan.volume_dB(0.0);  // output amp: -63.6 to +24 dB in 0.5dB steps.  uses signed 8-bit
 
   //Configure for Tympan PCB mics
   BOTH_SERIAL.println("Setup: Using Mic Jack with Mic Bias.");
@@ -165,7 +123,6 @@ void setup() {
   audioSDWriter.setSerial(&myTympan);
   audioSDWriter.setWriteDataType(AudioSDWriter::WriteDataType::INT16);  //this is the built-in the default, but here you could change it to FLOAT32
   audioSDWriter.setNumWriteChannels(2);             //this is also the defaullt, but you could set it to 2
-  //audioSDWriter.setWriteSizeBytes(4*512);  //most efficient in 512 or bigger (always in multiples of 512?)
 
   //setup saw wav (as a test signal)
   waveform.oscillatorMode(AudioSynthWaveform_F32::OscillatorMode::OSCILLATOR_MODE_SAW);
@@ -179,7 +136,6 @@ void setup() {
 
 // define the loop() function, the function that is repeated over and over for the life of the device
 void loop() {
-  //asm(" WFI");  //save power by sleeping.  Wakes when an interrupt is fired (usually by the audio subsystem...so every 256 audio samples)
 
   //respond to Serial commands
   if (Serial.available()) serialManager.respondToByte((char)Serial.read());   //USB Serial
@@ -238,13 +194,11 @@ void serviceLEDs(void) {
   loop_count++;
   
   if (audioSDWriter.getState() == AudioSDWriter::STATE::UNPREPARED) {
-    //myTympan.setRedLED(HIGH); myTympan.setAmberLED(LOW); //Turn ON RED
     if (loop_count > 200000) {  //slow toggle
       loop_count = 0;
       toggleLEDs(true,true); //blink both
     }
   } else if (audioSDWriter.getState() == AudioSDWriter::STATE::RECORDING) {
-    //myTympan.setRedLED(LOW); myTympan.setAmberLED(HIGH); //Go Amber
 
     //let's flicker the LEDs while writing
     loop_count++;
@@ -278,36 +232,30 @@ void toggleLEDs(const bool &useAmber, const bool &useRed) {
   if (!useAmber) myTympan.setAmberLED(false);
   if (!useRed) myTympan.setRedLED(false);
   
-  //Serial.println("toggleLEDs: toggled.");
 }
 
 #define PRINT_OVERRUN_WARNING 1   //set to 1 to print a warning that the there's been a hiccup in the writing to the SD.
 void serviceSD(void) {
-  static int write_counter = 0;
-  static int max_max_bytes_written = 0;
-  static int max_bytes_written = 0;
-  static int max_dT_micros = 0;
-  static int max_max_dT_micros = 0;
-  int bytes_written = 0;
-  static float max_micros_per_byte = 0;
-  static float max_max_micros_per_byte = 0;
+  static int max_max_bytes_written = 0; //for timing diagnotstics
+  static int max_bytes_written = 0; //for timing diagnotstics
+  static int max_dT_micros = 0; //for timing diagnotstics
+  static int max_max_dT_micros = 0; //for timing diagnotstics
+  static float max_micros_per_byte = 0; //for timing diagnotstics
+  static float max_max_micros_per_byte = 0; //for timing diagnotstics
 
-  unsigned long dT_micros = micros();
-  bytes_written = audioSDWriter.serviceSD();
-  dT_micros = micros() - dT_micros;
+  unsigned long dT_micros = micros();  //for timing diagnotstics
+  int bytes_written = audioSDWriter.serviceSD();
+  dT_micros = micros() - dT_micros;  //timing calculation
 
   if ( bytes_written > 0 ) {
-    //if we're here, data was written to the SD, so do some checking of the timing...
-    write_counter++;
-
     float micros_per_byte = ((float)dT_micros)/((float)bytes_written);
     
     max_bytes_written = max(max_bytes_written, bytes_written);
     max_dT_micros = max((int)max_dT_micros, (int)dT_micros);
     max_micros_per_byte = max(micros_per_byte,max_micros_per_byte);
     
-    //if (write_counter > 1000) {
-    if (dT_micros > 1000) {
+    if (dT_micros > 1000) {  //if the write took a while, print some diagnostic info
+      
       max_max_bytes_written = max(max_bytes_written,max_max_bytes_written);
       max_max_dT_micros = max(max_dT_micros, max_max_dT_micros);
       max_max_micros_per_byte = max(max_micros_per_byte, max_max_micros_per_byte);
@@ -326,12 +274,9 @@ void serviceSD(void) {
       //Serial.print(max_max_micros_per_byte,1);Serial.print(", ");      
       Serial.println();
       max_bytes_written = 0;
-      max_dT_micros = 0;
-      write_counter = 0;
-      
+      max_dT_micros = 0;     
     }
       
-
     //print a warning if there has been an SD writing hiccup
     if (PRINT_OVERRUN_WARNING) {
       //if (audioSDWriter.getQueueOverrun() || i2s_in.get_isOutOfMemory()) {
@@ -343,26 +288,7 @@ void serviceSD(void) {
         }
       }
     }
-
-    //print timing information to help debug hiccups in the audio.  Are the writes fast enough?  Are there overruns?
-    if (PRINT_FULL_SD_TIMING) {
-      Serial.print("SD Write Status: ");
-      //Serial.print(audioSDWriter.getQueueOverrun()); //zero means no overrun
-      //Serial.print(", ");
-      Serial.print(AudioMemoryUsageMax_F32());  //hopefully, is less than MAX_F32_BLOCKS
-      Serial.print(", ");
-      Serial.print(MAX_F32_BLOCKS);  // max possible memory allocation
-      Serial.print(", ");
-      Serial.println(i2s_in.get_isOutOfMemory());  //zero means i2s_input always had memory to work with.  Non-zero means it ran out at least once.
-
-      //Now that we've read the flags, reset them.
-      AudioMemoryUsageMaxReset_F32();
-    }
-
-    //audioSDWriter.clearQueueOverrun();
     i2s_in.clear_isOutOfMemory();
-  } else {
-    //no SD recording currently, so no SD action
   }
 }
 

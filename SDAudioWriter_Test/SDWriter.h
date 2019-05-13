@@ -1,9 +1,19 @@
 
 
 /*
-   Chip Audette, OpenAudio, Apr 2019
-
-   MIT License.  Use at your own risk.
+ * SDWriter.h containing SDWriter and BufferedSDWriter
+ * 
+ * Created: Chip Audette, OpenAudio, Apr 2019
+ * Purpose: These classes wrap lower-level SD libraries.  The purpose of these
+ *    wrapping classes is to provide functionality such as (1) writing audio in
+ *    WAV format, (2) writing in efficient 512B blocks, and (3) providing a big
+ *    memory buffer to the SD writing to help mitigate the occasional slow SD
+ *    writing operation.
+ *    
+ *    For a wrapper that works more directly with the Tympan/OpenAudio library,    
+ *    see the class AudioSDWriter in AudioSDWriter.h
+ *
+ * MIT License.  Use at your own risk.
 */
 
 
@@ -13,11 +23,10 @@
 #include <SdFat_Gre.h>       //originally from https://github.com/greiman/SdFat  but class names have been modified to prevent collisions with Teensy Audio/SD libraries
 #include <Print.h>
 
-#define maxBufferLengthBytes 150000
-
-//some constants for the AudioSDWriter
-const int DEFAULT_SDWRITE_BYTES = 512;  //minmum of 512 bytes is most efficient for SD.  Only used for binary writes
-//const uint64_t PRE_ALLOCATE_SIZE = 40ULL << 20;// Preallocate 40MB file.
+//set some constants
+#define maxBufferLengthBytes 150000    //size of big memroy buffer to smooth out slow SD write operations
+const int DEFAULT_SDWRITE_BYTES = 512; //target size for individual writes to the SD card.  Usually 512
+//const uint64_t PRE_ALLOCATE_SIZE = 40ULL << 20;// Preallocate 40MB file.  Not used.
 
 //SDWriter:  This is a class to write blocks of bytes, chars, ints or floats to
 //  the SD card.  It will write blocks of data of whatever the size, even if it is not
@@ -186,6 +195,12 @@ class SDWriter : public Print
 //  either Int16 or Float32.  This class will also handle interleaving of several input
 //  channels.  This class will also buffer the data until the optimal (or desired) number
 //  of samples have been accumulated, which makes the SD writing more efficient.
+//
+//  Note that "writeSizeBytes" is the size of an individual write operation to the SD
+//  card, which should normally be (I think) 512B or some multiple thereof.  This class
+//  also provides a big memory buffer for mitigating the effect of the occasional slow
+//  SD write operation.  The size of this buffer defaults to a very large size, as set
+//  by 
 class BufferedSDWriter : public SDWriter
 {
   public:
@@ -291,16 +306,16 @@ class BufferedSDWriter : public SDWriter
           if (samplesToWrite >= writeSizeSamples) {
             samplesToWrite = ((int)samplesToWrite / writeSizeSamples) * writeSizeSamples; //truncate to nearest whole number
           }
-          if (samplesToWrite == 0) {
-            Serial.print("SD Writer: writeBuff1: samplesAvail, to Write: ");
-            Serial.print(samplesAvail); Serial.print(", ");
-            Serial.println(samplesToWrite);
-          }
+          //if (samplesToWrite == 0) {
+          //  Serial.print("SD Writer: writeBuff1: samplesAvail, to Write: ");
+          //  Serial.print(samplesAvail); Serial.print(", ");
+          //  Serial.println(samplesToWrite);
+          //}
           return_val += write((byte *)(write_buffer + bufferReadInd), samplesToWrite * sizeof(write_buffer[0]));
-          if (return_val == 0) {
-            Serial.print("SDWriter: writeBuff1: samps to write, bytes written: "); Serial.print(samplesToWrite);
-            Serial.print(", "); Serial.println(return_val);
-          }
+          //if (return_val == 0) {
+          //  Serial.print("SDWriter: writeBuff1: samps to write, bytes written: "); Serial.print(samplesToWrite);
+          //  Serial.print(", "); Serial.println(return_val);
+          //}
           bufferReadInd += samplesToWrite;  //jump back to beginning of buffer
           if (bufferReadInd == bufferEndInd) bufferReadInd = 0;
         } else { 
@@ -337,108 +352,108 @@ class BufferedSDWriter : public SDWriter
       return return_val;
     }
 
-    virtual int interleaveAndWrite(int16_t *chan1, int16_t *chan2, int nsamps) {
-      //Serial.println("BuffSDI16: interleaveAndWrite given I16...");
-      Serial.println("BuffSDI16: interleave and write (I16 inputs).  UPDATE ME!!!");
-      if (!write_buffer) return -1;
-      int return_val = 0;
+//    virtual int interleaveAndWrite(int16_t *chan1, int16_t *chan2, int nsamps) {
+//      //Serial.println("BuffSDI16: interleaveAndWrite given I16...");
+//      Serial.println("BuffSDI16: interleave and write (I16 inputs).  UPDATE ME!!!");
+//      if (!write_buffer) return -1;
+//      int return_val = 0;
+//
+//      //interleave the data and write whenever the write buffer is full
+//      //Serial.println("BuffSDI16: buffering given I16...");
+//      for (int Isamp = 0; Isamp < nsamps; Isamp++) {
+//        write_buffer[bufferWriteInd++] = chan1[Isamp];
+//        write_buffer[bufferWriteInd++] = chan2[Isamp];
+//
+//        //do we have enough data to write our block to SD?
+//        if (bufferWriteInd >= writeSizeSamples) {
+//          //Serial.println("BuffSDI16: writing given I16...");
+//          return_val = write((byte *)write_buffer, writeSizeSamples * sizeof(write_buffer[0]));
+//          bufferWriteInd = 0;  //jump back to beginning of buffer
+//        }
+//      }
+//      return return_val;
+//    }
 
-      //interleave the data and write whenever the write buffer is full
-      //Serial.println("BuffSDI16: buffering given I16...");
-      for (int Isamp = 0; Isamp < nsamps; Isamp++) {
-        write_buffer[bufferWriteInd++] = chan1[Isamp];
-        write_buffer[bufferWriteInd++] = chan2[Isamp];
-
-        //do we have enough data to write our block to SD?
-        if (bufferWriteInd >= writeSizeSamples) {
-          //Serial.println("BuffSDI16: writing given I16...");
-          return_val = write((byte *)write_buffer, writeSizeSamples * sizeof(write_buffer[0]));
-          bufferWriteInd = 0;  //jump back to beginning of buffer
-        }
-      }
-      return return_val;
-    }
-
-    virtual int interleaveAndWrite(float32_t *chan1, float32_t *chan2, int nsamps) {
-      //Serial.println("BuffSDI16: interleaveAndWrite given F32...");
-      if (!write_buffer) return -1;
-      int return_val = 0;
-
-      //interleave the data into the buffer
-      //Serial.println("BuffSDI16: buffering given F32...");
-      if ( (bufferWriteInd + nsamps) >= bufferLengthSamples) { //is there room?
-        bufferEndInd = bufferWriteInd; //save the end point of the written data
-        bufferWriteInd = 0;  //reset
-      }
-      for (int Isamp = 0; Isamp < nsamps; Isamp++) {
-        //convert the F32 to Int16 and interleave
-        write_buffer[bufferWriteInd++] = (int16_t)(chan1[Isamp] * 32767.0);
-        write_buffer[bufferWriteInd++] = (int16_t)(chan2[Isamp] * 32767.0);
-      }
-
-      //if the write pointer has wrapped around, write the data
-      if (bufferWriteInd < bufferReadInd) { //if the buffer has wrapped around
-        //Serial.println("BuffSDI16: writing given F32...");
-        return_val = write((byte *)(write_buffer + bufferReadInd),
-                           (bufferEndInd - bufferReadInd) * sizeof(write_buffer[0]));
-        bufferReadInd = 0;  //jump back to beginning of buffer
-      }
-
-      //do we have enough data to write again?  If so, write the whole thing
-      if ((bufferWriteInd - bufferReadInd) >= writeSizeSamples) {
-        //Serial.println("BuffSDI16: writing given F32...");
-        //return_val = write((byte *)(write_buffer+buffer, writeSizeSamples * sizeof(write_buffer[0]));
-        return_val = write((byte *)(write_buffer + bufferReadInd),
-                           (bufferWriteInd - bufferReadInd) * sizeof(write_buffer[0]));
-        bufferReadInd = bufferWriteInd;  //increment to end of where it wrote
-      }
-      return return_val;
-    }
-
-    //write one channel of int16 as int16
-    virtual int writeOneChannel(int16_t *chan1, int nsamps) {
-      if (write_buffer == 0) return -1;
-      int return_val = 0;
-
-      if (nsamps == writeSizeSamples) {
-        //special case where everything is the right size...it'll be fast!
-        return write((byte *)chan1, writeSizeSamples * sizeof(chan1[0]));
-      } else {
-        //do the buffering and write when the buffer is full
-
-        for (int Isamp = 0; Isamp < nsamps; Isamp++) {
-          //convert the F32 to Int16 and interleave
-          write_buffer[bufferWriteInd++] = chan1[Isamp];
-
-          //do we have enough data to write our block to SD?
-          if (bufferWriteInd >= writeSizeSamples) {
-            return_val = write((byte *)write_buffer, writeSizeSamples * sizeof(write_buffer[0]));
-            bufferWriteInd = 0;  //jump back to beginning of buffer
-          }
-        }
-        return return_val;
-      }
-      return return_val;
-    }
-
-    //write one channel of float32 as int16
-    virtual int writeOneChannel(float32_t *chan1, int nsamps) {
-      if (write_buffer == 0) return -1;
-      int return_val = 0;
-
-      //interleave the data and write whenever the write buffer is full
-      for (int Isamp = 0; Isamp < nsamps; Isamp++) {
-        //convert the F32 to Int16 and interleave
-        write_buffer[bufferWriteInd++] = (int16_t)(chan1[Isamp] * 32767.0);
-
-        //do we have enough data to write our block to SD?
-        if (bufferWriteInd >= writeSizeSamples) {
-          return_val = write((byte *)write_buffer, writeSizeSamples * sizeof(write_buffer[0]));
-          bufferWriteInd = 0;  //jump back to beginning of buffer
-        }
-      }
-      return return_val;
-    }
+//    virtual int interleaveAndWrite(float32_t *chan1, float32_t *chan2, int nsamps) {
+//      //Serial.println("BuffSDI16: interleaveAndWrite given F32...");
+//      if (!write_buffer) return -1;
+//      int return_val = 0;
+//
+//      //interleave the data into the buffer
+//      //Serial.println("BuffSDI16: buffering given F32...");
+//      if ( (bufferWriteInd + nsamps) >= bufferLengthSamples) { //is there room?
+//        bufferEndInd = bufferWriteInd; //save the end point of the written data
+//        bufferWriteInd = 0;  //reset
+//      }
+//      for (int Isamp = 0; Isamp < nsamps; Isamp++) {
+//        //convert the F32 to Int16 and interleave
+//        write_buffer[bufferWriteInd++] = (int16_t)(chan1[Isamp] * 32767.0);
+//        write_buffer[bufferWriteInd++] = (int16_t)(chan2[Isamp] * 32767.0);
+//      }
+//
+//      //if the write pointer has wrapped around, write the data
+//      if (bufferWriteInd < bufferReadInd) { //if the buffer has wrapped around
+//        //Serial.println("BuffSDI16: writing given F32...");
+//        return_val = write((byte *)(write_buffer + bufferReadInd),
+//                           (bufferEndInd - bufferReadInd) * sizeof(write_buffer[0]));
+//        bufferReadInd = 0;  //jump back to beginning of buffer
+//      }
+//
+//      //do we have enough data to write again?  If so, write the whole thing
+//      if ((bufferWriteInd - bufferReadInd) >= writeSizeSamples) {
+//        //Serial.println("BuffSDI16: writing given F32...");
+//        //return_val = write((byte *)(write_buffer+buffer, writeSizeSamples * sizeof(write_buffer[0]));
+//        return_val = write((byte *)(write_buffer + bufferReadInd),
+//                           (bufferWriteInd - bufferReadInd) * sizeof(write_buffer[0]));
+//        bufferReadInd = bufferWriteInd;  //increment to end of where it wrote
+//      }
+//      return return_val;
+//    }
+//
+//    //write one channel of int16 as int16
+//    virtual int writeOneChannel(int16_t *chan1, int nsamps) {
+//      if (write_buffer == 0) return -1;
+//      int return_val = 0;
+//
+//      if (nsamps == writeSizeSamples) {
+//        //special case where everything is the right size...it'll be fast!
+//        return write((byte *)chan1, writeSizeSamples * sizeof(chan1[0]));
+//      } else {
+//        //do the buffering and write when the buffer is full
+//
+//        for (int Isamp = 0; Isamp < nsamps; Isamp++) {
+//          //convert the F32 to Int16 and interleave
+//          write_buffer[bufferWriteInd++] = chan1[Isamp];
+//
+//          //do we have enough data to write our block to SD?
+//          if (bufferWriteInd >= writeSizeSamples) {
+//            return_val = write((byte *)write_buffer, writeSizeSamples * sizeof(write_buffer[0]));
+//            bufferWriteInd = 0;  //jump back to beginning of buffer
+//          }
+//        }
+//        return return_val;
+//      }
+//      return return_val;
+//    }
+//
+//    //write one channel of float32 as int16
+//    virtual int writeOneChannel(float32_t *chan1, int nsamps) {
+//      if (write_buffer == 0) return -1;
+//      int return_val = 0;
+//
+//      //interleave the data and write whenever the write buffer is full
+//      for (int Isamp = 0; Isamp < nsamps; Isamp++) {
+//        //convert the F32 to Int16 and interleave
+//        write_buffer[bufferWriteInd++] = (int16_t)(chan1[Isamp] * 32767.0);
+//
+//        //do we have enough data to write our block to SD?
+//        if (bufferWriteInd >= writeSizeSamples) {
+//          return_val = write((byte *)write_buffer, writeSizeSamples * sizeof(write_buffer[0]));
+//          bufferWriteInd = 0;  //jump back to beginning of buffer
+//        }
+//      }
+//      return return_val;
+//    }
 
   protected:
     int writeSizeSamples = 0;

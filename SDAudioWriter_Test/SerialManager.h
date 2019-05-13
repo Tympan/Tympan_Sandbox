@@ -7,7 +7,6 @@
 //Extern variables
 extern Tympan myTympan;
 extern AudioSDWriter_F32 audioSDWriter;
-extern float vol_knob_gain_dB;
 extern float input_gain_dB;
 extern State_t myState;
 extern const int INPUT_PCBMICS;
@@ -20,12 +19,7 @@ extern const int INPUT_LINEIN_JACK;
 extern void setConfiguration(int);
 extern void togglePrintMemoryAndCPU(void);
 extern void setPrintMemoryAndCPU(bool);
-//extern void togglePrintAveSignalLevels(bool);
-//extern void beginRecordingProcess(void);
-//extern void stopRecording(void);
 extern void incrementInputGain(float);
-//extern void prepareSDforRecording(void);
-
 
 //now, define the Serial Manager class
 class SerialManager {
@@ -168,9 +162,7 @@ void SerialManager::printFullGUIState(void) {
 }
 
 void SerialManager::printGainSettings(void) {
-  myTympan.print("Vol Knob = ");
-  myTympan.print(vol_knob_gain_dB, 1);
-  myTympan.print(", Input PGA = ");
+  myTympan.print("Input PGA = ");
   myTympan.print(input_gain_dB, 1);
   myTympan.println();
 }
