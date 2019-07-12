@@ -8,6 +8,16 @@
 #include "AudioEffectCompWDRC_F32.h"    //change this if you change the name of the algorithm's source code filename
 typedef AudioEffectCompWDRC_F32 GainAlgorithm_t; //change this if you change the algorithm's class name
 
+#define MAX_DATASTREAM_LENGTH 1024
+#define DATASTREAM_START_CHAR (char)0x02
+#define DATASTREAM_SEPARATOR (char)0x03
+#define DATASTREAM_END_CHAR (char)0x04
+enum read_state_options {
+  SINGLE_CHAR,
+  STREAM_LENGTH,
+  STREAM_DATA
+};
+
 //now, define the Serial Manager class
 class SerialManager {
   public:
@@ -31,9 +41,12 @@ class SerialManager {
         feedbackCancelerR(_feedbackCancelR)
         {
           N_CHAN = n;
+          serial_read_state = SINGLE_CHAR;
         };
       
     void respondToByte(char c);
+    void processSingleCharacter(char c);
+    void processStream(void);
     void printHelp(void);
     void incrementChannelGain(int chan, float change_dB);
     void decreaseChannelGain(int chan);
@@ -43,6 +56,10 @@ class SerialManager {
 
     float channelGainIncrement_dB = 2.5f;  
     int N_CHAN;
+    int serial_read_state; // Are we reading one character at a time, or a stream?
+    char stream_data[MAX_DATASTREAM_LENGTH];
+    int stream_length;
+    int stream_chars_received;
   private:
     TympanBase &audioHardware;
     GainAlgorithm_t *gain_algorithmsL;  //point to first element in array of expanders
@@ -118,6 +135,61 @@ extern void configureLeftRightMixer(int);
 
 //switch yard to determine the desired action
 void SerialManager::respondToByte(char c) {
+  switch (serial_read_state) {
+    case SINGLE_CHAR:
+      if (c == DATASTREAM_START_CHAR) {
+        Serial.println("Start data stream.");
+        // Start a data stream:
+        serial_read_state = STREAM_LENGTH;
+        stream_chars_received = 0;
+      } else {
+        Serial.print("Processing character ");
+        Serial.println(c);
+        processSingleCharacter(c);
+      }
+      break;
+    case STREAM_LENGTH:
+      //Serial.print("Reading stream length char: ");
+      //Serial.print(c);
+      //Serial.print(" = ");
+      //Serial.println(c, HEX);
+      if (c == DATASTREAM_SEPARATOR) {
+        // Get the datastream length:
+        stream_length = *((int*)(stream_data));
+        serial_read_state = STREAM_DATA;
+        stream_chars_received = 0;
+        Serial.print("Stream length = ");
+        Serial.println(stream_length);
+      } else {
+        //Serial.println("End of stream length message");
+        stream_data[stream_chars_received] = c;
+        stream_chars_received++;
+      }
+      break;
+    case STREAM_DATA:
+      if (stream_chars_received < stream_length) {
+        stream_data[stream_chars_received] = c;
+        stream_chars_received++;        
+      } else {
+        if (c == DATASTREAM_END_CHAR) {
+          // successfully read the stream
+          Serial.println("Time to process stream!");
+          processStream();
+        } else {
+          audioHardware.print("ERROR: Expected string terminator ");
+          audioHardware.print(DATASTREAM_END_CHAR, HEX);
+          audioHardware.print("; found ");
+          audioHardware.print(c,HEX);
+          audioHardware.println(" instead.");
+        }
+        serial_read_state = SINGLE_CHAR;
+        stream_chars_received = 0;
+      }
+      break;
+  }
+}
+
+void SerialManager::processSingleCharacter(char c) {
   float old_val = 0.0, new_val = 0.0;
   switch (c) {
     case 'h': case '?':
@@ -334,6 +406,37 @@ void SerialManager::respondToByte(char c) {
       audioHardware.print("Received: Decreasing ADC HP Cutoff to "); audioHardware.print(audioHardware.getHPCutoff_Hz());audioHardware.println(" Hz");   
       break;
     }
+  }
+}
+
+void SerialManager::processStream(void) {
+  int idx = 0;
+  String streamType;
+  int tmpInt;
+  float tmpFloat;
+  
+  while (stream_data[idx] != DATASTREAM_SEPARATOR) {
+    streamType.append(stream_data[idx]);
+    idx++;
+  }
+  idx++; // move past the datastream separator
+
+  //audioHardware.print("Received stream: ");
+  //audioHardware.print(stream_data);
+
+  if (streamType == "wdrc") {    
+    audioHardware.println("Stream is of type 'wdrc'.");
+  } else if (streamType == "dsl") {
+    audioHardware.println("Stream is of type 'dsl'.");
+  } else if (streamType == "test") {    
+    audioHardware.println("Sream is of type 'test'.");
+    tmpInt = *((int*)(stream_data+idx)); idx = idx+4;
+    audioHardware.print("int is "); audioHardware.println(tmpInt);
+    tmpFloat = *((float*)(stream_data+idx)); idx = idx+4;
+    audioHardware.print("float is "); audioHardware.println(tmpFloat);
+  } else {
+    audioHardware.print("Unknown stream type: ");
+    audioHardware.println(streamType);
   }
 }
 
