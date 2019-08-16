@@ -53,6 +53,10 @@ class SerialManager {
     void set_N_CHAN(int _n_chan) { N_CHAN = _n_chan; };
     void printChanUpMsg(int N_CHAN);
     void printChanDownMsg(int N_CHAN);
+    void interpretStreamWDRC(int idx);
+    void interpretStreamDSL(int idx);
+    int readStreamIntArray(int idx, int* arr, int len);
+    int readStreamFloatArray(int idx, float* arr, int len);
 
     float channelGainIncrement_dB = 2.5f;  
     int N_CHAN;
@@ -426,10 +430,12 @@ void SerialManager::processStream(void) {
 
   if (streamType == "wdrc") {    
     audioHardware.println("Stream is of type 'wdrc'.");
+    interpretStreamWDRC(idx);
   } else if (streamType == "dsl") {
     audioHardware.println("Stream is of type 'dsl'.");
+    interpretStreamDSL(idx);
   } else if (streamType == "test") {    
-    audioHardware.println("Sream is of type 'test'.");
+    audioHardware.println("Stream is of type 'test'.");
     tmpInt = *((int*)(stream_data+idx)); idx = idx+4;
     audioHardware.print("int is "); audioHardware.println(tmpInt);
     tmpFloat = *((float*)(stream_data+idx)); idx = idx+4;
@@ -439,6 +445,95 @@ void SerialManager::processStream(void) {
     audioHardware.println(streamType);
   }
 }
+
+void SerialManager::interpretStreamWDRC(int idx) {
+  float attack, release, sampRate, maxdB, compRatioLow, kneepoint, compStartGain, compStartKnee, compRatioHigh, threshold;
+
+  attack        = *((float*)(stream_data+idx)); idx=idx+4;
+  release       = *((float*)(stream_data+idx)); idx=idx+4;
+  sampRate      = *((float*)(stream_data+idx)); idx=idx+4;
+  maxdB         = *((float*)(stream_data+idx)); idx=idx+4;
+  compRatioLow  = *((float*)(stream_data+idx)); idx=idx+4;
+  kneepoint     = *((float*)(stream_data+idx)); idx=idx+4;
+  compStartGain = *((float*)(stream_data+idx)); idx=idx+4;
+  compStartKnee = *((float*)(stream_data+idx)); idx=idx+4;
+  compRatioHigh = *((float*)(stream_data+idx)); idx=idx+4;
+  threshold     = *((float*)(stream_data+idx)); idx=idx+4;
+
+  /* Printing too much causes the teensy to freeze. 
+  audioHardware.println("New WDRC:");
+  audioHardware.print("  attack = "); audioHardware.println(attack); 
+  audioHardware.print("  release = "); audioHardware.println(release);
+  audioHardware.print("  sampRate = "); audioHardware.println(sampRate); 
+  audioHardware.print("  maxdB = "); audioHardware.println(maxdB); 
+  audioHardware.print("  compRatioLow = "); audioHardware.println(compRatioLow); 
+  audioHardware.print("  kneepoint = "); audioHardware.println(kneepoint); 
+  audioHardware.print("  compStartGain = "); audioHardware.println(compStartGain); 
+  audioHardware.print("  compStartKnee = "); audioHardware.println(compStartKnee); 
+  audioHardware.print("  compRatioHigh = "); audioHardware.println(compRatioHigh); 
+  audioHardware.print("  threshold = "); audioHardware.println(threshold); 
+  */
+  
+  audioHardware.println("SUCCESS.");    
+
+  /*
+  BTNRH_WDRC::CHA_WDRC gha = {attack, release, sampRate, maxdB, 
+    compRatioLow, kneepoint, compStartGain, compStartKnee, compRatioHigh, threshold};
+  */
+  
+  // Next step: use this new WDRC.
+}
+
+
+void SerialManager::interpretStreamDSL(int idx) {
+  float attack, release, maxdB;
+  int speaker, numChannels;
+
+  float freq[8];
+  float lowSPLRatio[8];
+  float expansionKneepoint[8];
+  float compStartGain[8];
+  float compRatio[8];
+  float compStartKnee[8];
+  float threshold[8];
+
+  attack        = *((float*)(stream_data+idx)); idx=idx+4;
+  release       = *((float*)(stream_data+idx)); idx=idx+4;
+  maxdB         = *((float*)(stream_data+idx)); idx=idx+4;
+  speaker       = *((int*)(stream_data+idx)); idx=idx+4;
+  numChannels   = *((int*)(stream_data+idx)); idx=idx+4;
+  idx = readStreamFloatArray(idx, freq, 8);
+  idx = readStreamFloatArray(idx, lowSPLRatio, 8);
+  idx = readStreamFloatArray(idx, expansionKneepoint, 8);
+  idx = readStreamFloatArray(idx, compStartGain, 8);
+  idx = readStreamFloatArray(idx, compRatio, 8);
+  idx = readStreamFloatArray(idx, compStartKnee, 8);
+  idx = readStreamFloatArray(idx, threshold, 8);
+
+  audioHardware.println("SUCCESS.");      
+}
+
+int SerialManager::readStreamIntArray(int idx, int* arr, int len) {
+  int i;
+  for (i=0; i<len; i++) {
+    arr[i] = *((int*)(stream_data+idx)); 
+    idx=idx+4;
+  }
+
+  return idx;
+}
+
+int SerialManager::readStreamFloatArray(int idx, float* arr, int len) {
+  int i;
+  for (i=0; i<len; i++) {
+    arr[i] = *((float*)(stream_data+idx)); 
+    idx=idx+4;
+  }
+
+  return idx;
+}
+
+
 
 void SerialManager::incrementChannelGain(int chan, float change_dB) {
   if (chan < N_CHAN) {
