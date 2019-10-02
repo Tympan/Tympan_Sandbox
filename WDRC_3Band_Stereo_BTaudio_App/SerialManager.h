@@ -53,8 +53,9 @@ class SerialManager {
     void set_N_CHAN(int _n_chan) { N_CHAN = _n_chan; };
     void printChanUpMsg(int N_CHAN);
     void printChanDownMsg(int N_CHAN);
-    void interpretStreamWDRC(int idx);
+    void interpretStreamGHA(int idx);
     void interpretStreamDSL(int idx);
+    void interpretStreamAFC(int idx);
     int readStreamIntArray(int idx, int* arr, int len);
     int readStreamFloatArray(int idx, float* arr, int len);
 
@@ -135,6 +136,9 @@ extern void togglePrintMemoryAndCPU(void);
 extern void togglePrintAveSignalLevels(bool);
 //extern void incrementDSLConfiguration(Stream *);
 extern void setDSLConfiguration(int);
+extern void updateDSL(BTNRH_WDRC::CHA_DSL);
+extern void updateGHA(BTNRH_WDRC::CHA_WDRC);
+extern void updateAFC(BTNRH_WDRC::CHA_AFC);
 extern void configureLeftRightMixer(int);
 
 //switch yard to determine the desired action
@@ -428,12 +432,15 @@ void SerialManager::processStream(void) {
   //audioHardware.print("Received stream: ");
   //audioHardware.print(stream_data);
 
-  if (streamType == "wdrc") {    
-    audioHardware.println("Stream is of type 'wdrc'.");
-    interpretStreamWDRC(idx);
+  if (streamType == "gha") {    
+    audioHardware.println("Stream is of type 'gha'.");
+    interpretStreamGHA(idx);
   } else if (streamType == "dsl") {
     audioHardware.println("Stream is of type 'dsl'.");
     interpretStreamDSL(idx);
+  } else if (streamType == "afc") {
+    audioHardware.println("Stream is of type 'afc'.");
+    interpretStreamAFC(idx);
   } else if (streamType == "test") {    
     audioHardware.println("Stream is of type 'test'.");
     tmpInt = *((int*)(stream_data+idx)); idx = idx+4;
@@ -446,7 +453,7 @@ void SerialManager::processStream(void) {
   }
 }
 
-void SerialManager::interpretStreamWDRC(int idx) {
+void SerialManager::interpretStreamGHA(int idx) {
   float attack, release, sampRate, maxdB, compRatioLow, kneepoint, compStartGain, compStartKnee, compRatioHigh, threshold;
 
   attack        = *((float*)(stream_data+idx)); idx=idx+4;
@@ -476,18 +483,16 @@ void SerialManager::interpretStreamWDRC(int idx) {
   
   audioHardware.println("SUCCESS.");    
 
-  /*
   BTNRH_WDRC::CHA_WDRC gha = {attack, release, sampRate, maxdB, 
     compRatioLow, kneepoint, compStartGain, compStartKnee, compRatioHigh, threshold};
-  */
-  
-  // Next step: use this new WDRC.
+
+  updateGHA(gha);
 }
 
 
 void SerialManager::interpretStreamDSL(int idx) {
   float attack, release, maxdB;
-  int speaker, numChannels;
+  int speaker, numChannels, i;
 
   float freq[8];
   float lowSPLRatio[8];
@@ -510,8 +515,55 @@ void SerialManager::interpretStreamDSL(int idx) {
   idx = readStreamFloatArray(idx, compStartKnee, 8);
   idx = readStreamFloatArray(idx, threshold, 8);
 
+  audioHardware.print("  freq = {"); 
+  audioHardware.print(freq[0]); 
+  for (i=1; i<8; i++) {
+    audioHardware.print(", "); audioHardware.print(freq[i]);
+  }
+  audioHardware.println("}");
+
+  /*
+  BTNRH_WDRC::CHA_DSL dsl = {
+    attack,  // attack (ms)
+    release,  // release (ms)
+    maxdB,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
+    speaker,    // 0=left, 1=right...ignored
+    numChannels,    //num channels used (must be less than MAX_CHAN constant set in the main program
+    freq,   // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
+    lowSPLRatio,   // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
+    expansionKneepoint,   // expansion-end kneepoint
+    compStartGain,   // compression-start gain
+    compRatio,   // compression ratio
+    compStartKnee,   // compression-start kneepoint (input dB SPL)
+    threshold    // output limiting threshold (comp ratio 10)
+  };
+  updateDSL(dsl);
+  */
+  
   audioHardware.println("SUCCESS.");      
 }
+
+void SerialManager::interpretStreamAFC(int idx) {
+  int default_to_active; //enable AFC at startup?  1=active. 0=disabled.
+  int afl;  //length (samples) of adaptive filter for modeling feedback path.
+  float mu; //mu, scale factor for how fast the adaptive filter adapts (bigger is faster)
+  float rho;  //rho, smoothing factor for estimating audio envelope (bigger is a longer average)
+  float eps;  //eps, when est the audio envelope, this is the min allowed level (avoids divide-by-zero)
+
+  default_to_active = *((int*)(stream_data+idx)); idx=idx+4;
+  afl               = *((int*)(stream_data+idx)); idx=idx+4;
+  mu                = *((float*)(stream_data+idx)); idx=idx+4;
+  rho               = *((float*)(stream_data+idx)); idx=idx+4;
+  eps               = *((float*)(stream_data+idx)); idx=idx+4;
+
+  BTNRH_WDRC::CHA_AFC afc = {default_to_active, afl, mu, rho, eps};
+
+  updateAFC(afc);
+
+  audioHardware.println("SUCCESS.");
+}
+
+
 
 int SerialManager::readStreamIntArray(int idx, int* arr, int len) {
   int i;

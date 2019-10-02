@@ -287,6 +287,18 @@ void setDSLConfiguration(int preset_ind) {
   configureLeftRightMixer(LEFTRIGHT_NORMAL);
 }
 
+void updateDSL(const BTNRH_WDRC::CHA_DSL &this_dsl) {
+  setupFromDSLandGHAandAFC(this_dsl, gha, afc, N_CHAN_MAX, audio_settings);
+}
+
+void updateGHA(const BTNRH_WDRC::CHA_WDRC &this_gha) {
+  setupFromDSLandGHAandAFC(dsl, this_gha, afc, N_CHAN_MAX, audio_settings);
+}
+
+void updateAFC(const BTNRH_WDRC::CHA_AFC &this_afc) {
+  setupFromDSLandGHAandAFC(dsl, gha, this_afc, N_CHAN_MAX, audio_settings);
+}
+
 void configureBroadbandWDRCs(float fs_Hz, const BTNRH_WDRC::CHA_WDRC &this_gha,
                              float vol_knob_gain_dB, AudioEffectCompWDRC_F32 &WDRC)
 {
