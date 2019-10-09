@@ -136,9 +136,9 @@ extern void togglePrintMemoryAndCPU(void);
 extern void togglePrintAveSignalLevels(bool);
 //extern void incrementDSLConfiguration(Stream *);
 extern void setDSLConfiguration(int);
-extern void updateDSL(BTNRH_WDRC::CHA_DSL);
-extern void updateGHA(BTNRH_WDRC::CHA_WDRC);
-extern void updateAFC(BTNRH_WDRC::CHA_AFC);
+extern void updateDSL(const BTNRH_WDRC::CHA_DSL &);
+extern void updateGHA(const BTNRH_WDRC::CHA_WDRC &);
+extern void updateAFC(const BTNRH_WDRC::CHA_AFC &);
 extern void configureLeftRightMixer(int);
 
 //switch yard to determine the desired action
@@ -483,7 +483,7 @@ void SerialManager::interpretStreamGHA(int idx) {
   
   audioHardware.println("SUCCESS.");    
 
-  BTNRH_WDRC::CHA_WDRC gha = {attack, release, sampRate, maxdB, 
+  const BTNRH_WDRC::CHA_WDRC gha = {attack, release, sampRate, maxdB, 
     compRatioLow, kneepoint, compStartGain, compStartKnee, compRatioHigh, threshold};
 
   updateGHA(gha);
@@ -522,23 +522,36 @@ void SerialManager::interpretStreamDSL(int idx) {
   }
   audioHardware.println("}");
 
-  /*
+//  audioHardware.print("  freq = {"); 
+//  audioHardware.print(lowSPLRatio[0]); 
+//  for (i=1; i<8; i++) {
+//    audioHardware.print(", "); audioHardware.print(lowSPLRatio[i]);
+//  }
+//  audioHardware.println("}");
+//
+//  audioHardware.print("  freq = {"); 
+//  audioHardware.print(expansionKneepoint[0]); 
+//  for (i=1; i<8; i++) {
+//    audioHardware.print(", "); audioHardware.print(expansionKneepoint[i]);
+//  }
+//  audioHardware.println("}");
+
   BTNRH_WDRC::CHA_DSL dsl = {
     attack,  // attack (ms)
     release,  // release (ms)
     maxdB,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
     speaker,    // 0=left, 1=right...ignored
     numChannels,    //num channels used (must be less than MAX_CHAN constant set in the main program
-    freq,   // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
-    lowSPLRatio,   // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
-    expansionKneepoint,   // expansion-end kneepoint
-    compStartGain,   // compression-start gain
-    compRatio,   // compression ratio
-    compStartKnee,   // compression-start kneepoint (input dB SPL)
-    threshold    // output limiting threshold (comp ratio 10)
+    *freq,   // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
+    *lowSPLRatio,   // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
+    *expansionKneepoint,   // expansion-end kneepoint
+    *compStartGain,   // compression-start gain
+    *compRatio,   // compression ratio
+    *compStartKnee,   // compression-start kneepoint (input dB SPL)
+    *threshold    // output limiting threshold (comp ratio 10)
   };
   updateDSL(dsl);
-  */
+
   
   audioHardware.println("SUCCESS.");      
 }
@@ -557,9 +570,8 @@ void SerialManager::interpretStreamAFC(int idx) {
   eps               = *((float*)(stream_data+idx)); idx=idx+4;
 
   BTNRH_WDRC::CHA_AFC afc = {default_to_active, afl, mu, rho, eps};
-
   updateAFC(afc);
-
+  
   audioHardware.println("SUCCESS.");
 }
 
