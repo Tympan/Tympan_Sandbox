@@ -320,7 +320,64 @@ void SerialManager::processSingleCharacter(char c) {
                           "{'name':'High Gain', 'buttons':[{'label': '-', 'cmd': '#'},{'label': '+', 'cmd': '3'}]},"
                           "{'name':'Mid Gain', 'buttons':[{'label': '-', 'cmd': '@'},{'label': '+', 'cmd': '2'}]},"
                           "{'name':'Low Gain', 'buttons':[{'label': '-', 'cmd': '!'},{'label': '+', 'cmd': '1'}]}"                          
-                      "]}"
+                      "]},"
+                      "{'title':'Prescription','cards':["
+                          "{'name':'Additional Pages','toggles':["
+                          "{'label': 'Boys Town Multiband Compression', 'pagename': 'BOYSTOWN_PAGE_DSL', 'id':'ADD_BOYSTOWN_DSL'},"
+                          "{'label': 'Boys Town Broadband Output Compression', 'pagename': 'BOYSTOWN_PAGE_WDRC', 'id': 'ADD_BOYSTOWN_WDRC'},"
+                          "{'label': 'Boys Town Adaptive Feedback Cancelation', 'pagename': 'BOYSTOWN_PAGE_AFC', 'id': 'ADD_BOYSTOWN_AFC'},"
+                          "{'label': 'Boys Town Plot', 'pagename': 'BOYSTOWN_PAGE_PLOT', 'id': 'ADD_BOYSTOWN_PLOT'}"
+                          "], 'submitButton':{'prefix': 'Add Pages'}}"
+                      "]},"
+                        "{'title': 'Boys Town Algorithm','cards': ["
+                            "{'name': 'Multiband Compression','inputs': ["
+                                "{'label': 'Attack (msec)', 'type': 'float', 'value': 30},"
+                                "{'label': 'Release (msec)', 'type': 'float', 'value': 300},"
+                                "{'label': 'Number of Channels (1-8)', 'type': 'int', 'value': 8, 'disabled': true},"
+                                "{'label': 'Output at Full Scale (db SPL)', 'type': 'float', 'value': 115},"
+                                "{'label': 'Band Data', 'type': 'grid', 'numRows': 8, 'indexLabel': 'Band', 'columns': ["
+                                        "{'label': 'Crossover Frequency (Hz)', 'type': 'int', 'values': [0, 317, 503, 798, 1265, 2006, 3181, 5045]},"
+                                        "{'label': 'Low SPL: Compression Ratio', 'type': 'float', 'values': [0.57, 0.57, 0.57, 0.57, 0.57, 0.57, 0.57, 0.57]},"
+                                        "{'label': 'Low SPL: End Knee (dB SPL)', 'type': 'float', 'values': [45.0, 45.0, 33.0, 32.0, 36.0, 34.0, 36.0, 40.0]},"
+                                        "{'label': 'Linear Region: Gain (dB)', 'type': 'float', 'values': [20.0, 20.0, 25.0, 30.0, 30.0, 30.0, 30.0, 30.0]},"
+                                        "{'label': 'Compression: Start Knee (dB SPL)', 'type': 'float', 'values': [20.0, 20.0, 25.0, 30.0, 30.0, 30.0, 30.0, 30.0]},"
+                                        "{'label': 'Compression: Ratio', 'type': 'float', 'values': [1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5]},"
+                                        "{'label': 'Limiter: Threshold (dB SPL)', 'type': 'float', 'values': [90.0, 90.0, 90.0, 90.0, 90.0, 91.0, 92.0, 93.0]}"
+                                "]}"
+                              "],"      
+                              "'submitButton': {'prefix': 'dsl'}}"
+                          "]"
+                        "},"
+                    "{'title': 'Boys Town Algorithm','cards': ["
+                    "{'name': 'Broadband Output Compression','inputs': ["
+                        "{'label': 'Attack (msec)', 'type': 'float', 'value': 5},"
+                        "{'label': 'Release (msec)', 'type': 'float', 'value': 300},"
+                        "{'label': 'Low SPL: Compression Ratio', 'type': 'float', 'value': 1.0},"
+                        "{'label': 'Low SPL: End Knee (dB SPL)', 'type': 'float', 'value': 0.0},"
+                        "{'label': 'Linear Region: Gain (dB)', 'type': 'float', 'value': 0},"
+                        "{'label': 'Compression: Start Knee (dB SPL)', 'type': 'float', 'value': 115},"
+                        "{'label': 'Compression: Ratio', 'type': 'float', 'value': 1},"
+                        "{'label': 'Limiter: Threshold (dB SPL)', 'type': 'float', 'value': 98.0}"
+                        "],"
+                      "'submitButton': {'prefix': 'gha'}}"
+                  "]"
+                "},"
+                      "{'title': 'Boys Town Algorithm','cards': ["
+                    "{'name': 'Adaptive Feedback Cancelation','inputs': ["
+                        "{'label': 'Enable (1=yes, 0=no)', 'type': 'int', 'value': 1},"
+                        "{'label': 'Filter Length (samples, 0-256)', 'type': 'int', 'value': 100},"
+                        "{'label': 'Adaptation Factor (mu, 0.0-1.0)', 'type': 'float', 'value': 0.00100},"
+                        "{'label': 'Smoothing Factor (rho, 0.0-1.0)', 'type': 'float', 'value': 0.90},"
+                        "{'label': 'Min Allowed Envelope (eps, 0-1.0)', 'type': 'float', 'value': 0.008}"
+                     " ],"
+                      "'submitButton': {'prefix': 'afc'}}"
+                  "]"
+                "},"
+                  "{'title': 'Boys Town Algorithm','cards': ["
+                      "{'name': 'Frequency v. Output Level',"
+                      "'plot':{}}"
+                    "]"
+                  "}"
                     "]}";
       audioHardware.println(jsonConfig);
       break;
@@ -492,9 +549,9 @@ void SerialManager::interpretStreamGHA(int idx) {
 
 void SerialManager::interpretStreamDSL(int idx) {
   float attack, release, maxdB;
-  int speaker, numChannels, i;
+  int numChannels, i;
 
-  float freq[8];
+  int freq[8];
   float lowSPLRatio[8];
   float expansionKneepoint[8];
   float compStartGain[8];
@@ -504,16 +561,25 @@ void SerialManager::interpretStreamDSL(int idx) {
 
   attack        = *((float*)(stream_data+idx)); idx=idx+4;
   release       = *((float*)(stream_data+idx)); idx=idx+4;
-  maxdB         = *((float*)(stream_data+idx)); idx=idx+4;
-  speaker       = *((int*)(stream_data+idx)); idx=idx+4;
   numChannels   = *((int*)(stream_data+idx)); idx=idx+4;
-  idx = readStreamFloatArray(idx, freq, 8);
+  maxdB         = *((float*)(stream_data+idx)); idx=idx+4;
+
+  idx = readStreamIntArray(idx, freq, 8);
   idx = readStreamFloatArray(idx, lowSPLRatio, 8);
   idx = readStreamFloatArray(idx, expansionKneepoint, 8);
   idx = readStreamFloatArray(idx, compStartGain, 8);
   idx = readStreamFloatArray(idx, compRatio, 8);
   idx = readStreamFloatArray(idx, compStartKnee, 8);
   idx = readStreamFloatArray(idx, threshold, 8);
+
+//  audioHardware.print("attack");
+//  audioHardware.print(attack);
+//  audioHardware.print("release");
+//  audioHardware.print(release);
+//  audioHardware.print("#channels");
+//  audioHardware.print(numChannels);
+//  audioHardware.print("maxdB");
+//  audioHardware.print(maxdB);
 
   audioHardware.print("  freq = {"); 
   audioHardware.print(freq[0]); 
@@ -522,26 +588,18 @@ void SerialManager::interpretStreamDSL(int idx) {
   }
   audioHardware.println("}");
 
-//  audioHardware.print("  freq = {"); 
-//  audioHardware.print(lowSPLRatio[0]); 
-//  for (i=1; i<8; i++) {
-//    audioHardware.print(", "); audioHardware.print(lowSPLRatio[i]);
-//  }
-//  audioHardware.println("}");
-//
-//  audioHardware.print("  freq = {"); 
-//  audioHardware.print(expansionKneepoint[0]); 
-//  for (i=1; i<8; i++) {
-//    audioHardware.print(", "); audioHardware.print(expansionKneepoint[i]);
-//  }
-//  audioHardware.println("}");
+  audioHardware.print("  lowSPLRatio = {"); 
+  audioHardware.print(lowSPLRatio[0]); 
+  for (i=1; i<8; i++) {
+    audioHardware.print(", "); audioHardware.print(lowSPLRatio[i]);
+  }
+  audioHardware.println("}");
 
   BTNRH_WDRC::CHA_DSL dsl = {
     attack,  // attack (ms)
     release,  // release (ms)
-    maxdB,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
-    speaker,    // 0=left, 1=right...ignored
     numChannels,    //num channels used (must be less than MAX_CHAN constant set in the main program
+    maxdB,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
     *freq,   // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
     *lowSPLRatio,   // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
     *expansionKneepoint,   // expansion-end kneepoint
@@ -551,7 +609,6 @@ void SerialManager::interpretStreamDSL(int idx) {
     *threshold    // output limiting threshold (comp ratio 10)
   };
   updateDSL(dsl);
-
   
   audioHardware.println("SUCCESS.");      
 }
