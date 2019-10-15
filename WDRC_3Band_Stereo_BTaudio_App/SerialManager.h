@@ -213,11 +213,17 @@ void SerialManager::processSingleCharacter(char c) {
     case 'K':   //which is "shift k"
       incrementKnobGain(-channelGainIncrement_dB);  break;
     case '1':
-      incrementChannelGain(1-1, channelGainIncrement_dB); break;
+      incrementChannelGain(1-1, channelGainIncrement_dB);
+      setButtonText("lowGain",channelGainAsString(1-1));
+      break;
     case '2':
-      incrementChannelGain(2-1, channelGainIncrement_dB); break;
+      incrementChannelGain(2-1, channelGainIncrement_dB);
+      setButtonText("midGain",channelGainAsString(2-1));
+      break;
     case '3':
-      incrementChannelGain(3-1, channelGainIncrement_dB); break;
+      incrementChannelGain(3-1, channelGainIncrement_dB);
+      setButtonText("highGain",channelGainAsString(3-1));
+      break;
     case '4':
       incrementChannelGain(4-1, channelGainIncrement_dB); break;
     case '5':
