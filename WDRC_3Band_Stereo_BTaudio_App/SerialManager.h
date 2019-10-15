@@ -58,6 +58,9 @@ class SerialManager {
     void interpretStreamAFC(int idx);
     int readStreamIntArray(int idx, int* arr, int len);
     int readStreamFloatArray(int idx, float* arr, int len);
+    void setButtonState(String btnId, bool newState);
+    void setButtonText(String btnId, String text);
+    String channelGainAsString(int chan);
 
     float channelGainIncrement_dB = 2.5f;  
     int N_CHAN;
@@ -65,6 +68,7 @@ class SerialManager {
     char stream_data[MAX_DATASTREAM_LENGTH];
     int stream_length;
     int stream_chars_received;
+    float FAKE_GAIN_LEVEL[8] = {0.,0.,0.,0.,0.,0.,0.,0.};
   private:
     TympanBase &audioHardware;
     GainAlgorithm_t *gain_algorithmsL;  //point to first element in array of expanders
@@ -225,11 +229,17 @@ void SerialManager::processSingleCharacter(char c) {
     case '8':      
       incrementChannelGain(8-1, channelGainIncrement_dB); break;    
     case '!':  //which is "shift 1"
-      incrementChannelGain(1-1, -channelGainIncrement_dB); break;
+      incrementChannelGain(1-1, -channelGainIncrement_dB);
+      setButtonText("lowGain",channelGainAsString(1-1));
+      break;  
     case '@':  //which is "shift 2"
-      incrementChannelGain(2-1, -channelGainIncrement_dB); break;
+      incrementChannelGain(2-1, -channelGainIncrement_dB);
+      setButtonText("midGain",channelGainAsString(2-1));
+      break;  
     case '#':  //which is "shift 3"
-      incrementChannelGain(3-1, -channelGainIncrement_dB); break;
+      incrementChannelGain(3-1, -channelGainIncrement_dB);
+      setButtonText("highGain",channelGainAsString(3-1));
+      break;  
     case '$':  //which is "shift 4"
       incrementChannelGain(4-1, -channelGainIncrement_dB); break;
     case '%':  //which is "shift 5"
@@ -310,7 +320,7 @@ void SerialManager::processSingleCharacter(char c) {
     {
       // Print the layout for the Tympan Remote app, in a JSON-ish string 
       // (single quotes are used here, whereas JSON spec requires double quotes.  The app converts ' to " before parsing the JSON string).  
-      char jsonConfig[] = "JSON={'pages':["
+      char jsonConfig2[] = "JSON={'pages':["
                       "{'title':'Presets','cards':["
                           "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd'},{'label': 'Linear', 'cmd': 'D'}]},"
                           "{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q'},{'label': 'Mono','cmd': 's'},{'label': 'Mute','cmd': 'q'}]}"
@@ -383,6 +393,23 @@ void SerialManager::processSingleCharacter(char c) {
                           "], 'submitButton':{'prefix': 'Add Pages'}}"
                       "]}"
                     "]}";
+
+      char jsonConfig[] = "JSON={"
+        "'pages':["
+          "{'title':'Presets','cards':["
+              "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd'},{'label': 'Linear', 'cmd': 'D'}]},"
+              "{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q'},{'label': 'Mono','cmd': 's'},{'label': 'Mute','cmd': 'q'}]}"
+          "]},"
+          "{'title':'Tuner','cards':["
+              "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
+              "{'name':'High Gain', 'buttons':[{'label': '-', 'cmd': '#','width':'4'},{'id':'highGain', 'label': '', 'width':'4'},{'label': '+', 'cmd': '3','width':'4'}]},"
+              "{'name':'Mid Gain', 'buttons':[{'label': '-', 'cmd': '@','width':'4'},{'id':'midGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '2','width':'4'}]},"
+              "{'name':'Low Gain', 'buttons':[{'label': '-', 'cmd': '!','width':'4'},{'id':'lowGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '1','width':'4'}]}"                          
+          "]}"
+        "],"
+        "'prescription':{'type':'BoysTown','pages':['multiband','broadband','afc','plot']}"
+      "}";
+
       audioHardware.println(jsonConfig);
       break;
     }
@@ -665,7 +692,24 @@ void SerialManager::incrementChannelGain(int chan, float change_dB) {
     gain_algorithmsL[chan].incrementGain_dB(change_dB);
     gain_algorithmsR[chan].incrementGain_dB(change_dB);
     printGainSettings();  //in main sketch file
+    FAKE_GAIN_LEVEL[chan] += change_dB;
   }
+}
+
+String SerialManager::channelGainAsString(int chan) {
+  return String(FAKE_GAIN_LEVEL[chan],1);
+}
+
+void SerialManager::setButtonState(String btnId, bool newState) {
+  if (newState) {
+    audioHardware.println("STATE=BTN:" + btnId + ":1");
+  } else {
+    audioHardware.println("STATE=BTN:" + btnId + ":0");
+  }
+}
+
+void SerialManager::setButtonText(String btnId, String text) {
+  audioHardware.println("TEXT=BTN:" + btnId + ":"+text);
 }
 
 #endif
