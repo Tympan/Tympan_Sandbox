@@ -629,8 +629,9 @@ void SerialManager::interpretStreamDSL(int idx) {
   BTNRH_WDRC::CHA_DSL dsl = {
     attack,  // attack (ms)
     release,  // release (ms)
-    numChannels,    //num channels used (must be less than MAX_CHAN constant set in the main program
     maxdB,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
+    0,
+    numChannels,    //num channels used (must be less than MAX_CHAN constant set in the main program
     *freq,   // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
     *lowSPLRatio,   // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
     *expansionKneepoint,   // expansion-end kneepoint
