@@ -49,7 +49,7 @@ const int LEFTRIGHT_NORMAL=0, LEFTRIGHT_MONO=1, LEFTRIGHT_MUTE=2;
 #include "SerialManager.h"
 
 // define how to use Serial / Bluetooth messaging
-#define BOTH_SERIAL audioHardware
+#define BOTH_SERIAL myTympan
 
 const float sample_rate_Hz = 22050.0f ; //16000, 24000 or 44117.64706f (or other frequencies in the table in AudioOutputI2S_F32
 const int audio_block_samples = 16;  //do not make bigger than AUDIO_BLOCK_SAMPLES from AudioStream.h (which is 128)
@@ -58,8 +58,7 @@ AudioSettings_F32   audio_settings(sample_rate_Hz, audio_block_samples);
 // /////////// Define audio objects...they are configured later
 
 //create audio library objects for handling the audio
-TympanPins                    tympPins(TYMPAN_REV_D3);        //TYMPAN_REV_C or TYMPAN_REV_D
-TympanBase                    audioHardware(tympPins);
+Tympan                        myTympan(TympanRev::D);   //use TympanRev::D or TympanRev::C
 AudioInputI2S_F32             i2s_in(audio_settings);   //Digital audio input from the ADC
 AudioMixer4_F32               leftRightMixer[2];        //left-right mixer for the left output and for the right output
 AudioTestSignalGenerator_F32  audioTestGenerator(audio_settings); //keep this to be *after* the creation of the i2s_in object
@@ -160,7 +159,7 @@ void togglePrintAveSignalLevels(bool as_dBSPL) {
   enable_printAveSignalLevels = !enable_printAveSignalLevels;
   printAveSignalLevels_as_dBSPL = as_dBSPL;
 };
-SerialManager serialManager(audioHardware, N_CHAN_MAX,
+SerialManager serialManager(myTympan, N_CHAN_MAX,
       expCompLim[LEFT], expCompLim[RIGHT], 
       ampSweepTester, freqSweepTester, freqSweepTester_FIR,
       feedbackCancel, feedbackCancelR);
@@ -168,27 +167,27 @@ SerialManager serialManager(audioHardware, N_CHAN_MAX,
 //routine to setup the hardware
 void setupTympanHardware(void) {
   BOTH_SERIAL.println("Setting up Tympan Audio Board...");
-  audioHardware.enable(); // activate AIC
+  myTympan.enable(); // activate AIC
 
   //enable the Tympman to detect whether something was plugged inot the pink mic jack
-  audioHardware.enableMicDetect(true);
+  myTympan.enableMicDetect(true);
 
   //setup DC-blocking highpass filter running in the ADC hardware itself
   float cutoff_Hz = 70.0;  //set the default cutoff frequency for the highpass filter
-  audioHardware.setHPFonADC(true, cutoff_Hz, audio_settings.sample_rate_Hz); //set to false to disble
-  //BOTH_SERIAL.print("Setting HP Filter in hardware at "); BOTH_SERIAL.print(audioHardware.getHPCutoff_Hz()); BOTH_SERIAL.println(" Hz.");
+  myTympan.setHPFonADC(true, cutoff_Hz, audio_settings.sample_rate_Hz); //set to false to disble
+  //BOTH_SERIAL.print("Setting HP Filter in hardware at "); BOTH_SERIAL.print(myTympan.getHPCutoff_Hz()); BOTH_SERIAL.println(" Hz.");
 
   //Choose the desired audio input on the Typman...this will be overridden by the serviceMicDetect() in loop()
-  //audioHardware.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the on-board micropphones
-  audioHardware.inputSelect(TYMPAN_INPUT_JACK_AS_MIC); audioHardware.setEnableStereoExtMicBias(true); // use the microphone jack - defaults to mic bias 2.5V
-  //audioHardware.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the microphone jack - defaults to mic bias OFF
+  //myTympan.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the on-board micropphones
+  myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_MIC); myTympan.setEnableStereoExtMicBias(true); // use the microphone jack - defaults to mic bias 2.5V
+  //myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the microphone jack - defaults to mic bias OFF
 
   //Set the Bluetooth audio to go straight to the headphone amp, not through the Tympan software
-  audioHardware.mixBTAudioWithOutput(true);
+  myTympan.mixBTAudioWithOutput(true);
 
   //set volumes
-  audioHardware.volume_dB(0.f);  // -63.6 to +24 dB in 0.5dB steps.  uses signed 8-bit
-  audioHardware.setInputGain_dB(input_gain_dB); // set MICPGA volume, 0-47.5dB in 0.5dB setps
+  myTympan.volume_dB(0.f);  // -63.6 to +24 dB in 0.5dB steps.  uses signed 8-bit
+  myTympan.setInputGain_dB(input_gain_dB); // set MICPGA volume, 0-47.5dB in 0.5dB setps
 }
 
 
@@ -275,13 +274,13 @@ void setDSLConfiguration(int preset_ind) {
       current_dsl_config = preset_ind;
       //BOTH_SERIAL.println("setDSLConfiguration: Using DSL Preset A");
       setupFromDSLandGHAandAFC(dsl, gha, afc, N_CHAN_MAX, audio_settings);
-      audioHardware.setRedLED(true);  audioHardware.setAmberLED(false);
+      myTympan.setRedLED(true);  myTympan.setAmberLED(false);
       break;
     case (DSL_PRESET_B):
       current_dsl_config = preset_ind;
       //BOTH_SERIAL.println("setDSLConfiguration: Using DSL Preset B");
       setupFromDSLandGHAandAFC(dsl_fullon, gha_fullon, afc_fullon, N_CHAN_MAX, audio_settings);
-      audioHardware.setRedLED(false);  audioHardware.setAmberLED(true);
+      myTympan.setRedLED(false);  myTympan.setAmberLED(true);
       break;
   }
   configureLeftRightMixer(LEFTRIGHT_NORMAL);
@@ -386,7 +385,7 @@ void configureLeftRightMixer(int LEFTRIGHT_setting) {
 // define the setup() function, the function that is called once when the device is booting
 void setup() {
   //begin the serial comms
-  audioHardware.beginBothSerial(); delay(1000);
+  myTympan.beginBothSerial(); delay(1000);
   BOTH_SERIAL.print(overall_name); BOTH_SERIAL.println(": setup():...");
   BOTH_SERIAL.print("Sample Rate (Hz): "); BOTH_SERIAL.println(audio_settings.sample_rate_Hz);
   BOTH_SERIAL.print("Audio Block Size (samples): "); BOTH_SERIAL.println(audio_settings.audio_block_samples);
@@ -458,7 +457,7 @@ void servicePotentiometer(unsigned long curTime_millis) {
   if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
 
     //read potentiometer
-    float val = float(audioHardware.readPotentiometer()) / 1023.0; //0.0 to 1.0
+    float val = float(myTympan.readPotentiometer()) / 1023.0; //0.0 to 1.0
     val = (1.0 / 9.0) * (float)((int)(9.0 * val + 0.5)); //quantize so that it doesn't chatter...0 to 1.0
 
     //send the potentiometer value to your algorithm as a control parameter
@@ -512,7 +511,7 @@ void serviceMicDetect(unsigned long curTime_millis, unsigned long updatePeriod_m
   if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0; //handle wrap-around of the clock
   if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
 
-    cur_val = audioHardware.updateInputBasedOnMicDetect(); //if mic is plugged in, defaults to TYMPAN_INPUT_JACK_AS_MIC
+    cur_val = myTympan.updateInputBasedOnMicDetect(); //if mic is plugged in, defaults to TYMPAN_INPUT_JACK_AS_MIC
     if (cur_val != prev_val) {
       if (cur_val) {
         BOTH_SERIAL.println("serviceMicDetect: detected plug-in microphone!  External mic now active.");
@@ -639,4 +638,3 @@ void serviceBTAudio(void) {
   if (BTModu.connectionState() == BC127::SUCCESS) resetFlag = false;
 
 }
-
