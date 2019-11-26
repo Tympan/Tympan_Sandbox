@@ -275,10 +275,14 @@ void SerialManager::processSingleCharacter(char c) {
     case 'd':
       audioHardware.println("Received: changing to Preset A");
       setDSLConfiguration(0);
+      setButtonState("comp",1);
+      setButtonState("linear",0);
       break;      
     case 'D':
       audioHardware.println("Received: changing to Preset B");
       setDSLConfiguration(1);
+      setButtonState("comp",0);
+      setButtonState("linear",1);
       break;
     case 'F':
       //frequency sweep test...end-to-end
@@ -309,14 +313,23 @@ void SerialManager::processSingleCharacter(char c) {
     case 'q':
       configureLeftRightMixer(LEFTRIGHT_MUTE);
       audioHardware.println("Received: Muting audio.");
+      setButtonState("mute",1);
+      setButtonState("stereo",0);
+      setButtonState("mono",0);
       break;
     case 'Q':
       configureLeftRightMixer(LEFTRIGHT_NORMAL);
       audioHardware.println("Received: Stereo audio.");
+      setButtonState("mute",0);
+      setButtonState("stereo",1);
+      setButtonState("mono",0);
       break;  
     case 's':
       configureLeftRightMixer(LEFTRIGHT_MONO);
       audioHardware.println("Received: Mono audio.");
+      setButtonState("mute",0);
+      setButtonState("stereo",0);
+      setButtonState("mono",1);
       break;
     case 'S':
       configureLeftRightMixer(LEFTRIGHT_NORMAL);
@@ -326,85 +339,11 @@ void SerialManager::processSingleCharacter(char c) {
     {
       // Print the layout for the Tympan Remote app, in a JSON-ish string 
       // (single quotes are used here, whereas JSON spec requires double quotes.  The app converts ' to " before parsing the JSON string).  
-      char jsonConfig2[] = "JSON={'pages':["
-                      "{'title':'Presets','cards':["
-                          "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd'},{'label': 'Linear', 'cmd': 'D'}]},"
-                          "{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q'},{'label': 'Mono','cmd': 's'},{'label': 'Mute','cmd': 'q'}]}"
-                      "]},"
-                      "{'title':'Tuner','cards':["
-                          "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
-                          "{'name':'High Gain', 'buttons':[{'label': '-', 'cmd': '#'},{'label': '+', 'cmd': '3'}]},"
-                          "{'name':'Mid Gain', 'buttons':[{'label': '-', 'cmd': '@'},{'label': '+', 'cmd': '2'}]},"
-                          "{'name':'Low Gain', 'buttons':[{'label': '-', 'cmd': '!'},{'label': '+', 'cmd': '1'}]}"                          
-                      "]},"
-                      "{'title':'Prescription','cards':["
-                          "{'name':'Additional Pages','toggles':["
-                          "{'label': 'Boys Town Multiband Compression', 'pagename':" 
-                                       "{'title': 'Boys Town Algorithm','cards': ["
-                                        "{'name': 'Multiband Compression','inputs': ["
-                                            "{'label': 'Attack (msec)', 'type': 'float', 'value': 30},"
-                                            "{'label': 'Release (msec)', 'type': 'float', 'value': 300},"
-                                            "{'label': 'Number of Channels (1-8)', 'type': 'int', 'value': 8, 'disabled': true},"
-                                            "{'label': 'Output at Full Scale (db SPL)', 'type': 'float', 'value': 115},"
-                                            "{'label': 'Band Data', 'type': 'grid', 'numRows': 8, 'indexLabel': 'Band', 'columns': ["
-                                                    "{'label': 'Crossover Frequency (Hz)', 'type': 'int', 'values': [0, 317, 503, 798, 1265, 2006, 3181, 5045]},"
-                                                    "{'label': 'Low SPL: Compression Ratio', 'type': 'float', 'values': [0.57, 0.57, 0.57, 0.57, 0.57, 0.57, 0.57, 0.57]},"
-                                                    "{'label': 'Low SPL: End Knee (dB SPL)', 'type': 'float', 'values': [45.0, 45.0, 33.0, 32.0, 36.0, 34.0, 36.0, 40.0]},"
-                                                    "{'label': 'Linear Region: Gain (dB)', 'type': 'float', 'values': [20.0, 20.0, 25.0, 30.0, 30.0, 30.0, 30.0, 30.0]},"
-                                                    "{'label': 'Compression: Start Knee (dB SPL)', 'type': 'float', 'values': [20.0, 20.0, 25.0, 30.0, 30.0, 30.0, 30.0, 30.0]},"
-                                                    "{'label': 'Compression: Ratio', 'type': 'float', 'values': [1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5]},"
-                                                    "{'label': 'Limiter: Threshold (dB SPL)', 'type': 'float', 'values': [90.0, 90.0, 90.0, 90.0, 90.0, 91.0, 92.0, 93.0]}"
-                                            "]}"
-                                          "],"      
-                                          "'submitButton': {'prefix': 'dsl'}}"
-                                      "]"
-                                    "},"
-                          "'id':'ADD_BOYSTOWN_DSL'},"
-                          "{'label': 'Boys Town Broadband Output Compression', 'pagename':"
-                                    "{'title': 'Boys Town Algorithm','cards': ["
-                                      "{'name': 'Broadband Output Compression','inputs': ["
-                                          "{'label': 'Attack (msec)', 'type': 'float', 'value': 5},"
-                                          "{'label': 'Release (msec)', 'type': 'float', 'value': 300},"
-                                          "{'label': 'Low SPL: Compression Ratio', 'type': 'float', 'value': 1.0},"
-                                          "{'label': 'Low SPL: End Knee (dB SPL)', 'type': 'float', 'value': 0.0},"
-                                          "{'label': 'Linear Region: Gain (dB)', 'type': 'float', 'value': 0},"
-                                          "{'label': 'Compression: Start Knee (dB SPL)', 'type': 'float', 'value': 115},"
-                                          "{'label': 'Compression: Ratio', 'type': 'float', 'value': 1},"
-                                          "{'label': 'Limiter: Threshold (dB SPL)', 'type': 'float', 'value': 98.0}"
-                                          "],"
-                                        "'submitButton': {'prefix': 'gha'}}"
-                                    "]"
-                                  "},"
-                          "'id': 'ADD_BOYSTOWN_WDRC'},"
-                          "{'label': 'Boys Town Adaptive Feedback Cancelation', 'pagename':"
-                                    "{'title': 'Boys Town Algorithm','cards': ["
-                                      "{'name': 'Adaptive Feedback Cancelation','inputs': ["
-                                          "{'label': 'Enable (1=yes, 0=no)', 'type': 'int', 'value': 1},"
-                                          "{'label': 'Filter Length (samples, 0-256)', 'type': 'int', 'value': 100},"
-                                          "{'label': 'Adaptation Factor (mu, 0.0-1.0)', 'type': 'float', 'value': 0.00100},"
-                                          "{'label': 'Smoothing Factor (rho, 0.0-1.0)', 'type': 'float', 'value': 0.90},"
-                                          "{'label': 'Min Allowed Envelope (eps, 0-1.0)', 'type': 'float', 'value': 0.008}"
-                                       " ],"
-                                        "'submitButton': {'prefix': 'afc'}}"
-                                    "]"
-                                  "},"
-                          "'id': 'ADD_BOYSTOWN_AFC'},"
-                          "{'label': 'Boys Town Plot', 'pagename':"
-                                      "{'title': 'Boys Town Algorithm','cards': ["
-                                          "{'name': 'Frequency v. Output Level',"
-                                          "'plot':{}}"
-                                        "]"
-                                      "}," 
-                          "'id': 'ADD_BOYSTOWN_PLOT'}"
-                          "], 'submitButton':{'prefix': 'Add Pages'}}"
-                      "]}"
-                    "]}";
-
       char jsonConfig[] = "JSON={"
         "'pages':["
           "{'title':'Presets','cards':["
-              "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd'},{'label': 'Linear', 'cmd': 'D'}]},"
-              "{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q'},{'label': 'Mono','cmd': 's'},{'label': 'Mute','cmd': 'q'}]}"
+              "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'comp'},{'label': 'Linear', 'cmd': 'D', 'id': 'linear'}]},"
+              "{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q','id':'stereo'},{'label': 'Mono','cmd': 's','id':'mono'},{'label': 'Mute','cmd': 'q','id':'mute'}]}"
           "]},"
           "{'title':'Tuner','cards':["
               "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
@@ -417,6 +356,9 @@ void SerialManager::processSingleCharacter(char c) {
       "}";
 
       audioHardware.println(jsonConfig);
+      setButtonText("highGain",0);
+      setButtonText("midGain",0);
+      setButtonText("lowGain",0);
       break;
     }
     case 'l':
