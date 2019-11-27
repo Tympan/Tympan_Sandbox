@@ -3,6 +3,7 @@
 #define _SerialManager_h
 
 #include <Tympan_Library.h>
+#include "State.h"
 
 //add in the algorithm whose gains we wish to set via this SerialManager...change this if your gain algorithms class changes names!
 #include "AudioEffectCompWDRC_F32.h"    //change this if you change the name of the algorithm's source code filename
@@ -17,6 +18,11 @@ enum read_state_options {
   STREAM_LENGTH,
   STREAM_DATA
 };
+
+//objects in the main sketch that I want to call from here
+//extern Tympan myTympan;
+//extern AudioSDWriter_F32 audioSDWriter;
+extern State myState;
 
 //now, define the Serial Manager class
 class SerialManager {
@@ -58,6 +64,9 @@ class SerialManager {
     void interpretStreamAFC(int idx);
     int readStreamIntArray(int idx, int* arr, int len);
     int readStreamFloatArray(int idx, float* arr, int len);
+    void setFullGUIState(void);
+    void setButtonState_algPresets(void);
+    void setButtonState_inputMixer(void);
     void setButtonState(String btnId, bool newState);
     void setButtonText(String btnId, String text);
     String channelGainAsString(int chan);
@@ -108,7 +117,7 @@ void SerialManager::printHelp(void) {
   audioHardware.println("SerialManager Help: Available Commands:");
   audioHardware.println("   h: Print this help");
   audioHardware.println("   g: Print the gain settings of the device.");
-  audioHardware.println("   C: Toggle printing of CPU and Memory usage");
+  audioHardware.println("   c/C: Enable/disable printing of CPU and Memory");
   audioHardware.println("   l: Toggle printing of pre-gain per-channel signal levels (dBFS)");
   audioHardware.println("   L: Toggle printing of pre-gain per-channel signal levels (dBSPL, per DSL 'maxdB')");
   audioHardware.println("   A: Self-Generated Test: Amplitude sweep.  End-to-End Measurement.");
@@ -136,13 +145,12 @@ void SerialManager::printHelp(void) {
 extern void incrementKnobGain(float);
 extern void printGainSettings(void);
 extern void printGainSettings(void);
-extern void togglePrintMemoryAndCPU(void);
 extern void togglePrintAveSignalLevels(bool);
 //extern void incrementDSLConfiguration(Stream *);
 extern void setDSLConfiguration(int);
-extern void updateDSL(const BTNRH_WDRC::CHA_DSL &);
-extern void updateGHA(const BTNRH_WDRC::CHA_WDRC &);
-extern void updateAFC(const BTNRH_WDRC::CHA_AFC &);
+extern void updateDSL(BTNRH_WDRC::CHA_DSL &);
+extern void updateGHA(BTNRH_WDRC::CHA_WDRC &);
+extern void updateAFC(BTNRH_WDRC::CHA_AFC &);
 extern void configureLeftRightMixer(int);
 
 //switch yard to determine the desired action
@@ -269,21 +277,25 @@ void SerialManager::processSingleCharacter(char c) {
       while (!ampSweepTester.available()) {delay(100);};
       audioHardware.println("Press 'h' for help...");
       break;
-    case 'C': case 'c':
-      audioHardware.println("Received: toggle printing of memory and CPU usage.");
-      togglePrintMemoryAndCPU(); break;
+    case 'c':
+      Serial.println("Received: printing memory and CPU.");
+      myState.flag_printCPUandMemory = true;
+      //setButtonState("cpuStart",true);
+      break;
+    case 'C':
+      Serial.println("Received: stopping printing of memory and CPU.");
+      myState.flag_printCPUandMemory = false;
+      //setButtonState("cpuStart",false);
+      break;
     case 'd':
       audioHardware.println("Received: changing to Preset A");
-      setDSLConfiguration(0);
-      setButtonState("comp",1);
-      setButtonState("linear",0);
+      setDSLConfiguration(State::DSL_PRESET_A);
+      setButtonState_algPresets();
       break;      
     case 'D':
       audioHardware.println("Received: changing to Preset B");
-      setDSLConfiguration(1);
-      setButtonState("comp",0);
-      setButtonState("linear",1);
-      break;
+      setDSLConfiguration(State::DSL_PRESET_B);
+      setButtonState_algPresets();      break;
     case 'F':
       //frequency sweep test...end-to-end
       { //limit the scope of any variables that I create here
@@ -311,29 +323,24 @@ void SerialManager::processSingleCharacter(char c) {
       audioHardware.println("Press 'h' for help...");
       break; 
     case 'q':
-      configureLeftRightMixer(LEFTRIGHT_MUTE);
+      configureLeftRightMixer(State::INPUTMIX_MUTE);
       audioHardware.println("Received: Muting audio.");
-      setButtonState("mute",1);
-      setButtonState("stereo",0);
-      setButtonState("mono",0);
+      setButtonState_inputMixer();
       break;
     case 'Q':
-      configureLeftRightMixer(LEFTRIGHT_NORMAL);
+      configureLeftRightMixer(State::INPUTMIX_STEREO);
       audioHardware.println("Received: Stereo audio.");
-      setButtonState("mute",0);
-      setButtonState("stereo",1);
-      setButtonState("mono",0);
+      setButtonState_inputMixer();
       break;  
     case 's':
-      configureLeftRightMixer(LEFTRIGHT_MONO);
+      configureLeftRightMixer(State::INPUTMIX_MONO);
       audioHardware.println("Received: Mono audio.");
-      setButtonState("mute",0);
-      setButtonState("stereo",0);
-      setButtonState("mono",1);
+      setButtonState_inputMixer();
       break;
     case 'S':
-      configureLeftRightMixer(LEFTRIGHT_NORMAL);
+      configureLeftRightMixer(State::INPUTMIX_STEREO);
       audioHardware.println("Received: Stereo audio.");
+      setButtonState_inputMixer();
       break;   
     case 'J':
     {
@@ -342,8 +349,8 @@ void SerialManager::processSingleCharacter(char c) {
       char jsonConfig[] = "JSON={"
         "'pages':["
           "{'title':'Presets','cards':["
-              "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'comp'},{'label': 'Linear', 'cmd': 'D', 'id': 'linear'}]},"
-              "{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q','id':'stereo'},{'label': 'Mono','cmd': 's','id':'mono'},{'label': 'Mute','cmd': 'q','id':'mute'}]}"
+              "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'alg_preset0'},{'label': 'Linear', 'cmd': 'D', 'id': 'alg_preset1'}]},"
+              "{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q','id':'inp_stereo'},{'label': 'Mono','cmd': 's','id':'inp_mono'},{'label': 'Mute','cmd': 'q','id':'inp_mute'}]}"
           "]},"
           "{'title':'Tuner','cards':["
               "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
@@ -356,6 +363,8 @@ void SerialManager::processSingleCharacter(char c) {
       "}";
 
       audioHardware.println(jsonConfig);
+      delay(100);
+      setFullGUIState();
       setButtonText("highGain",0);
       setButtonText("midGain",0);
       setButtonText("lowGain",0);
@@ -519,7 +528,7 @@ void SerialManager::interpretStreamGHA(int idx) {
   
   audioHardware.println("SUCCESS.");    
 
-  const BTNRH_WDRC::CHA_WDRC gha = {attack, release, sampRate, maxdB, 
+  BTNRH_WDRC::CHA_WDRC gha = {attack, release, sampRate, maxdB, 
     compRatioLow, kneepoint, compStartGain, compStartKnee, compRatioHigh, threshold};
 
   updateGHA(gha);
@@ -647,6 +656,36 @@ void SerialManager::incrementChannelGain(int chan, float change_dB) {
 
 String SerialManager::channelGainAsString(int chan) {
   return String(FAKE_GAIN_LEVEL[chan],1);
+}
+
+void SerialManager::setFullGUIState(void) {
+  setButtonState_algPresets();
+  setButtonState_inputMixer();
+}
+
+void SerialManager::setButtonState_algPresets(void) {
+  setButtonState("alg_preset0",false);  delay(10);
+  setButtonState("alg_preset1",false); delay(10);
+  switch (myState.current_dsl_config) {
+    case (State::DSL_PRESET_A):
+      setButtonState("alg_preset0",true);  delay(10); break;
+    case (State::DSL_PRESET_B):
+      setButtonState("alg_preset1",true); delay(10); break;
+  }
+}
+
+void SerialManager::setButtonState_inputMixer(void) {
+  setButtonState("inp_stereo",false);  delay(10);
+  setButtonState("inp_mono",false); delay(10);
+  setButtonState("inp_mute",false);delay(10);
+  switch (myState.input_mixer_config) {
+    case (State::INPUTMIX_STEREO):
+      setButtonState("inp_stereo",true);  delay(10); break;
+    case (State::INPUTMIX_MONO):
+      setButtonState("inp_mono",true); delay(10); break;
+    case (State::INPUTMIX_MUTE):
+      setButtonState("inp_mute",true);  delay(10); break;
+  }
 }
 
 void SerialManager::setButtonState(String btnId, bool newState) {

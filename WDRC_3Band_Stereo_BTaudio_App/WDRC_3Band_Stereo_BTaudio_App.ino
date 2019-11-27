@@ -31,7 +31,6 @@
 
 // Include all the of the needed libraries
 #include <Tympan_Library.h>
-#include <SparkFunbc127.h>  //from https://github.com/sparkfun/SparkFun_BC127_Bluetooth_Module_Arduino_Library
 
 // Define the overall setup
 String overall_name = String("Tympan: Stereo, 3-Band IIR WDRC, BTAudio, App Control");
@@ -41,15 +40,11 @@ const float input_gain_dB = 15.0f; //gain on the microphone
 float vol_knob_gain_dB = 0.0; //will be overridden by volume knob
 int USE_VOLUME_KNOB = 0;  //set to 1 to use volume knob to override the default vol_knob_gain_dB set a few lines below
 const int LEFT = 0, RIGHT = 1;
-const int LEFTRIGHT_NORMAL=0, LEFTRIGHT_MONO=1, LEFTRIGHT_MUTE=2;
 
 //local files
 #include "AudioEffectFeedbackCancel_F32.h"
 #include "AudioEffectAFC_BTNRH_F32.h"
 #include "SerialManager.h"
-
-// define how to use Serial / Bluetooth messaging
-#define BOTH_SERIAL myTympan
 
 const float sample_rate_Hz = 22050.0f ; //16000, 24000 or 44117.64706f (or other frequencies in the table in AudioOutputI2S_F32
 const int audio_block_samples = 16;  //do not make bigger than AUDIO_BLOCK_SAMPLES from AudioStream.h (which is 128)
@@ -60,7 +55,7 @@ AudioSettings_F32   audio_settings(sample_rate_Hz, audio_block_samples);
 //create audio library objects for handling the audio
 Tympan                        myTympan(TympanRev::D);   //use TympanRev::D or TympanRev::C
 AudioInputI2S_F32             i2s_in(audio_settings);   //Digital audio input from the ADC
-AudioMixer4_F32               leftRightMixer[2];        //left-right mixer for the left output and for the right output
+AudioMixer4_F32               leftRightMixer[2];        //mixers to control mono versus stereo
 AudioTestSignalGenerator_F32  audioTestGenerator(audio_settings); //keep this to be *after* the creation of the i2s_in object
 
 //create audio objects for the algorithm
@@ -81,8 +76,6 @@ AudioControlTestAmpSweep_F32    ampSweepTester(audio_settings, audioTestGenerato
 AudioControlTestFreqSweep_F32    freqSweepTester(audio_settings, audioTestGenerator, audioTestMeasurement);
 AudioControlTestFreqSweep_F32    freqSweepTester_FIR(audio_settings, audioTestGenerator, audioTestMeasurement_filterbank);
 
-BC127 BTModu(&Serial1);  //Bluetooth module
-
 //make the audio connections
 #define N_MAX_CONNECTIONS 150  //some large number greater than the number of connections that we'll make
 AudioConnection_F32 *patchCord[N_MAX_CONNECTIONS];
@@ -90,31 +83,38 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
   int count = 0;
 
   //connect input
-  configureLeftRightMixer(LEFTRIGHT_NORMAL);
   patchCord[count++] = new AudioConnection_F32(i2s_in, LEFT, leftRightMixer[LEFT], LEFT); // (i2s_in,0) is left input
-  patchCord[count++] = new AudioConnection_F32(i2s_in, RIGHT, leftRightMixer[LEFT], RIGHT); // (i2s_in,0) is left input
+  patchCord[count++] = new AudioConnection_F32(i2s_in, RIGHT, leftRightMixer[LEFT], RIGHT); // (i2s_in,1) is right input
   patchCord[count++] = new AudioConnection_F32(i2s_in, LEFT, leftRightMixer[RIGHT], LEFT); // (i2s_in,0) is left input
-  patchCord[count++] = new AudioConnection_F32(i2s_in, RIGHT, leftRightMixer[RIGHT], RIGHT); // (i2s_in,0) is left input
+  patchCord[count++] = new AudioConnection_F32(i2s_in, RIGHT, leftRightMixer[RIGHT], RIGHT); // (i2s_in,0) is right input
+  configureLeftRightMixer(State::INPUTMIX_STEREO); //set left mixer to only listen to left, set right mixer to only listen to right
 
-  patchCord[count++] = new AudioConnection_F32(leftRightMixer[LEFT], 0, audioTestGenerator, 0); // (i2s_in,0) is left input
-  //patchCord[count++] = new AudioConnection_F32(i2s_in, RIGHT, feedbackCancelR, 0); // (i2s_in,1) is right input
 
-  //make the connection for the audio test measurements
-  patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, audioTestMeasurement, 0);
-  patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, audioTestMeasurement_filterbank, 0);
+  //make the connection for the audio test measurements...only relevant when the audio test functions are being invoked by the engineer/user
+  patchCord[count++] = new AudioConnection_F32(leftRightMixer[LEFT], 0, audioTestGenerator, 0); // set output of left mixer to the audioTestGenerator (which is will then pass through)
+  patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, audioTestMeasurement, 0); // connect test generator to test measurements
+  patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, audioTestMeasurement_filterbank, 0); //connect test generator to the test measurement filterbank
 
   //start the algorithms with the feedback cancallation block
-  //patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, feedbackCancel, 0);
+  #if 0  //set to zero to discable the adaptive feedback cancelation
+    patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, feedbackCancel, 0); //remember, even the normal audio is coming through the audioTestGenerator
+  #endif
 
   //make per-channel connections: filterbank -> delay -> WDRC Compressor -> mixer (synthesis)
   for (int Iear = LEFT; Iear <= RIGHT; Iear++) { //loop over channels
     for (int Iband = 0; Iband < N_CHAN_MAX; Iband++) {
       if (Iear == LEFT) {
-        //patchCord[count++] = new AudioConnection_F32(feedbackCancel, 0, bpFilt[Iear][Iband], 0); //connect to Feedback canceler
-        patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, bpFilt[Iear][Iband], 0); //input is coming from the audio test generator
+        #if 0  //set to zero to discable the adaptive feedback cancelation
+          patchCord[count++] = new AudioConnection_F32(feedbackCancel, 0, bpFilt[Iear][Iband], 0); //connect to Feedback canceler //perhaps 
+        #else
+          patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, bpFilt[Iear][Iband], 0); //input is coming from the audio test generator
+        #endif
       } else {
-        //patchCord[count++] = new AudioConnection_F32(feedbackCancelR, 0, bpFilt[Iear][Iband], 0); //connect to Feedback canceler
-        patchCord[count++] = new AudioConnection_F32(leftRightMixer[RIGHT], 0, bpFilt[Iear][Iband], 0); //input is coming directly from i2s_in
+        #if 0  //set to zero to discable the adaptive feedback cancelation
+          patchCord[count++] = new AudioConnection_F32(feedbackCancelR, 0, bpFilt[Iear][Iband], 0); //connect to Feedback canceler
+        #else
+          patchCord[count++] = new AudioConnection_F32(leftRightMixer[RIGHT], 0, bpFilt[Iear][Iband], 0); //input is coming directly from i2s_in
+        #endif
       }
       patchCord[count++] = new AudioConnection_F32(bpFilt[Iear][Iband], 0, postFiltDelay[Iear][Iband], 0);  //connect to delay
       patchCord[count++] = new AudioConnection_F32(postFiltDelay[Iear][Iband], 0, expCompLim[Iear][Iband], 0); //connect to compressor
@@ -133,15 +133,17 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
   //connect the loop back to the adaptive feedback canceller
   feedbackLoopBack.setTargetAFC(&feedbackCancel);   //left ear
   feedbackLoopBackR.setTargetAFC(&feedbackCancelR); //right ear
-  //patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, feedbackLoopBack, 0); //loopback to the adaptive feedback canceler
-  //patchCord[count++] = new AudioConnection_F32(compBroadband[RIGHT], 0, feedbackLoopBackR, 0); //loopback to the adaptive feedback canceler
+  #if 0  // set to zero to disable the adaptive feedback canceler
+    patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, feedbackLoopBack, 0); //loopback to the adaptive feedback canceler
+    patchCord[count++] = new AudioConnection_F32(compBroadband[RIGHT], 0, feedbackLoopBackR, 0); //loopback to the adaptive feedback canceler
+  #endif
 
   //send the audio out
   for (int Iear=0; Iear <= RIGHT; Iear++) {
     patchCord[count++] = new AudioConnection_F32(compBroadband[Iear], 0, i2s_out, Iear);  //left output
   }
 
-  //make the connections for the audio test measurements
+  //make the last connections for the audio test measurements
   patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, audioTestMeasurement, 0);
   patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, audioTestMeasurement, 1);
 
@@ -150,10 +152,7 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
 
 
 //control display and serial interaction
-bool enable_printCPUandMemory = false;
-void togglePrintMemoryAndCPU(void) {
-  enable_printCPUandMemory = !enable_printCPUandMemory;
-}; //"extern" let's be it accessible outside
+State myState(&audio_settings, &myTympan);  //for keeping track of state (especially useful for sync'ing to mobile App)
 bool enable_printAveSignalLevels = false, printAveSignalLevels_as_dBSPL = false;
 void togglePrintAveSignalLevels(bool as_dBSPL) {
   enable_printAveSignalLevels = !enable_printAveSignalLevels;
@@ -166,7 +165,7 @@ SerialManager serialManager(myTympan, N_CHAN_MAX,
 
 //routine to setup the hardware
 void setupTympanHardware(void) {
-  BOTH_SERIAL.println("Setting up Tympan Audio Board...");
+  myTympan.println("Setting up Tympan Audio Board...");
   myTympan.enable(); // activate AIC
 
   //enable the Tympman to detect whether something was plugged inot the pink mic jack
@@ -175,7 +174,7 @@ void setupTympanHardware(void) {
   //setup DC-blocking highpass filter running in the ADC hardware itself
   float cutoff_Hz = 70.0;  //set the default cutoff frequency for the highpass filter
   myTympan.setHPFonADC(true, cutoff_Hz, audio_settings.sample_rate_Hz); //set to false to disble
-  //BOTH_SERIAL.print("Setting HP Filter in hardware at "); BOTH_SERIAL.print(myTympan.getHPCutoff_Hz()); BOTH_SERIAL.println(" Hz.");
+  //myTympan.print("Setting HP Filter in hardware at "); myTympan.print(myTympan.getHPCutoff_Hz()); myTympan.println(" Hz.");
 
   //Choose the desired audio input on the Typman...this will be overridden by the serviceMicDetect() in loop()
   //myTympan.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the on-board micropphones
@@ -196,9 +195,6 @@ void setupTympanHardware(void) {
 #include "GHA_Constants.h"  //this sets dsl and gha settings, which will be the defaults
 #include "GHA_Alternates.h"  //this sets alternate dsl and gha, which can be switched in via commands
 #include "filter_coeff_sos.h"  //IIR filter coefficients for our filterbank
-#define DSL_PRESET_A 0
-#define DSL_PRESET_B 1
-int current_dsl_config = DSL_PRESET_B; //used to select one of the configurations above for startup
 float overall_cal_dBSPL_at0dBFS; //will be set later
 
 void setupAudioProcessing(void) {
@@ -209,16 +205,11 @@ void setupAudioProcessing(void) {
   preFilter.setHighpass(0, 40.0);  preFilterR.setHighpass(0, 40.0);
 
   //setup processing based on the DSL and GHA prescriptions
-  setDSLConfiguration(current_dsl_config);
-  //if (current_dsl_config == DSL_PRESET_A) {
-  //  setupFromDSLandGHAandAFC(dsl, gha, afc, N_CHAN_MAX, audio_settings);
-  //} else if (current_dsl_config == DSL_PRESET_B) {
-  //  setupFromDSLandGHAandAFC(dsl_fullon, gha_fullon, afc_fullon, N_CHAN_MAX, audio_settings);
-  //}
+  setDSLConfiguration(myState.current_dsl_config);
 }
 
-void setupFromDSLandGHAandAFC(const BTNRH_WDRC::CHA_DSL &this_dsl, const BTNRH_WDRC::CHA_WDRC &this_gha,
-                              const BTNRH_WDRC::CHA_AFC &this_afc, const int n_chan_max, const AudioSettings_F32 &settings)
+void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDRC &this_gha,
+                              BTNRH_WDRC::CHA_AFC &this_afc, const int n_chan_max, const AudioSettings_F32 &settings)
 {
   //int n_chan = n_chan_max;  //maybe change this to be the value in the DSL itself.  other logic would need to change, too.
   N_CHAN = max(1, min(n_chan_max, this_dsl.nchannel));
@@ -265,36 +256,41 @@ void setupFromDSLandGHAandAFC(const BTNRH_WDRC::CHA_DSL &this_dsl, const BTNRH_W
   //overwrite the one-point calibration based on the dsl data structure
   overall_cal_dBSPL_at0dBFS = this_dsl.maxdB;
 
+  //save the state
+  myState.wdrc_perBand = this_dsl;
+  myState.wdrc_broadBand = this_gha;
+  myState.afc = this_afc;
+
 }
 
 
 void setDSLConfiguration(int preset_ind) {
   switch (preset_ind) {
-    case (DSL_PRESET_A):
-      current_dsl_config = preset_ind;
-      //BOTH_SERIAL.println("setDSLConfiguration: Using DSL Preset A");
+    case (State::DSL_PRESET_A):
+      myState.current_dsl_config = preset_ind;
+      //myTympan.println("setDSLConfiguration: Using DSL Preset A");
       setupFromDSLandGHAandAFC(dsl, gha, afc, N_CHAN_MAX, audio_settings);
       myTympan.setRedLED(true);  myTympan.setAmberLED(false);
       break;
-    case (DSL_PRESET_B):
-      current_dsl_config = preset_ind;
-      //BOTH_SERIAL.println("setDSLConfiguration: Using DSL Preset B");
+    case (State::DSL_PRESET_B):
+      myState.current_dsl_config = preset_ind;
+      //myTympan.println("setDSLConfiguration: Using DSL Preset B");
       setupFromDSLandGHAandAFC(dsl_fullon, gha_fullon, afc_fullon, N_CHAN_MAX, audio_settings);
       myTympan.setRedLED(false);  myTympan.setAmberLED(true);
       break;
   }
-  configureLeftRightMixer(LEFTRIGHT_NORMAL);
+  configureLeftRightMixer(State::INPUTMIX_STEREO);
 }
 
-void updateDSL(const BTNRH_WDRC::CHA_DSL &this_dsl) {
+void updateDSL(BTNRH_WDRC::CHA_DSL &this_dsl) {
   setupFromDSLandGHAandAFC(this_dsl, gha, afc, N_CHAN_MAX, audio_settings);
 }
 
-void updateGHA(const BTNRH_WDRC::CHA_WDRC &this_gha) {
+void updateGHA(BTNRH_WDRC::CHA_WDRC &this_gha) {
   setupFromDSLandGHAandAFC(dsl, this_gha, afc, N_CHAN_MAX, audio_settings);
 }
 
-void updateAFC(const BTNRH_WDRC::CHA_AFC &this_afc) {
+void updateAFC(BTNRH_WDRC::CHA_AFC &this_afc) {
   setupFromDSLandGHAandAFC(dsl, gha, this_afc, N_CHAN_MAX, audio_settings);
 }
 
@@ -331,9 +327,9 @@ void configurePerBandWDRCs(int nchan, float fs_Hz,
                            AudioEffectCompWDRC_F32 *WDRCs)
 {
   if (nchan > this_dsl.nchannel) {
-    BOTH_SERIAL.println(F("configureWDRC.configure: *** ERROR ***: nchan > dsl.nchannel"));
-    BOTH_SERIAL.print(F("    : nchan = ")); BOTH_SERIAL.println(nchan);
-    BOTH_SERIAL.print(F("    : dsl.nchannel = ")); BOTH_SERIAL.println(dsl.nchannel);
+    myTympan.println(F("configureWDRC.configure: *** ERROR ***: nchan > dsl.nchannel"));
+    myTympan.print(F("    : nchan = ")); myTympan.println(nchan);
+    myTympan.print(F("    : dsl.nchannel = ")); myTympan.println(dsl.nchannel);
   }
 
   //now, loop over each channel
@@ -363,17 +359,20 @@ void configurePerBandWDRCs(int nchan, float fs_Hz,
   }
 }
 
-void configureLeftRightMixer(int LEFTRIGHT_setting) {
-  switch (LEFTRIGHT_setting) {
-    case LEFTRIGHT_NORMAL:
+void configureLeftRightMixer(int val) {
+  switch (val) {
+    case State::INPUTMIX_STEREO:
+      myState.input_mixer_config = val;
       leftRightMixer[LEFT].gain(LEFT,1.0);leftRightMixer[LEFT].gain(RIGHT,0.0);
       leftRightMixer[RIGHT].gain(LEFT,0.0);leftRightMixer[RIGHT].gain(RIGHT,1.0);
       break;
-    case LEFTRIGHT_MONO:
+    case State::INPUTMIX_MONO:
+      myState.input_mixer_config = val;
       leftRightMixer[LEFT].gain(LEFT,0.5);leftRightMixer[LEFT].gain(RIGHT,0.5);
       leftRightMixer[RIGHT].gain(LEFT,0.5);leftRightMixer[RIGHT].gain(RIGHT,0.5);
       break;
-    case LEFTRIGHT_MUTE:
+    case State::INPUTMIX_MUTE:
+      myState.input_mixer_config = val;
       leftRightMixer[LEFT].gain(LEFT,0.0);leftRightMixer[LEFT].gain(RIGHT,0.0);
       leftRightMixer[RIGHT].gain(LEFT,0.0);leftRightMixer[RIGHT].gain(RIGHT,0.0);
       break;
@@ -386,9 +385,9 @@ void configureLeftRightMixer(int LEFTRIGHT_setting) {
 void setup() {
   //begin the serial comms
   myTympan.beginBothSerial(); delay(1000);
-  BOTH_SERIAL.print(overall_name); BOTH_SERIAL.println(": setup():...");
-  BOTH_SERIAL.print("Sample Rate (Hz): "); BOTH_SERIAL.println(audio_settings.sample_rate_Hz);
-  BOTH_SERIAL.print("Audio Block Size (samples): "); BOTH_SERIAL.println(audio_settings.audio_block_samples);
+  myTympan.print(overall_name); myTympan.println(": setup():...");
+  myTympan.print("Sample Rate (Hz): "); myTympan.println(audio_settings.sample_rate_Hz);
+  myTympan.print("Audio Block Size (samples): "); myTympan.println(audio_settings.audio_block_samples);
 #if (USE_BT_SERIAL)
   BT_SERIAL.print(overall_name); BT_SERIAL.println(": setup():...");
   BT_SERIAL.print("Sample Rate (Hz): "); BT_SERIAL.println(audio_settings.sample_rate_Hz);
@@ -407,12 +406,9 @@ void setup() {
   //update the potentiometer settings
   if (USE_VOLUME_KNOB) servicePotentiometer(millis());
 
-  //service BT Audio
-  serviceBTAudio();
-
   //End of setup
   printGainSettings();
-  BOTH_SERIAL.print("Setup complete:"); BOTH_SERIAL.println(overall_name);
+  myTympan.print("Setup complete:"); myTympan.println(overall_name);
   serialManager.printHelp();
 
 } //end setup()
@@ -434,7 +430,7 @@ void loop() {
   serviceMicDetect(millis(), 500);
 
   //update the memory and CPU usage...if enough time has passed
-  if (enable_printCPUandMemory) printCPUandMemory(millis());
+  if (myState.flag_printCPUandMemory) printCPUandMemory(millis());
 
   //print info about the signal processing
   updateAveSignalLevels(millis());
@@ -473,15 +469,15 @@ void servicePotentiometer(unsigned long curTime_millis) {
 
 
 void printGainSettings(void) {
-  BOTH_SERIAL.print("Gain (dB): ");
-  BOTH_SERIAL.print("Knob = "); BOTH_SERIAL.print(vol_knob_gain_dB, 1);
-  BOTH_SERIAL.print(", PGA = "); BOTH_SERIAL.print(input_gain_dB, 1);
-  BOTH_SERIAL.print(", Chan = ");
+  myTympan.print("Gain (dB): ");
+  myTympan.print("Knob = "); myTympan.print(vol_knob_gain_dB, 1);
+  myTympan.print(", PGA = "); myTympan.print(input_gain_dB, 1);
+  myTympan.print(", Chan = ");
   for (int i = 0; i < N_CHAN; i++) {
-    BOTH_SERIAL.print(expCompLim[LEFT][i].getGain_dB() - vol_knob_gain_dB, 1);
-    BOTH_SERIAL.print(", ");
+    myTympan.print(expCompLim[LEFT][i].getGain_dB() - vol_knob_gain_dB, 1);
+    myTympan.print(", ");
   }
-  BOTH_SERIAL.println();
+  myTympan.println();
 }
 
 extern void incrementKnobGain(float increment_dB) { //"extern" to make it available to other files, such as SerialManager.h
@@ -514,9 +510,9 @@ void serviceMicDetect(unsigned long curTime_millis, unsigned long updatePeriod_m
     cur_val = myTympan.updateInputBasedOnMicDetect(); //if mic is plugged in, defaults to TYMPAN_INPUT_JACK_AS_MIC
     if (cur_val != prev_val) {
       if (cur_val) {
-        BOTH_SERIAL.println("serviceMicDetect: detected plug-in microphone!  External mic now active.");
+        myTympan.println("serviceMicDetect: detected plug-in microphone!  External mic now active.");
       } else {
-        BOTH_SERIAL.println("serviceMicDetect: detected removal of plug-in microphone. On-board PCB mics now active.");
+        myTympan.println("serviceMicDetect: detected removal of plug-in microphone. On-board PCB mics now active.");
       }
     }
     prev_val = cur_val;
@@ -539,18 +535,18 @@ void printCPUandMemory(unsigned long curTime_millis) {
   }
 }
 void printCPUandMemoryMessage(void) {
-  BOTH_SERIAL.print("CPU Cur/Peak: ");
-  BOTH_SERIAL.print(audio_settings.processorUsage());
-  //BOTH_SERIAL.print(AudioProcessorUsage());
-  BOTH_SERIAL.print("%/");
-  BOTH_SERIAL.print(audio_settings.processorUsageMax());
-  //BOTH_SERIAL.print(AudioProcessorUsageMax());
-  BOTH_SERIAL.print("%,   ");
-  BOTH_SERIAL.print("Dyn MEM Float32 Cur/Peak: ");
-  BOTH_SERIAL.print(AudioMemoryUsage_F32());
-  BOTH_SERIAL.print("/");
-  BOTH_SERIAL.print(AudioMemoryUsageMax_F32());
-  BOTH_SERIAL.println();
+  myTympan.print("CPU Cur/Peak: ");
+  myTympan.print(audio_settings.processorUsage());
+  //myTympan.print(AudioProcessorUsage());
+  myTympan.print("%/");
+  myTympan.print(audio_settings.processorUsageMax());
+  //myTympan.print(AudioProcessorUsageMax());
+  myTympan.print("%,   ");
+  myTympan.print("Dyn MEM Float32 Cur/Peak: ");
+  myTympan.print(AudioMemoryUsage_F32());
+  myTympan.print("/");
+  myTympan.print(AudioMemoryUsageMax_F32());
+  myTympan.println();
 }
 
 float aveSignalLevels_dBFS[2][N_CHAN_MAX]; //left ear and right ear, one for each frequency band
@@ -577,64 +573,66 @@ void printAveSignalLevels(unsigned long curTime_millis, bool as_dBSPL) {
   //is it time to print to the screen
   if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0; //handle wrap-around of the clock
   if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
-    printAveSignalLevelsMessage(&Serial, as_dBSPL);
-#if (USE_BT_SERIAL)
-    printAveSignalLevelsMessage(&BT_SERIAL, as_dBSPL);
-#endif
+    printAveSignalLevelsMessage(as_dBSPL);
     lastUpdate_millis = curTime_millis; //we will use this value the next time around.
   }
 }
-void printAveSignalLevelsMessage(Stream *s, bool as_dBSPL) {
+void printAveSignalLevelsMessage(bool as_dBSPL) {
   float offset_dB = 0.0f;
   String units_txt = String("dBFS");
   if (as_dBSPL) {
     offset_dB = overall_cal_dBSPL_at0dBFS;
     units_txt = String("est dBSPL");
   }
-  BOTH_SERIAL.print("Ave Input Level ("); BOTH_SERIAL.print(units_txt); BOTH_SERIAL.print("), Per-Band = ");
+  myTympan.print("Ave Input Level ("); myTympan.print(units_txt); myTympan.print("), Per-Band = ");
   for (int i = 0; i < N_CHAN; i++) {
-    BOTH_SERIAL.print(aveSignalLevels_dBFS[LEFT][i] + offset_dB, 1);
-    BOTH_SERIAL.print(", ");
+    myTympan.print(aveSignalLevels_dBFS[LEFT][i] + offset_dB, 1);
+    myTympan.print(", ");
   }
-  BOTH_SERIAL.println();
+  myTympan.println();
 }
 
-void serviceBTAudio(void) {
-    // resetFlag tracks the state of the module. When true, the module is reset and
-  //  ready to receive a connection. When false, the module either has an active
-  //  connection or has lost its connection; checking connectionState() will verify
-  //  which of those conditions we're in.
-  static boolean resetFlag = false;
-
-  // This is where we determine the state of the module. If resetFlag is false, and
-  //  we have a CONNECT_ERROR, we need to restart the module to clear its pairing
-  //  list so it can accept another connection.
-  if (BTModu.connectionState() == BC127::CONNECT_ERROR  && !resetFlag)
-  {  
-    Serial.println("Connection lost! Resetting...");
-    // Blast the existing settings of the BC127 module, so I know that the module is
-    //  set to factory defaults...
-    BTModu.restore();
-
-    // ...but, before I restart, I need to set the device to be a SINK, so it will
-    //  enable its audio output and dump the audio to the output.
-    BTModu.setClassicSink();
-
-    // Write, reset, to commit and effect the change to a source.
-    BTModu.writeConfig();
-    // Repeat the connection process if we've lost our connection.
-    BTModu.reset();
-    // Change the resetFlag, so we know we've restored the module to a usable state.
-    resetFlag = true;
-  }
-  // If we ARE connected, we'll issue the "PLAY" command. Note that issuing this when
-  //  we are already playing doesn't hurt anything.
-  else {
-    //BTModu.musicCommands(BC127::PLAY);
-  }
-
-  // We want to look for a connection to be made to the module; once a connection
-  //  has been made, we can clear the resetFlag.
-  if (BTModu.connectionState() == BC127::SUCCESS) resetFlag = false;
-
-}
+// // I don't think that this is really needed to receive audio from the BT Module...WEA 2019-11-27
+//
+// #include <SparkFunbc127.h>  //from https://github.com/sparkfun/SparkFun_BC127_Bluetooth_Module_Arduino_Library
+// BC127 BTModu(&Serial1);  //Bluetooth module
+//
+//void serviceBTAudio(void) {
+//    // resetFlag tracks the state of the module. When true, the module is reset and
+//  //  ready to receive a connection. When false, the module either has an active
+//  //  connection or has lost its connection; checking connectionState() will verify
+//  //  which of those conditions we're in.
+//  static boolean resetFlag = false;
+//
+//  // This is where we determine the state of the module. If resetFlag is false, and
+//  //  we have a CONNECT_ERROR, we need to restart the module to clear its pairing
+//  //  list so it can accept another connection.
+//  if (BTModu.connectionState() == BC127::CONNECT_ERROR  && !resetFlag)
+//  {  
+//    Serial.println("Connection lost! Resetting...");
+//    // Blast the existing settings of the BC127 module, so I know that the module is
+//    //  set to factory defaults...
+//    BTModu.restore();
+//
+//    // ...but, before I restart, I need to set the device to be a SINK, so it will
+//    //  enable its audio output and dump the audio to the output.
+//    BTModu.setClassicSink();
+//
+//    // Write, reset, to commit and effect the change to a source.
+//    BTModu.writeConfig();
+//    // Repeat the connection process if we've lost our connection.
+//    BTModu.reset();
+//    // Change the resetFlag, so we know we've restored the module to a usable state.
+//    resetFlag = true;
+//  }
+//  // If we ARE connected, we'll issue the "PLAY" command. Note that issuing this when
+//  //  we are already playing doesn't hurt anything.
+//  else {
+//    //BTModu.musicCommands(BC127::PLAY);
+//  }
+//
+//  // We want to look for a connection to be made to the module; once a connection
+//  //  has been made, we can clear the resetFlag.
+//  if (BTModu.connectionState() == BC127::SUCCESS) resetFlag = false;
+//
+//}
