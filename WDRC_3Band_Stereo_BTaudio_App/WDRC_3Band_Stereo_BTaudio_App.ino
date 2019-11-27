@@ -165,7 +165,6 @@ SerialManager serialManager(myTympan, N_CHAN_MAX,
 
 //routine to setup the hardware
 void setupTympanHardware(void) {
-  myTympan.println("Setting up Tympan Audio Board...");
   myTympan.enable(); // activate AIC
 
   //enable the Tympman to detect whether something was plugged inot the pink mic jack
@@ -174,13 +173,12 @@ void setupTympanHardware(void) {
   //setup DC-blocking highpass filter running in the ADC hardware itself
   float cutoff_Hz = 70.0;  //set the default cutoff frequency for the highpass filter
   myTympan.setHPFonADC(true, cutoff_Hz, audio_settings.sample_rate_Hz); //set to false to disble
-  //myTympan.print("Setting HP Filter in hardware at "); myTympan.print(myTympan.getHPCutoff_Hz()); myTympan.println(" Hz.");
 
   //Choose the desired audio input on the Typman...this will be overridden by the serviceMicDetect() in loop()
   //myTympan.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the on-board micropphones
   myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_MIC); myTympan.setEnableStereoExtMicBias(true); // use the microphone jack - defaults to mic bias 2.5V
   //myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the microphone jack - defaults to mic bias OFF
-
+  
   //Set the Bluetooth audio to go straight to the headphone amp, not through the Tympan software
   myTympan.mixBTAudioWithOutput(true);
 
@@ -205,7 +203,7 @@ void setupAudioProcessing(void) {
   preFilter.setHighpass(0, 40.0);  preFilterR.setHighpass(0, 40.0);
 
   //setup processing based on the DSL and GHA prescriptions
-  setDSLConfiguration(myState.current_dsl_config);
+  setDSLConfiguration(myState.current_dsl_config); //sets the Per Band, the Broad Band, and the AFC parameters using a preset
 }
 
 void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDRC &this_gha,
@@ -257,9 +255,9 @@ void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDR
   overall_cal_dBSPL_at0dBFS = this_dsl.maxdB;
 
   //save the state
-  myState.wdrc_perBand = this_dsl;
-  myState.wdrc_broadBand = this_gha;
-  myState.afc = this_afc;
+  myState.wdrc_perBand = this_dsl;  //shallow copy the contents of this_dsl into wdrc_perBand
+  myState.wdrc_broadBand = this_gha; //shallow copy into wdrc_broadBand
+  myState.afc = this_afc;   //shallow copy into AFC
 
 }
 
@@ -280,18 +278,19 @@ void setDSLConfiguration(int preset_ind) {
       break;
   }
   configureLeftRightMixer(State::INPUTMIX_STEREO);
+  
 }
 
 void updateDSL(BTNRH_WDRC::CHA_DSL &this_dsl) {
-  setupFromDSLandGHAandAFC(this_dsl, gha, afc, N_CHAN_MAX, audio_settings);
+  setupFromDSLandGHAandAFC(this_dsl, myState.wdrc_broadBand, myState.afc, N_CHAN_MAX, audio_settings);
 }
 
 void updateGHA(BTNRH_WDRC::CHA_WDRC &this_gha) {
-  setupFromDSLandGHAandAFC(dsl, this_gha, afc, N_CHAN_MAX, audio_settings);
+  setupFromDSLandGHAandAFC(myState.wdrc_perBand, this_gha, myState.afc, N_CHAN_MAX, audio_settings);
 }
 
 void updateAFC(BTNRH_WDRC::CHA_AFC &this_afc) {
-  setupFromDSLandGHAandAFC(dsl, gha, this_afc, N_CHAN_MAX, audio_settings);
+  setupFromDSLandGHAandAFC(myState.wdrc_perBand, myState.wdrc_broadBand, this_afc, N_CHAN_MAX, audio_settings);
 }
 
 void configureBroadbandWDRCs(float fs_Hz, const BTNRH_WDRC::CHA_WDRC &this_gha,
@@ -384,18 +383,13 @@ void configureLeftRightMixer(int val) {
 // define the setup() function, the function that is called once when the device is booting
 void setup() {
   //begin the serial comms
-  myTympan.beginBothSerial(); delay(1000);
+  myTympan.beginBothSerial(); delay(1500);
   myTympan.print(overall_name); myTympan.println(": setup():...");
   myTympan.print("Sample Rate (Hz): "); myTympan.println(audio_settings.sample_rate_Hz);
   myTympan.print("Audio Block Size (samples): "); myTympan.println(audio_settings.audio_block_samples);
-#if (USE_BT_SERIAL)
-  BT_SERIAL.print(overall_name); BT_SERIAL.println(": setup():...");
-  BT_SERIAL.print("Sample Rate (Hz): "); BT_SERIAL.println(audio_settings.sample_rate_Hz);
-  BT_SERIAL.print("Audio Block Size (samples): "); BT_SERIAL.println(audio_settings.audio_block_samples);
-#endif
 
   // Audio connections require memory
-  AudioMemory_F32_wSettings(200, audio_settings); //allocate Float32 audio data blocks (primary memory used for audio processing)
+  AudioMemory_F32_wSettings(150, audio_settings); //allocate Float32 audio data blocks (primary memory used for audio processing)
 
   // Enable the audio shield, select input, and enable output
   setupTympanHardware();
@@ -408,7 +402,7 @@ void setup() {
 
   //End of setup
   printGainSettings();
-  myTympan.print("Setup complete:"); myTympan.println(overall_name);
+  myTympan.print("Setup complete: "); myTympan.println(overall_name);
   serialManager.printHelp();
 
 } //end setup()
@@ -430,7 +424,7 @@ void loop() {
   serviceMicDetect(millis(), 500);
 
   //update the memory and CPU usage...if enough time has passed
-  if (myState.flag_printCPUandMemory) printCPUandMemory(millis());
+  if (myState.flag_printCPUandMemory) myState.printCPUandMemory(millis());
 
   //print info about the signal processing
   updateAveSignalLevels(millis());
@@ -518,35 +512,6 @@ void serviceMicDetect(unsigned long curTime_millis, unsigned long updatePeriod_m
     prev_val = cur_val;
     lastUpdate_millis = curTime_millis;
   }
-}
-
-void printCPUandMemory(unsigned long curTime_millis) {
-  static unsigned long updatePeriod_millis = 3000; //how many milliseconds between updating gain reading?
-  static unsigned long lastUpdate_millis = 0;
-
-  //has enough time passed to update everything?
-  if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0; //handle wrap-around of the clock
-  if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
-    printCPUandMemoryMessage();
-#if (USE_BT_SERIAL)
-    printCPUandMemoryMessage(&BT_SERIAL); //Bluetooth Serial
-#endif
-    lastUpdate_millis = curTime_millis; //we will use this value the next time around.
-  }
-}
-void printCPUandMemoryMessage(void) {
-  myTympan.print("CPU Cur/Peak: ");
-  myTympan.print(audio_settings.processorUsage());
-  //myTympan.print(AudioProcessorUsage());
-  myTympan.print("%/");
-  myTympan.print(audio_settings.processorUsageMax());
-  //myTympan.print(AudioProcessorUsageMax());
-  myTympan.print("%,   ");
-  myTympan.print("Dyn MEM Float32 Cur/Peak: ");
-  myTympan.print(AudioMemoryUsage_F32());
-  myTympan.print("/");
-  myTympan.print(AudioMemoryUsageMax_F32());
-  myTympan.println();
 }
 
 float aveSignalLevels_dBFS[2][N_CHAN_MAX]; //left ear and right ear, one for each frequency band

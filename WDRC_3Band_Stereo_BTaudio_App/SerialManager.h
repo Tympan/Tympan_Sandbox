@@ -129,7 +129,7 @@ void SerialManager::printHelp(void) {
   audioHardware.println("   s,S: Mono or Stereo Audio.");
   printChanUpMsg(N_CHAN);  audioHardware.print(channelGainIncrement_dB); audioHardware.println(" dB");
   printChanDownMsg(N_CHAN);  audioHardware.print(channelGainIncrement_dB); audioHardware.println(" dB");
-  audioHardware.print("   d,D: Switch to DSL Preset A or Preset B");audioHardware.println();
+  audioHardware.print("   d,D: Switch to WDRC Preset A or Preset B");audioHardware.println();
   //audioHardware.print("   p,P: Enable or Disable Adaptive Feedback Cancelation.");audioHardware.println();
   //audioHardware.print("   m,M: Increase or Decrease AFC mu (currently "); audioHardware.print(feedbackCanceler.getMu(),6) ; audioHardware.println(").");
   //audioHardware.print("   r,R: Increase or Decrease AFC rho (currently "); audioHardware.print(feedbackCanceler.getRho(),6) ; audioHardware.println(").");
@@ -143,7 +143,6 @@ void SerialManager::printHelp(void) {
 
 //functions in the main sketch that I want to call from here
 extern void incrementKnobGain(float);
-extern void printGainSettings(void);
 extern void printGainSettings(void);
 extern void togglePrintAveSignalLevels(bool);
 //extern void incrementDSLConfiguration(Stream *);
@@ -350,7 +349,7 @@ void SerialManager::processSingleCharacter(char c) {
         "'pages':["
           "{'title':'Presets','cards':["
               "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'alg_preset0'},{'label': 'Linear', 'cmd': 'D', 'id': 'alg_preset1'}]},"
-              "{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q','id':'inp_stereo'},{'label': 'Mono','cmd': 's','id':'inp_mono'},{'label': 'Mute','cmd': 'q','id':'inp_mute'}]}"
+              "{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mono','cmd': 's','id':'inp_mono','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'12'}]}"
           "]},"
           "{'title':'Tuner','cards':["
               "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
@@ -646,9 +645,14 @@ int SerialManager::readStreamFloatArray(int idx, float* arr, int len) {
 
 
 void SerialManager::incrementChannelGain(int chan, float change_dB) {
+  //increments the linear gain
   if (chan < N_CHAN) {
-    gain_algorithmsL[chan].incrementGain_dB(change_dB);
-    gain_algorithmsR[chan].incrementGain_dB(change_dB);
+    //gain_algorithmsL[chan].incrementGain_dB(change_dB);
+    //gain_algorithmsR[chan].incrementGain_dB(change_dB);
+    myState.wdrc_perBand.tkgain[chan] += change_dB;
+    updateDSL(myState.wdrc_perBand);
+    //add something here (?) to send updated prescription values to the remote device
+    
     printGainSettings();  //in main sketch file
     FAKE_GAIN_LEVEL[chan] += change_dB;
   }
@@ -661,6 +665,7 @@ String SerialManager::channelGainAsString(int chan) {
 void SerialManager::setFullGUIState(void) {
   setButtonState_algPresets();
   setButtonState_inputMixer();
+  //add something here to send prescription values to the remote device
 }
 
 void SerialManager::setButtonState_algPresets(void) {
