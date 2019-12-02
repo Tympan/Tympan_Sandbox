@@ -56,6 +56,9 @@ class SerialManager {
     void interpretStreamGHA(int idx);
     void interpretStreamDSL(int idx);
     void interpretStreamAFC(int idx);
+    void sendStreamDSL(const BTNRH_WDRC::CHA_DSL &this_dsl);
+    void sendStreamGHA(const BTNRH_WDRC::CHA_WDRC &this_gha);
+    void sendStreamAFC(const BTNRH_WDRC::CHA_AFC &this_afc);
     int readStreamIntArray(int idx, int* arr, int len);
     int readStreamFloatArray(int idx, float* arr, int len);
     void setButtonState(String btnId, bool newState);
@@ -450,6 +453,24 @@ void SerialManager::processSingleCharacter(char c) {
       audioHardware.print("Received: Decreasing ADC HP Cutoff to "); audioHardware.print(audioHardware.getHPCutoff_Hz());audioHardware.println(" Hz");   
       break;
     }
+    case 'b':
+      audioHardware.println("Received b; sending test dsl");
+      BTNRH_WDRC::CHA_DSL test_dsl = {5,  // attack (ms)
+        300,  // release (ms)
+        115,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
+        0,    // 0=left, 1=right...ignored
+        3,    //num channels used (must be less than MAX_CHAN constant set in the main program
+        {700.0, 2400.0,       1.e4, 1.e4, 1.e4, 1.e4, 1.e4},   // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
+        {0.57, 0.57, 0.57,     1.0, 1.0, 1.0, 1.0, 1.0},   // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
+        {73.0, 50.0, 50.0,    34., 34., 34., 34., 34.},   // expansion-end kneepoint
+        {0.f, 5.f, 10.f,       30.f, 30.f, 30.f, 30.f, 30.f},   // compression-start gain
+        {1.5f, 1.5f, 1.5f,     1.5f, 1.5f, 1.5f, 1.5f, 1.5f},   // compression ratio
+        {50.0, 50.0, 50.0,     50.0, 50.0, 50.0, 50.0, 50.0},   // compression-start kneepoint (input dB SPL)
+        {90.f, 90.f, 90.f,     90.f, 90.f, 91.f, 92.f, 93.f}    // output limiting threshold (comp ratio 10)
+      };
+      sendStreamDSL(test_dsl);
+
+      break;
   }
 }
 
@@ -525,12 +546,11 @@ void SerialManager::interpretStreamGHA(int idx) {
   updateGHA(gha);
 }
 
-
 void SerialManager::interpretStreamDSL(int idx) {
   float attack, release, maxdB;
   int numChannels, i;
 
-  int freq[8];
+  float freq[8];
   float lowSPLRatio[8];
   float expansionKneepoint[8];
   float compStartGain[8];
@@ -543,22 +563,13 @@ void SerialManager::interpretStreamDSL(int idx) {
   numChannels   = *((int*)(stream_data+idx)); idx=idx+4;
   maxdB         = *((float*)(stream_data+idx)); idx=idx+4;
 
-  idx = readStreamIntArray(idx, freq, 8);
+  idx = readStreamFloatArray(idx, freq, 8);
   idx = readStreamFloatArray(idx, lowSPLRatio, 8);
   idx = readStreamFloatArray(idx, expansionKneepoint, 8);
   idx = readStreamFloatArray(idx, compStartGain, 8);
   idx = readStreamFloatArray(idx, compRatio, 8);
   idx = readStreamFloatArray(idx, compStartKnee, 8);
   idx = readStreamFloatArray(idx, threshold, 8);
-
-//  audioHardware.print("attack");
-//  audioHardware.print(attack);
-//  audioHardware.print("release");
-//  audioHardware.print(release);
-//  audioHardware.print("#channels");
-//  audioHardware.print(numChannels);
-//  audioHardware.print("maxdB");
-//  audioHardware.print(maxdB);
 
   audioHardware.print("  freq = {"); 
   audioHardware.print(freq[0]); 
@@ -612,8 +623,6 @@ void SerialManager::interpretStreamAFC(int idx) {
   audioHardware.println("SUCCESS.");
 }
 
-
-
 int SerialManager::readStreamIntArray(int idx, int* arr, int len) {
   int i;
   for (i=0; i<len; i++) {
@@ -634,7 +643,25 @@ int SerialManager::readStreamFloatArray(int idx, float* arr, int len) {
   return idx;
 }
 
+void SerialManager::sendStreamDSL(const BTNRH_WDRC::CHA_DSL &this_dsl) {
+  audioHardware.print("PRESC=DSL:");
+  audioHardware.print(DSL_MXCH);
+  audioHardware.print(":");
+  audioHardware.write((uint8_t*) &this_dsl, sizeof(this_dsl));
+  audioHardware.println("");
+}
 
+void SerialManager::sendStreamGHA(const BTNRH_WDRC::CHA_WDRC &this_gha) {
+  audioHardware.print("PRESC=GHA:");
+  audioHardware.write((uint8_t*) &this_gha, sizeof(this_gha));
+  audioHardware.println("");
+};
+
+void SerialManager::sendStreamAFC(const BTNRH_WDRC::CHA_AFC &this_afc) {
+  audioHardware.print("PRESC=AFC:");
+  audioHardware.write((uint8_t*) &this_afc, sizeof(this_afc));
+  audioHardware.println("");
+};
 
 void SerialManager::incrementChannelGain(int chan, float change_dB) {
   if (chan < N_CHAN) {
