@@ -20,15 +20,14 @@ enum read_state_options {
 };
 
 //objects in the main sketch that I want to call from here
-//extern Tympan myTympan;
+extern Tympan myTympan;
 //extern AudioSDWriter_F32 audioSDWriter;
 extern State myState;
 
 //now, define the Serial Manager class
 class SerialManager {
   public:
-    SerialManager(TympanBase &_audioHardware,
-          int n,
+    SerialManager(int n,
           GainAlgorithm_t *gain_algsL, 
           GainAlgorithm_t *gain_algsR,
           AudioControlTestAmpSweep_F32 &_ampSweepTester,
@@ -37,8 +36,7 @@ class SerialManager {
           AudioEffectFeedbackCancel_F32 &_feedbackCancel,
           AudioEffectFeedbackCancel_F32 &_feedbackCancelR
           )
-      : audioHardware(_audioHardware),
-        gain_algorithmsL(gain_algsL), 
+      : gain_algorithmsL(gain_algsL), 
         gain_algorithmsR(gain_algsR),
         ampSweepTester(_ampSweepTester), 
         freqSweepTester(_freqSweepTester),
@@ -82,7 +80,6 @@ class SerialManager {
     int stream_chars_received;
     float FAKE_GAIN_LEVEL[8] = {0.,0.,0.,0.,0.,0.,0.,0.};
   private:
-    TympanBase &audioHardware;
     GainAlgorithm_t *gain_algorithmsL;  //point to first element in array of expanders
     GainAlgorithm_t *gain_algorithmsR;  //point to first element in array of expanders
     AudioControlTestAmpSweep_F32 &ampSweepTester;
@@ -95,53 +92,54 @@ class SerialManager {
 #define MAX_CHANS 8
 void SerialManager::printChanUpMsg(int N_CHAN) {
   char fooChar[] = "12345678";
-  audioHardware.print("   ");
+  myTympan.print("   ");
   for (int i=0;i<min(MAX_CHANS,N_CHAN);i++) {
-    audioHardware.print(fooChar[i]); 
-    if (i < (N_CHAN-1)) audioHardware.print(",");
+    myTympan.print(fooChar[i]); 
+    if (i < (N_CHAN-1)) myTympan.print(",");
   }
-  audioHardware.print(": Increase linear gain of given channel (1-");
-  audioHardware.print(N_CHAN);
-  audioHardware.print(") by ");
+  myTympan.print(": Increase linear gain of given channel (1-");
+  myTympan.print(N_CHAN);
+  myTympan.print(") by ");
 }
 void SerialManager::printChanDownMsg(int N_CHAN) {
   char fooChar[] = "!@#$%^&*";
-  audioHardware.print("   ");
+  myTympan.print("   ");
   for (int i=0;i<min(MAX_CHANS,N_CHAN);i++) {
-    audioHardware.print(fooChar[i]); 
-    if (i < (N_CHAN-1)) audioHardware.print(",");
+    myTympan.print(fooChar[i]); 
+    if (i < (N_CHAN-1)) myTympan.print(",");
   }
-  audioHardware.print(": Decrease linear gain of given channel (1-");
-  audioHardware.print(N_CHAN);
-  audioHardware.print(") by ");
+  myTympan.print(": Decrease linear gain of given channel (1-");
+  myTympan.print(N_CHAN);
+  myTympan.print(") by ");
 }
 void SerialManager::printHelp(void) {  
-  audioHardware.println();
-  audioHardware.println("SerialManager Help: Available Commands:");
-  audioHardware.println("   h: Print this help");
-  audioHardware.println("   g: Print the gain settings of the device.");
-  audioHardware.println("   c/C: Enable/disable printing of CPU and Memory");
-  audioHardware.println("   l: Toggle printing of pre-gain per-channel signal levels (dBFS)");
-  audioHardware.println("   L: Toggle printing of pre-gain per-channel signal levels (dBSPL, per DSL 'maxdB')");
-  audioHardware.println("   A: Self-Generated Test: Amplitude sweep.  End-to-End Measurement.");
-  audioHardware.println("   F: Self-Generated Test: Frequency sweep.  End-to-End Measurement.");
-  audioHardware.println("   f: Self-Generated Test: Frequency sweep.  Measure filterbank.");
-  audioHardware.print("   k: Increase the gain of all channels (ie, knob gain) by "); audioHardware.print(channelGainIncrement_dB); audioHardware.println(" dB");
-  audioHardware.print("   K: Decrease the gain of all channels (ie, knob gain) by ");audioHardware.println(" dB");
-  audioHardware.println("   q,Q: Mute or Unmute the audio.");
-  audioHardware.println("   s,S: Mono or Stereo Audio.");
-  printChanUpMsg(N_CHAN);  audioHardware.print(channelGainIncrement_dB); audioHardware.println(" dB");
-  printChanDownMsg(N_CHAN);  audioHardware.print(channelGainIncrement_dB); audioHardware.println(" dB");
-  audioHardware.print("   d,D: Switch to WDRC Preset A or Preset B");audioHardware.println();
-  //audioHardware.print("   p,P: Enable or Disable Adaptive Feedback Cancelation.");audioHardware.println();
-  //audioHardware.print("   m,M: Increase or Decrease AFC mu (currently "); audioHardware.print(feedbackCanceler.getMu(),6) ; audioHardware.println(").");
-  //audioHardware.print("   r,R: Increase or Decrease AFC rho (currently "); audioHardware.print(feedbackCanceler.getRho(),6) ; audioHardware.println(").");
-  //audioHardware.print("   e,E: Increase or Decrease AFC eps (currently "); audioHardware.print(feedbackCanceler.getEps(),6) ; audioHardware.println(").");
-  //audioHardware.print("   x,X: Increase or Decrease AFC filter length (currently "); audioHardware.print(feedbackCanceler.getAfl()) ; audioHardware.println(").");
-  //audioHardware.print("   u,U: Increase or Decrease Cutoff Frequency of HP Prefilter (currently "); audioHardware.print(audioHardware.getHPCutoff_Hz()); audioHardware.println(" Hz).");
-  //audioHardware.print("   z,Z: Increase or Decrease AFC N_Coeff_To_Zero (currently "); audioHardware.print(feedbackCanceler.getNCoeffToZero()) ; audioHardware.println(").");  
-  audioHardware.println("   J: Print the JSON config object, for the Tympan Remote app");
-  audioHardware.println();
+  myTympan.println();
+  myTympan.println("SerialManager Help: Available Commands:");
+  myTympan.println("   h: Print this help");
+  myTympan.println("   g: Print the gain settings of the device.");
+  myTympan.println("   c/C: Enable/disable printing of CPU and Memory");
+  myTympan.println("   l: Toggle printing of pre-gain per-channel signal levels (dBFS)");
+  myTympan.println("   L: Toggle printing of pre-gain per-channel signal levels (dBSPL, per DSL 'maxdB')");
+  myTympan.println("   A: Self-Generated Test: Amplitude sweep.  End-to-End Measurement.");
+  myTympan.println("   F: Self-Generated Test: Frequency sweep.  End-to-End Measurement.");
+  myTympan.println("   f: Self-Generated Test: Frequency sweep.  Measure filterbank.");
+  myTympan.print("   k: Increase the gain of all channels (ie, knob gain) by "); myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
+  myTympan.print("   K: Decrease the gain of all channels (ie, knob gain) by ");myTympan.println(" dB");
+  myTympan.println("   q,Q: Mute or Unmute the audio.");
+  myTympan.println("   s,S: Mono or Stereo Audio.");
+  printChanUpMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
+  printChanDownMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
+  myTympan.print("   d,D: Switch to WDRC Preset A or Preset B");myTympan.println();
+  //myTympan.print("   p,P: Enable or Disable Adaptive Feedback Cancelation.");myTympan.println();
+  //myTympan.print("   m,M: Increase or Decrease AFC mu (currently "); myTympan.print(feedbackCanceler.getMu(),6) ; myTympan.println(").");
+  //myTympan.print("   r,R: Increase or Decrease AFC rho (currently "); myTympan.print(feedbackCanceler.getRho(),6) ; myTympan.println(").");
+  //myTympan.print("   e,E: Increase or Decrease AFC eps (currently "); myTympan.print(feedbackCanceler.getEps(),6) ; myTympan.println(").");
+  //myTympan.print("   x,X: Increase or Decrease AFC filter length (currently "); myTympan.print(feedbackCanceler.getAfl()) ; myTympan.println(").");
+  //myTympan.print("   u,U: Increase or Decrease Cutoff Frequency of HP Prefilter (currently "); myTympan.print(myTympan.getHPCutoff_Hz()); myTympan.println(" Hz).");
+  //myTympan.print("   z,Z: Increase or Decrease AFC N_Coeff_To_Zero (currently "); myTympan.print(feedbackCanceler.getNCoeffToZero()) ; myTympan.println(").");  
+  myTympan.println("   J: Print the JSON config object, for the Tympan Remote app");
+  myTympan.println("   ],}: Enable/Disable printing of data to plot.");
+  myTympan.println();
 }
 
 //functions in the main sketch that I want to call from here
@@ -198,11 +196,11 @@ void SerialManager::respondToByte(char c) {
           Serial.println("Time to process stream!");
           processStream();
         } else {
-          audioHardware.print("ERROR: Expected string terminator ");
-          audioHardware.print(DATASTREAM_END_CHAR, HEX);
-          audioHardware.print("; found ");
-          audioHardware.print(c,HEX);
-          audioHardware.println(" instead.");
+          myTympan.print("ERROR: Expected string terminator ");
+          myTympan.print(DATASTREAM_END_CHAR, HEX);
+          myTympan.print("; found ");
+          myTympan.print(c,HEX);
+          myTympan.println(" instead.");
         }
         serial_read_state = SINGLE_CHAR;
         stream_chars_received = 0;
@@ -274,28 +272,38 @@ void SerialManager::processSingleCharacter(char c) {
         ampSweepTester.setStepPattern(start_amp_dB, end_amp_dB, step_amp_dB);
         ampSweepTester.setTargetDurPerStep_sec(1.0);
       }
-      audioHardware.println("Received: starting test using amplitude sweep...");
+      myTympan.println("Received: starting test using amplitude sweep...");
       ampSweepTester.begin();
       while (!ampSweepTester.available()) {delay(100);};
-      audioHardware.println("Press 'h' for help...");
+      myTympan.println("Press 'h' for help...");
       break;
     case 'c':
       Serial.println("Received: printing memory and CPU.");
       myState.flag_printCPUandMemory = true;
-      //setButtonState("cpuStart",true);
+      setButtonState("cpuStart",true);
       break;
     case 'C':
       Serial.println("Received: stopping printing of memory and CPU.");
       myState.flag_printCPUandMemory = false;
-      //setButtonState("cpuStart",false);
+      setButtonState("cpuStart",false);
       break;
+    case ']':
+      myTympan.println("Received: printing plot data.");
+      myState.flag_printPlottableData = true;
+      setButtonState("printStart",true);
+      break;
+    case '}':
+      myTympan.println("Received: stopping printing plot data.");
+      myState.flag_printPlottableData = false;
+      setButtonState("printStart",false);
+      break;        
     case 'd':
-      audioHardware.println("Received: changing to Preset A");
+      myTympan.println("Received: changing to Preset A");
       setDSLConfiguration(State::DSL_PRESET_A);
       setButtonState_algPresets();
       break;      
     case 'D':
-      audioHardware.println("Received: changing to Preset B");
+      myTympan.println("Received: changing to Preset B");
       setDSLConfiguration(State::DSL_PRESET_B);
       setButtonState_algPresets();      break;
     case 'F':
@@ -306,10 +314,10 @@ void SerialManager::processSingleCharacter(char c) {
         freqSweepTester.setStepPattern(start_freq_Hz, end_freq_Hz, step_octave);
         freqSweepTester.setTargetDurPerStep_sec(1.0);
       }
-      audioHardware.println("Received: starting test using frequency sweep, end-to-end assessment...");
+      myTympan.println("Received: starting test using frequency sweep, end-to-end assessment...");
       freqSweepTester.begin();
       while (!freqSweepTester.available()) {delay(100);};
-      audioHardware.println("Press 'h' for help...");
+      myTympan.println("Press 'h' for help...");
       break; 
     case 'f':
       //frequency sweep test
@@ -319,29 +327,29 @@ void SerialManager::processSingleCharacter(char c) {
         freqSweepTester_filterbank.setStepPattern(start_freq_Hz, end_freq_Hz, step_octave);
         freqSweepTester_filterbank.setTargetDurPerStep_sec(0.5);
       }
-      audioHardware.println("Received: starting test using frequency sweep.  Filterbank assessment...");
+      myTympan.println("Received: starting test using frequency sweep.  Filterbank assessment...");
       freqSweepTester_filterbank.begin();
       while (!freqSweepTester_filterbank.available()) {delay(100);};
-      audioHardware.println("Press 'h' for help...");
+      myTympan.println("Press 'h' for help...");
       break; 
     case 'q':
       configureLeftRightMixer(State::INPUTMIX_MUTE);
-      audioHardware.println("Received: Muting audio.");
+      myTympan.println("Received: Muting audio.");
       setButtonState_inputMixer();
       break;
     case 'Q':
       configureLeftRightMixer(State::INPUTMIX_STEREO);
-      audioHardware.println("Received: Stereo audio.");
+      myTympan.println("Received: Stereo audio.");
       setButtonState_inputMixer();
       break;  
     case 's':
       configureLeftRightMixer(State::INPUTMIX_MONO);
-      audioHardware.println("Received: Mono audio.");
+      myTympan.println("Received: Mono audio.");
       setButtonState_inputMixer();
       break;
     case 'S':
       configureLeftRightMixer(State::INPUTMIX_STEREO);
-      audioHardware.println("Received: Stereo audio.");
+      myTympan.println("Received: Stereo audio.");
       setButtonState_inputMixer();
       break;   
     case 'J':
@@ -353,18 +361,23 @@ void SerialManager::processSingleCharacter(char c) {
           "{'title':'Presets','cards':["
               "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'alg_preset0'},{'label': 'Linear', 'cmd': 'D', 'id': 'alg_preset1'}]},"
               "{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mono','cmd': 's','id':'inp_mono','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'12'}]}"
-          "]},"
+          "]},"   //include comma if NOT the last one
           "{'title':'Tuner','cards':["
               "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
               "{'name':'High Gain', 'buttons':[{'label': '-', 'cmd': '#','width':'4'},{'id':'highGain', 'label': '', 'width':'4'},{'label': '+', 'cmd': '3','width':'4'}]},"
               "{'name':'Mid Gain', 'buttons':[{'label': '-', 'cmd': '@','width':'4'},{'id':'midGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '2','width':'4'}]},"
               "{'name':'Low Gain', 'buttons':[{'label': '-', 'cmd': '!','width':'4'},{'id':'lowGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '1','width':'4'}]}"                          
-          "]}"
+          "]}," //include comma if NOT the last one
+          "{'title':'Globals','cards':["
+              "{'name':'CPU Reporting', 'buttons':[{'label': 'Start', 'cmd' :'c','id':'cpuStart'},{'label': 'Stop', 'cmd': 'C'}]},"
+              //"{'name':'Record Mics to SD Card','buttons':[{'label': 'Start', 'cmd': 'r', 'id':'recordStart'},{'label': 'Stop', 'cmd': 's'}]},"
+              "{'name':'Send Data to Plot', 'buttons':[{'label': 'Start', 'cmd' :']','id':'plotStart'},{'label': 'Stop', 'cmd': '}'}]}"
+             "]}" //no comma if last one
         "],"
         "'prescription':{'type':'BoysTown','pages':['multiband','broadband','afc','plot']}"
       "}";
 
-      audioHardware.println(jsonConfig);
+      myTympan.println(jsonConfig);
       delay(100);
       setFullGUIState();
       setButtonText("highGain",0);
@@ -373,96 +386,96 @@ void SerialManager::processSingleCharacter(char c) {
       break;
     }
     case 'l':
-      audioHardware.println("Received: toggle printing of per-band ave signal levels.");
+      myTympan.println("Received: toggle printing of per-band ave signal levels.");
       { bool as_dBSPL = false; togglePrintAveSignalLevels(as_dBSPL); }
       break;
     case 'L':
-      audioHardware.println("Received: toggle printing of per-band ave signal levels.");
+      myTympan.println("Received: toggle printing of per-band ave signal levels.");
       { bool as_dBSPL = true; togglePrintAveSignalLevels(as_dBSPL); }
       break;
 //    case 'p':
-//      audioHardware.println("Received: enabling feedback cancelation.");
+//      myTympan.println("Received: enabling feedback cancelation.");
 //      feedbackCanceler.setEnable(true);feedbackCancelerR.setEnable(true);
 //      //feedbackCanceler.resetAFCfilter();
 //      break;
 //    case 'P':
-//      audioHardware.println("Received: disabling feedback cancelation.");      
+//      myTympan.println("Received: disabling feedback cancelation.");      
 //      feedbackCanceler.setEnable(false);feedbackCancelerR.setEnable(false);
 //      break;
 //    case 'm':
 //      old_val = feedbackCanceler.getMu(); new_val = old_val * 2.0;
-//      audioHardware.print("Received: increasing AFC mu to ");
-//      audioHardware.println(feedbackCanceler.setMu(new_val),6);
+//      myTympan.print("Received: increasing AFC mu to ");
+//      myTympan.println(feedbackCanceler.setMu(new_val),6);
 //      feedbackCancelerR.setMu(new_val);
 //      break;
 //    case 'M':
 //      old_val = feedbackCanceler.getMu(); new_val = old_val / 2.0;
-//      audioHardware.print("Received: decreasing AFC mu to "); 
-//      audioHardware.println(feedbackCanceler.setMu(new_val),6);
+//      myTympan.print("Received: decreasing AFC mu to "); 
+//      myTympan.println(feedbackCanceler.setMu(new_val),6);
 //      feedbackCancelerR.setMu(new_val);
 //      break;
 //    case 'r':
 //      old_val = feedbackCanceler.getRho(); new_val = 1.0-((1.0-old_val)/sqrt(2.0));
-//      audioHardware.print("Received: increasing AFC rho to "); 
-//      audioHardware.println(feedbackCanceler.setRho(new_val),6);
+//      myTympan.print("Received: increasing AFC rho to "); 
+//      myTympan.println(feedbackCanceler.setRho(new_val),6);
 //      feedbackCancelerR.setRho(new_val);
 //      break;
 //    case 'R':
 //      old_val = feedbackCanceler.getRho(); new_val = 1.0-((1.0-old_val)*sqrt(2.0));
-//      audioHardware.print("Received: increasing AFC rho to "); 
-//      audioHardware.println(feedbackCanceler.setRho(new_val),6);
+//      myTympan.print("Received: increasing AFC rho to "); 
+//      myTympan.println(feedbackCanceler.setRho(new_val),6);
 //      feedbackCancelerR.setRho(new_val);
 //      break;
 //    case 'e':
 //      old_val = feedbackCanceler.getEps(); new_val = old_val*sqrt(10.0);
-//      audioHardware.print("Received: increasing AFC eps to "); 
-//      audioHardware.println(feedbackCanceler.setEps(new_val),6);
+//      myTympan.print("Received: increasing AFC eps to "); 
+//      myTympan.println(feedbackCanceler.setEps(new_val),6);
 //      feedbackCancelerR.setEps(new_val);
 //      break;
 //    case 'E':
 //      old_val = feedbackCanceler.getEps(); new_val = old_val/sqrt(10.0);
-//      audioHardware.print("Received: increasing AFC eps to ");
-//      audioHardware.println(feedbackCanceler.setEps(new_val),6);
+//      myTympan.print("Received: increasing AFC eps to ");
+//      myTympan.println(feedbackCanceler.setEps(new_val),6);
 //      feedbackCancelerR.setEps(new_val);
 //      break;    
 //    case 'x':
 //      old_val = feedbackCanceler.getAfl(); new_val = old_val + 5;
-//      audioHardware.print("Received: increasing AFC filter length to ");
-//      audioHardware.println(feedbackCanceler.setAfl(new_val));
+//      myTympan.print("Received: increasing AFC filter length to ");
+//      myTympan.println(feedbackCanceler.setAfl(new_val));
 //      feedbackCancelerR.setAfl(new_val);
 //      break;    
 //    case 'X':
 //      old_val = feedbackCanceler.getAfl(); new_val = old_val - 5;
-//      audioHardware.print("Received: decreasing AFC filter length to ");
-//      audioHardware.println(feedbackCanceler.setAfl(new_val));
+//      myTympan.print("Received: decreasing AFC filter length to ");
+//      myTympan.println(feedbackCanceler.setAfl(new_val));
 //      feedbackCanceler.setAfl(new_val);
 //      break;            
 //    case 'z':
 //      old_val = feedbackCanceler.getNCoeffToZero(); new_val = old_val + 5;
-//      audioHardware.print("Received: increasing AFC N_Coeff_To_Zero to "); audioHardware.println(feedbackCanceler.setNCoeffToZero(new_val));
+//      myTympan.print("Received: increasing AFC N_Coeff_To_Zero to "); myTympan.println(feedbackCanceler.setNCoeffToZero(new_val));
 //      break;
 //    case 'Z':
 //      old_val = feedbackCanceler.getNCoeffToZero(); new_val = old_val - 5;
-//      audioHardware.print("Received: decreasing AFC N_Coeff_To_Zero to "); audioHardware.println(feedbackCanceler.setNCoeffToZero(new_val));      
+//      myTympan.print("Received: decreasing AFC N_Coeff_To_Zero to "); myTympan.println(feedbackCanceler.setNCoeffToZero(new_val));      
 //      break;
     case 'u':
     {
-      old_val = audioHardware.getHPCutoff_Hz(); new_val = min(old_val*sqrt(2.0), 8000.0); //half-octave steps up
-      float fs_Hz = audioHardware.getSampleRate_Hz();
-      audioHardware.setHPFonADC(true,new_val,fs_Hz);
-      audioHardware.print("Received: Increasing ADC HP Cutoff to "); audioHardware.print(audioHardware.getHPCutoff_Hz());audioHardware.println(" Hz");
+      old_val = myTympan.getHPCutoff_Hz(); new_val = min(old_val*sqrt(2.0), 8000.0); //half-octave steps up
+      float fs_Hz = myTympan.getSampleRate_Hz();
+      myTympan.setHPFonADC(true,new_val,fs_Hz);
+      myTympan.print("Received: Increasing ADC HP Cutoff to "); myTympan.print(myTympan.getHPCutoff_Hz());myTympan.println(" Hz");
     }
       break;
     case 'U':
     {
-      old_val = audioHardware.getHPCutoff_Hz(); new_val = max(old_val/sqrt(2.0), 5.0); //half-octave steps down
-      float fs_Hz = audioHardware.getSampleRate_Hz();
-      audioHardware.setHPFonADC(true,new_val,fs_Hz);
-      audioHardware.print("Received: Decreasing ADC HP Cutoff to "); audioHardware.print(audioHardware.getHPCutoff_Hz());audioHardware.println(" Hz");   
+      old_val = myTympan.getHPCutoff_Hz(); new_val = max(old_val/sqrt(2.0), 5.0); //half-octave steps down
+      float fs_Hz = myTympan.getSampleRate_Hz();
+      myTympan.setHPFonADC(true,new_val,fs_Hz);
+      myTympan.print("Received: Decreasing ADC HP Cutoff to "); myTympan.print(myTympan.getHPCutoff_Hz());myTympan.println(" Hz");   
       break;
     }
     case 'b':
-      audioHardware.println("Received b; sending test dsl");
+      myTympan.println("Received b; sending test dsl");
       BTNRH_WDRC::CHA_DSL test_dsl = {5,  // attack (ms)
         300,  // release (ms)
         115,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
@@ -477,8 +490,7 @@ void SerialManager::processSingleCharacter(char c) {
         {90.f, 90.f, 90.f,     90.f, 90.f, 91.f, 92.f, 93.f}    // output limiting threshold (comp ratio 10)
       };
       sendStreamDSL(test_dsl);
-
-      break;
+      break;    
   }
 }
 
@@ -494,27 +506,27 @@ void SerialManager::processStream(void) {
   }
   idx++; // move past the datastream separator
 
-  //audioHardware.print("Received stream: ");
-  //audioHardware.print(stream_data);
+  //myTympan.print("Received stream: ");
+  //myTympan.print(stream_data);
 
   if (streamType == "gha") {    
-    audioHardware.println("Stream is of type 'gha'.");
+    myTympan.println("Stream is of type 'gha'.");
     interpretStreamGHA(idx);
   } else if (streamType == "dsl") {
-    audioHardware.println("Stream is of type 'dsl'.");
+    myTympan.println("Stream is of type 'dsl'.");
     interpretStreamDSL(idx);
   } else if (streamType == "afc") {
-    audioHardware.println("Stream is of type 'afc'.");
+    myTympan.println("Stream is of type 'afc'.");
     interpretStreamAFC(idx);
   } else if (streamType == "test") {    
-    audioHardware.println("Stream is of type 'test'.");
+    myTympan.println("Stream is of type 'test'.");
     tmpInt = *((int*)(stream_data+idx)); idx = idx+4;
-    audioHardware.print("int is "); audioHardware.println(tmpInt);
+    myTympan.print("int is "); myTympan.println(tmpInt);
     tmpFloat = *((float*)(stream_data+idx)); idx = idx+4;
-    audioHardware.print("float is "); audioHardware.println(tmpFloat);
+    myTympan.print("float is "); myTympan.println(tmpFloat);
   } else {
-    audioHardware.print("Unknown stream type: ");
-    audioHardware.println(streamType);
+    myTympan.print("Unknown stream type: ");
+    myTympan.println(streamType);
   }
 }
 
@@ -533,20 +545,20 @@ void SerialManager::interpretStreamGHA(int idx) {
   threshold     = *((float*)(stream_data+idx)); idx=idx+4;
 
   /* Printing too much causes the teensy to freeze. 
-  audioHardware.println("New WDRC:");
-  audioHardware.print("  attack = "); audioHardware.println(attack); 
-  audioHardware.print("  release = "); audioHardware.println(release);
-  audioHardware.print("  sampRate = "); audioHardware.println(sampRate); 
-  audioHardware.print("  maxdB = "); audioHardware.println(maxdB); 
-  audioHardware.print("  compRatioLow = "); audioHardware.println(compRatioLow); 
-  audioHardware.print("  kneepoint = "); audioHardware.println(kneepoint); 
-  audioHardware.print("  compStartGain = "); audioHardware.println(compStartGain); 
-  audioHardware.print("  compStartKnee = "); audioHardware.println(compStartKnee); 
-  audioHardware.print("  compRatioHigh = "); audioHardware.println(compRatioHigh); 
-  audioHardware.print("  threshold = "); audioHardware.println(threshold); 
+  myTympan.println("New WDRC:");
+  myTympan.print("  attack = "); myTympan.println(attack); 
+  myTympan.print("  release = "); myTympan.println(release);
+  myTympan.print("  sampRate = "); myTympan.println(sampRate); 
+  myTympan.print("  maxdB = "); myTympan.println(maxdB); 
+  myTympan.print("  compRatioLow = "); myTympan.println(compRatioLow); 
+  myTympan.print("  kneepoint = "); myTympan.println(kneepoint); 
+  myTympan.print("  compStartGain = "); myTympan.println(compStartGain); 
+  myTympan.print("  compStartKnee = "); myTympan.println(compStartKnee); 
+  myTympan.print("  compRatioHigh = "); myTympan.println(compRatioHigh); 
+  myTympan.print("  threshold = "); myTympan.println(threshold); 
   */
   
-  audioHardware.println("SUCCESS.");    
+  myTympan.println("SUCCESS.");    
 
   BTNRH_WDRC::CHA_WDRC gha = {attack, release, sampRate, maxdB, 
     compRatioLow, kneepoint, compStartGain, compStartKnee, compRatioHigh, threshold};
@@ -579,19 +591,19 @@ void SerialManager::interpretStreamDSL(int idx) {
   idx = readStreamFloatArray(idx, compStartKnee, 8);
   idx = readStreamFloatArray(idx, threshold, 8);
 
-  audioHardware.print("  freq = {"); 
-  audioHardware.print(freq[0]); 
+  myTympan.print("  freq = {"); 
+  myTympan.print(freq[0]); 
   for (i=1; i<8; i++) {
-    audioHardware.print(", "); audioHardware.print(freq[i]);
+    myTympan.print(", "); myTympan.print(freq[i]);
   }
-  audioHardware.println("}");
+  myTympan.println("}");
 
-  audioHardware.print("  lowSPLRatio = {"); 
-  audioHardware.print(lowSPLRatio[0]); 
+  myTympan.print("  lowSPLRatio = {"); 
+  myTympan.print(lowSPLRatio[0]); 
   for (i=1; i<8; i++) {
-    audioHardware.print(", "); audioHardware.print(lowSPLRatio[i]);
+    myTympan.print(", "); myTympan.print(lowSPLRatio[i]);
   }
-  audioHardware.println("}");
+  myTympan.println("}");
 
   BTNRH_WDRC::CHA_DSL dsl = {
     attack,  // attack (ms)
@@ -609,7 +621,7 @@ void SerialManager::interpretStreamDSL(int idx) {
   };
   updateDSL(dsl);
   
-  audioHardware.println("SUCCESS.");      
+  myTympan.println("SUCCESS.");      
 }
 
 void SerialManager::interpretStreamAFC(int idx) {
@@ -628,7 +640,7 @@ void SerialManager::interpretStreamAFC(int idx) {
   BTNRH_WDRC::CHA_AFC afc = {default_to_active, afl, mu, rho, eps};
   updateAFC(afc);
   
-  audioHardware.println("SUCCESS.");
+  myTympan.println("SUCCESS.");
 }
 
 int SerialManager::readStreamIntArray(int idx, int* arr, int len) {
@@ -652,23 +664,23 @@ int SerialManager::readStreamFloatArray(int idx, float* arr, int len) {
 }
 
 void SerialManager::sendStreamDSL(const BTNRH_WDRC::CHA_DSL &this_dsl) {
-  audioHardware.print("PRESC=DSL:");
-  audioHardware.print(DSL_MXCH);
-  audioHardware.print(":");
-  audioHardware.write((uint8_t*) &this_dsl, sizeof(this_dsl));
-  audioHardware.println("");
+  myTympan.print("PRESC=DSL:");
+  myTympan.print(DSL_MXCH);
+  myTympan.print(":");
+  myTympan.write((uint8_t*) &this_dsl, sizeof(this_dsl));
+  myTympan.println("");
 }
 
 void SerialManager::sendStreamGHA(const BTNRH_WDRC::CHA_WDRC &this_gha) {
-  audioHardware.print("PRESC=GHA:");
-  audioHardware.write((uint8_t*) &this_gha, sizeof(this_gha));
-  audioHardware.println("");
+  myTympan.print("PRESC=GHA:");
+  myTympan.write((uint8_t*) &this_gha, sizeof(this_gha));
+  myTympan.println("");
 };
 
 void SerialManager::sendStreamAFC(const BTNRH_WDRC::CHA_AFC &this_afc) {
-  audioHardware.print("PRESC=AFC:");
-  audioHardware.write((uint8_t*) &this_afc, sizeof(this_afc));
-  audioHardware.println("");
+  myTympan.print("PRESC=AFC:");
+  myTympan.write((uint8_t*) &this_afc, sizeof(this_afc));
+  myTympan.println("");
 };
 
 void SerialManager::incrementChannelGain(int chan, float change_dB) {
@@ -693,6 +705,18 @@ void SerialManager::setFullGUIState(void) {
   setButtonState_algPresets();
   setButtonState_inputMixer();
   //add something here to send prescription values to the remote device
+
+  //update buttons related to the "print" states
+  if (myState.flag_printCPUandMemory) {
+    setButtonState("cpuStart",true);
+  } else {
+    setButtonState("cpuStart",false);
+  }
+  if (myState.flag_printPlottableData) {
+    setButtonState("plotStart",true);
+  } else {
+    setButtonState("plotStart",false);
+  }
 }
 
 void SerialManager::setButtonState_algPresets(void) {
@@ -722,14 +746,14 @@ void SerialManager::setButtonState_inputMixer(void) {
 
 void SerialManager::setButtonState(String btnId, bool newState) {
   if (newState) {
-    audioHardware.println("STATE=BTN:" + btnId + ":1");
+    myTympan.println("STATE=BTN:" + btnId + ":1");
   } else {
-    audioHardware.println("STATE=BTN:" + btnId + ":0");
+    myTympan.println("STATE=BTN:" + btnId + ":0");
   }
 }
 
 void SerialManager::setButtonText(String btnId, String text) {
-  audioHardware.println("TEXT=BTN:" + btnId + ":"+text);
+  myTympan.println("TEXT=BTN:" + btnId + ":"+text);
 }
 
 #endif

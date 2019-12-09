@@ -70,6 +70,10 @@ class State {
 //      local_serial->print(", Out "); local_serial->print(vol_knob_gain_dB,1);
 //      local_serial->println();
 //    }
+
+    bool flag_printPlottableData = false;
+    
+
   private:
     Print *local_serial;
     AudioSettings_F32 *local_audio_settings;

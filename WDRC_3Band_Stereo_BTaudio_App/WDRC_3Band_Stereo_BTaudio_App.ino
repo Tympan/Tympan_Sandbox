@@ -158,7 +158,7 @@ void togglePrintAveSignalLevels(bool as_dBSPL) {
   enable_printAveSignalLevels = !enable_printAveSignalLevels;
   printAveSignalLevels_as_dBSPL = as_dBSPL;
 };
-SerialManager serialManager(myTympan, N_CHAN_MAX,
+SerialManager serialManager(N_CHAN_MAX,
       expCompLim[LEFT], expCompLim[RIGHT], 
       ampSweepTester, freqSweepTester, freqSweepTester_FIR,
       feedbackCancel, feedbackCancelR);
@@ -398,7 +398,7 @@ void setup() {
   setupAudioProcessing();
 
   //update the potentiometer settings
-  if (USE_VOLUME_KNOB) servicePotentiometer(millis());
+  if (USE_VOLUME_KNOB) servicePotentiometer(millis(),0);  //the "0" forces it to read the pot now
 
   //End of setup
   printGainSettings();
@@ -418,17 +418,20 @@ void loop() {
   while (Serial1.available()) serialManager.respondToByte((char)Serial1.read()); //BT Serial
 
   //service the potentiometer...if enough time has passed
-  if (USE_VOLUME_KNOB) servicePotentiometer(millis());
+  if (USE_VOLUME_KNOB) servicePotentiometer(millis(),100); //service the pot every 100 msec
 
   //check the mic_detect signal
-  serviceMicDetect(millis(), 500);
+  serviceMicDetect(millis(), 500);  //service the MicDetect every 500 msec
 
   //update the memory and CPU usage...if enough time has passed
-  if (myState.flag_printCPUandMemory) myState.printCPUandMemory(millis());
+  if (myState.flag_printCPUandMemory) myState.printCPUandMemory(millis(),3000); //print CPU and mem every 3000 msec
 
   //print info about the signal processing
   updateAveSignalLevels(millis());
   if (enable_printAveSignalLevels) printAveSignalLevels(millis(), printAveSignalLevels_as_dBSPL);
+
+  //print plottable data
+  if (myState.flag_printPlottableData) printPlottableData(millis(), 1000);  //print values every 1000msec
 
 } //end loop()
 
@@ -437,8 +440,8 @@ void loop() {
 
 //servicePotentiometer: listens to the blue potentiometer and sends the new pot value
 //  to the audio processing algorithm as a control parameter
-void servicePotentiometer(unsigned long curTime_millis) {
-  static unsigned long updatePeriod_millis = 100; //how many milliseconds between updating the potentiometer reading?
+void servicePotentiometer(unsigned long curTime_millis,unsigned long updatePeriod_millis) {
+  //static unsigned long updatePeriod_millis = 100; //how many milliseconds between updating the potentiometer reading?
   static unsigned long lastUpdate_millis = 0;
   static float prev_val = -1.0;
 
@@ -556,6 +559,30 @@ void printAveSignalLevelsMessage(bool as_dBSPL) {
   }
   myTympan.println();
 }
+
+void printPlottableData(unsigned long curTime_millis, unsigned long updatePeriod_millis) {
+  //static unsigned long updatePeriod_millis = 100; //how many milliseconds between updating the potentiometer reading?
+  static unsigned long lastUpdate_millis = 0;
+  static int counter=0;
+
+  //has enough time passed to update everything?
+  if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0; //handle wrap-around of the clock
+  if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
+
+    //print data to be plotted
+    myTympan.print("P");          //Let's assume that all plottable data starts with a "P"
+    myTympan.print(counter++);    //Let's plot a counter
+    if (counter > 100) counter=0; //let's have the counter stay between 0 and 100
+    myTympan.print(",");
+    myTympan.print(audio_settings.processorUsage(), 1);  //let's plot the CPU being used (should be 0-100)
+    myTympan.print(",");
+    myTympan.print(aveSignalLevels_dBFS[LEFT][0] + overall_cal_dBSPL_at0dBFS, 1); //let's plot the ave signal level for the first channel
+    myTympan.println();
+
+    lastUpdate_millis = curTime_millis; //we will use this value the next time around.
+    
+  } // end if
+} //end servicePotentiometer();
 
 // // I don't think that this is really needed to receive audio from the BT Module...WEA 2019-11-27
 //
