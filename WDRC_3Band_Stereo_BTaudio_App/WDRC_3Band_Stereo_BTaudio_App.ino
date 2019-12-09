@@ -431,7 +431,7 @@ void loop() {
   if (enable_printAveSignalLevels) printAveSignalLevels(millis(), printAveSignalLevels_as_dBSPL);
 
   //print plottable data
-  if (myState.flag_printPlottableData) printPlottableData(millis(), 250);  //print values every 500msec
+  if (myState.flag_printPlottableData) printPlottableData(millis(), 250);  //print values every 250msec
 
 } //end loop()
 
