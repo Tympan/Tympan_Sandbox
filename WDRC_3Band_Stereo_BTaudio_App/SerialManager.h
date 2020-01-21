@@ -383,6 +383,9 @@ void SerialManager::processSingleCharacter(char c) {
       setButtonText("highGain",0);
       setButtonText("midGain",0);
       setButtonText("lowGain",0);
+      sendStreamDSL(myState.wdrc_perBand);
+      sendStreamGHA(myState.wdrc_broadBand);
+      sendStreamAFC(myState.afc);
       break;
     }
     case 'l':
