@@ -475,22 +475,24 @@ void SerialManager::processSingleCharacter(char c) {
       break;
     }
     case 'b':
-      myTympan.println("Received b; sending test dsl");
-      BTNRH_WDRC::CHA_DSL test_dsl = {5,  // attack (ms)
-        300,  // release (ms)
-        115,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
-        0,    // 0=left, 1=right...ignored
-        3,    //num channels used (must be less than MAX_CHAN constant set in the main program
-        {700.0, 2400.0,       1.e4, 1.e4, 1.e4, 1.e4, 1.e4},   // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
-        {0.57, 0.57, 0.57,     1.0, 1.0, 1.0, 1.0, 1.0},   // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
-        {73.0, 50.0, 50.0,    34., 34., 34., 34., 34.},   // expansion-end kneepoint
-        {0.f, 5.f, 10.f,       30.f, 30.f, 30.f, 30.f, 30.f},   // compression-start gain
-        {1.5f, 1.5f, 1.5f,     1.5f, 1.5f, 1.5f, 1.5f, 1.5f},   // compression ratio
-        {50.0, 50.0, 50.0,     50.0, 50.0, 50.0, 50.0, 50.0},   // compression-start kneepoint (input dB SPL)
-        {90.f, 90.f, 90.f,     90.f, 90.f, 91.f, 92.f, 93.f}    // output limiting threshold (comp ratio 10)
-      };
-      sendStreamDSL(test_dsl);
-      break;    
+      {
+        myTympan.println("Received b; sending test dsl");
+        BTNRH_WDRC::CHA_DSL test_dsl = {5.f,  // attack (ms)
+          300.f,  // release (ms)
+          115.f,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
+          0,    // 0=left, 1=right...ignored
+          3,    //num channels used (must be less than MAX_CHAN constant set in the main program
+          {700.0, 2400.0,       1.e4, 1.e4, 1.e4, 1.e4, 1.e4},   // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
+          {0.57, 0.57, 0.57,     1.0, 1.0, 1.0, 1.0, 1.0},   // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
+          {73.0, 50.0, 50.0,    34., 34., 34., 34., 34.},   // expansion-end kneepoint
+          {0.f, 5.f, 10.f,       30.f, 30.f, 30.f, 30.f, 30.f},   // compression-start gain
+          {1.5f, 1.5f, 1.5f,     1.5f, 1.5f, 1.5f, 1.5f, 1.5f},   // compression ratio
+          {50.0, 50.0, 50.0,     50.0, 50.0, 50.0, 50.0, 50.0},   // compression-start kneepoint (input dB SPL)
+          {90.f, 90.f, 90.f,     90.f, 90.f, 91.f, 92.f, 93.f}    // output limiting threshold (comp ratio 10)
+        };
+        sendStreamDSL(test_dsl);
+      }
+      break;
   }
 }
 
@@ -664,23 +666,64 @@ int SerialManager::readStreamFloatArray(int idx, float* arr, int len) {
 }
 
 void SerialManager::sendStreamDSL(const BTNRH_WDRC::CHA_DSL &this_dsl) {
+  int i;
+  int num_digits = 4; // How many spots past the decimal point are sent.  Only used for floats
+
   myTympan.print("PRESC=DSL:");
   myTympan.print(DSL_MXCH);
   myTympan.print(":");
-  myTympan.write((uint8_t*) &this_dsl, sizeof(this_dsl));
-  myTympan.println("");
+
+  myTympan.print(this_dsl.attack,num_digits); myTympan.print(",");
+  myTympan.print(this_dsl.release,num_digits); myTympan.print(",");
+  myTympan.print(this_dsl.maxdB,num_digits); myTympan.print(",");
+  myTympan.print(this_dsl.ear); myTympan.print(","); // int
+  myTympan.print(this_dsl.nchannel); myTympan.print(","); // int
+  for (i=0; i<this_dsl.nchannel; i++) { myTympan.print(this_dsl.cross_freq[i], num_digits); myTympan.print(","); }
+  for (i=0; i<this_dsl.nchannel; i++) { myTympan.print(this_dsl.exp_cr[i], num_digits); myTympan.print(","); }
+  for (i=0; i<this_dsl.nchannel; i++) { myTympan.print(this_dsl.exp_end_knee[i], num_digits); myTympan.print(","); }
+  for (i=0; i<this_dsl.nchannel; i++) { myTympan.print(this_dsl.tkgain[i], num_digits); myTympan.print(","); }
+  for (i=0; i<this_dsl.nchannel; i++) { myTympan.print(this_dsl.cr[i], num_digits); myTympan.print(","); }
+  for (i=0; i<this_dsl.nchannel; i++) { myTympan.print(this_dsl.tk[i], num_digits); myTympan.print(","); }
+  for (i=0; i<this_dsl.nchannel; i++) { myTympan.print(this_dsl.bolt[i], num_digits); myTympan.print(","); }
+
+  myTympan.println(DSL_MXCH); // We can double-check this on the other end to confirm we got the right thing
 }
 
 void SerialManager::sendStreamGHA(const BTNRH_WDRC::CHA_WDRC &this_gha) {
+  int num_digits = 4; // How many spots past the decimal point are sent.  Only used for floats
+  int checkVal = 11; // Arbitrary number, just to make sure we get the same number at the beginning and the end (as a double-check on the string parsing)
+
   myTympan.print("PRESC=GHA:");
-  myTympan.write((uint8_t*) &this_gha, sizeof(this_gha));
-  myTympan.println("");
+  myTympan.print(checkVal);
+  myTympan.print(":");
+  myTympan.print(this_gha.attack,        num_digits); myTympan.print(",");
+  myTympan.print(this_gha.release,       num_digits); myTympan.print(",");
+  myTympan.print(this_gha.fs,            num_digits); myTympan.print(",");
+  myTympan.print(this_gha.maxdB,         num_digits); myTympan.print(",");
+  myTympan.print(this_gha.exp_cr,        num_digits); myTympan.print(",");
+  myTympan.print(this_gha.exp_end_knee,  num_digits); myTympan.print(",");
+  myTympan.print(this_gha.tkgain,        num_digits); myTympan.print(",");
+  myTympan.print(this_gha.tk,            num_digits); myTympan.print(",");
+  myTympan.print(this_gha.cr,            num_digits); myTympan.print(",");
+  myTympan.print(this_gha.bolt,          num_digits); myTympan.print(",");
+  myTympan.println(checkVal);
 };
 
 void SerialManager::sendStreamAFC(const BTNRH_WDRC::CHA_AFC &this_afc) {
+  int num_digits = 4; // How many spots past the decimal point are sent.  Only used for floats
+  int checkVal = 11; // Arbitrary number, just to make sure we get the same number at the beginning and the end (as a double-check on the string parsing)
+
   myTympan.print("PRESC=AFC:");
-  myTympan.write((uint8_t*) &this_afc, sizeof(this_afc));
-  myTympan.println("");
+  myTympan.print(checkVal);
+  myTympan.print(":");
+
+  myTympan.print(this_afc.default_to_active); myTympan.print(",");
+  myTympan.print(this_afc.afl); myTympan.print(",");
+  myTympan.print(this_afc.mu, num_digits); myTympan.print(",");
+  myTympan.print(this_afc.rho, num_digits); myTympan.print(",");
+  myTympan.print(this_afc.eps, num_digits); myTympan.print(",");
+
+  myTympan.println(checkVal);
 };
 
 void SerialManager::incrementChannelGain(int chan, float change_dB) {
