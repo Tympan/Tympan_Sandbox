@@ -374,7 +374,7 @@ void SerialManager::processSingleCharacter(char c) {
               "{'name':'Send Data to Plot', 'buttons':[{'label': 'Start', 'cmd' :']','id':'plotStart'},{'label': 'Stop', 'cmd': '}'}]}"
              "]}" //no comma if last one
         "],"
-        "'prescription':{'type':'BoysTown','pages':['multiband','broadband','afc','plot']}"
+        "'prescription':{'type':'BoysTown','pages':['serialMonitor','multiband','broadband','afc','plot']}"
       "}";
 
       myTympan.println(jsonConfig);
