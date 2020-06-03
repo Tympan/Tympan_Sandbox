@@ -54,7 +54,8 @@ AudioSettings_F32   audio_settings(sample_rate_Hz, audio_block_samples);
 
 //create audio library objects for handling the audio
 Tympan                        myTympan(TympanRev::D);   //use TympanRev::D or TympanRev::C
-AudioInputI2S_F32             i2s_in(audio_settings);   //Digital audio input from the ADC
+AICShield                     earpieceShield(TympanRev::D,AICShieldRev::A);
+AudioInputI2SQuad_F32         i2s_in(audio_settings);   //Digital audio input from the ADC
 AudioMixer4_F32               leftRightMixer[2];        //mixers to control mono versus stereo
 AudioTestSignalGenerator_F32  audioTestGenerator(audio_settings); //keep this to be *after* the creation of the i2s_in object
 
@@ -67,7 +68,7 @@ AudioEffectCompWDRC_F32    expCompLim[2][N_CHAN_MAX];     //here are the per-ban
 AudioMixer8_F32            mixerFilterBank[2];                     //mixer to reconstruct the broadband audio
 AudioEffectCompWDRC_F32    compBroadband[2];              //broad band compressor
 AudioEffectFeedbackCancel_LoopBack_F32 feedbackLoopBack(audio_settings), feedbackLoopBackR(audio_settings);
-AudioOutputI2S_F32          i2s_out(audio_settings);    //Digital audio output to the DAC.  Should be last.
+AudioOutputI2SQuad_F32      i2s_out(audio_settings);    //Digital audio output to the DAC.  Should be last.
 
 //complete the creation of the tester objects
 AudioTestSignalMeasurement_F32  audioTestMeasurement(audio_settings);
@@ -163,21 +164,23 @@ SerialManager serialManager(N_CHAN_MAX,
       ampSweepTester, freqSweepTester, freqSweepTester_FIR,
       feedbackCancel, feedbackCancelR);
 
-//routine to setup the hardware
+//Setup the hardware
 void setupTympanHardware(void) {
   myTympan.enable(); // activate AIC
+  earpieceShield.enable();
 
   //enable the Tympman to detect whether something was plugged inot the pink mic jack
   myTympan.enableMicDetect(true);
 
   //setup DC-blocking highpass filter running in the ADC hardware itself
   float cutoff_Hz = 70.0;  //set the default cutoff frequency for the highpass filter
-  myTympan.setHPFonADC(true, cutoff_Hz, audio_settings.sample_rate_Hz); //set to false to disble
+  myTympan.setHPFonADC(true, cutoff_Hz, audio_settings.sample_rate_Hz); //set to false to disable
 
   //Choose the desired audio input on the Typman...this will be overridden by the serviceMicDetect() in loop()
   //myTympan.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the on-board micropphones
-  myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_MIC); myTympan.setEnableStereoExtMicBias(true); // use the microphone jack - defaults to mic bias 2.5V
+  //myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_MIC); myTympan.setEnableStereoExtMicBias(true); // use the microphone jack - defaults to mic bias 2.5V
   //myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the microphone jack - defaults to mic bias OFF
+  setInputSource(State::INPUT_PCBMICS);
   
   //Set the Bluetooth audio to go straight to the headphone amp, not through the Tympan software
   myTympan.mixBTAudioWithOutput(true);
@@ -185,6 +188,89 @@ void setupTympanHardware(void) {
   //set volumes
   myTympan.volume_dB(0.f);  // -63.6 to +24 dB in 0.5dB steps.  uses signed 8-bit
   myTympan.setInputGain_dB(input_gain_dB); // set MICPGA volume, 0-47.5dB in 0.5dB setps
+}
+
+//Choose the input to use
+//set the desired input source 
+int setInputSource(int input_config) { 
+  switch (input_config) {
+    case State::INPUT_PCBMICS:
+      //Select Input
+      myTympan.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the on-board microphones
+      //earpieceShield.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC);  //this doesn't really exist
+
+      //Disable Digital Mic (enable analog inputs)
+      myTympan.enableDigitalMicInputs(false);
+      earpieceShield.enableDigitalMicInputs(false);
+
+      //Set input gain in dB
+      setInputGain_dB(15.0);
+
+      //Store configuration
+      myState.input_source = input_config;
+      break;
+      
+    case State::INPUT_MICJACK_MIC:
+      //Select Input
+      myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_MIC); // use the mic jack
+      earpieceShield.inputSelect(TYMPAN_INPUT_JACK_AS_MIC);
+
+      //Disable Digital Mic (enable analog inputs)
+      myTympan.enableDigitalMicInputs(false);
+      earpieceShield.enableDigitalMicInputs(false);
+
+      //Set input gain in dB
+      setInputGain_dB(15.0);
+
+      //Store configuration
+      myState.input_source = input_config;
+      break;
+      
+  case State::INPUT_MICJACK_LINEIN:
+      //Select Input
+      myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the mic jack
+      earpieceShield.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN);
+
+      //Disable Digital Mic (enable analog inputs)
+      myTympan.enableDigitalMicInputs(false);
+      earpieceShield.enableDigitalMicInputs(false);
+
+      //Set input gain in dB
+      setInputGain_dB(0.0);
+
+      //Store configuration
+      myState.input_source = input_config;
+      break;     
+    case State::INPUT_LINEIN_SE:      
+      //Select Input
+      myTympan.inputSelect(TYMPAN_INPUT_LINE_IN); // use the line-input through holes
+      earpieceShield.inputSelect(TYMPAN_INPUT_LINE_IN);
+
+      //Disable Digital Mic (enable analog inputs)
+      myTympan.enableDigitalMicInputs(false);
+      earpieceShield.enableDigitalMicInputs(false);
+
+      //Set input gain in dB
+      setInputGain_dB(0.0);
+
+      //Store configuration
+      myState.input_source = input_config;
+      break;
+      
+    case State::INPUT_PDMMICS:
+      //Set the AIC's ADC to digital mic mode. Assign MFP4 to output a clock for the PDM, and MFP3 as the input to the PDM data line
+      myTympan.enableDigitalMicInputs(true);  //two of the earpiece digital mics are routed here
+      earpieceShield.enableDigitalMicInputs(true);  //the other two of the earpiece digital mics are routed here
+      
+      //Set input gain in dB
+      setInputGain_dB(0.0);
+
+      //Store configuration
+      myState.input_source = input_config;
+      break;
+  }
+
+  return myState.input_source;
 }
 
 
@@ -245,9 +331,22 @@ void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDR
     }
 
     //setup all of the per-channel compressors
+    //Serial.print("setupFromDSLandGHAandAFC: disabling setting of per-band WDRCs. Ear: ");Serial.println(Iear);
     configurePerBandWDRCs(N_CHAN, settings.sample_rate_Hz, this_dsl, this_gha, expCompLim[Iear]);
 
     //setup the broad band compressor (limiter)
+    //Serial.print("setupFromDSLandGHAandAFC: disabling setting of broadband WDRC. Ear: ");Serial.println(Iear);
+    Serial.println("setupFromDSLandGHAandAFC: this_gha = ");
+    Serial.print("  attack: ");Serial.println(this_gha.attack);
+    Serial.print("  release: ");Serial.println(this_gha.release);
+    Serial.print("  fs: ");Serial.println(this_gha.fs);
+    Serial.print("  maxdB: ");Serial.println(this_gha.maxdB);
+    Serial.print("  exp_cr: ");Serial.println(this_gha.exp_cr);
+    Serial.print("  exp_end_knee: ");Serial.println(this_gha.exp_end_knee);
+    Serial.print("  tkgain: ");Serial.println(this_gha.tkgain);
+    Serial.print("  tk: ");Serial.println(this_gha.tk);
+    Serial.print("  cr: ");Serial.println(this_gha.cr);
+    Serial.print("  bolt: ");Serial.println(this_gha.bolt);
     configureBroadbandWDRCs(settings.sample_rate_Hz, this_gha, vol_knob_gain_dB, compBroadband[Iear]);
   }
 
@@ -425,6 +524,7 @@ void loop() {
 
   //update the memory and CPU usage...if enough time has passed
   if (myState.flag_printCPUandMemory) myState.printCPUandMemory(millis(),3000); //print CPU and mem every 3000 msec
+  if (myState.flag_printCPUtoGUI) serialManager.printCPUtoGUI(millis(),3000);
 
   //print info about the signal processing
   updateAveSignalLevels(millis());
@@ -432,6 +532,7 @@ void loop() {
 
   //print plottable data
   if (myState.flag_printPlottableData) printPlottableData(millis(), 250);  //print values every 250msec
+
 
 } //end loop()
 
@@ -476,6 +577,21 @@ void printGainSettings(void) {
   }
   myTympan.println();
 }
+
+
+// ////////////// Change settings of system
+
+//here's a function to change the volume settings.   We'll also invoke it from our serialManager
+float incrementInputGain(float increment_dB) {
+  return setInputGain_dB(myState.inputGain_dB + increment_dB);
+}
+float setInputGain_dB(float gain_dB) { 
+  myState.inputGain_dB = myTympan.setInputGain_dB(gain_dB);   //set the AIC on the main Tympan board
+  earpieceShield.setInputGain_dB(gain_dB);  //set the AIC on the Earpiece Sheild
+  return myState.inputGain_dB;
+}
+
+
 
 extern void incrementKnobGain(float increment_dB) { //"extern" to make it available to other files, such as SerialManager.h
   setVolKnobGain_dB(vol_knob_gain_dB + increment_dB);

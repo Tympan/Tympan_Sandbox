@@ -15,9 +15,9 @@ BTNRH_WDRC::CHA_DSL dsl_fullon = {5,  // attack (ms)
   0,    // 0=left, 1=right...ignored
   3,    //num channels used (must be less than MAX_CHAN constant set in the main program
   {700.0, 2400.0,       1.e4, 1.e4, 1.e4, 1.e4, 1.e4},    // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
-  {0.57, 0.57, 0.57,       1.0, 1.0, 1.0, 1.0, 1.0},           // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
-  {73.0, 50.0, 50.0,    34., 34., 34., 34., 34.},   // expansion-end kneepoint.  not relevant when there is no expansion or compression.
-  {0.f, 5.f, 10.f,     20.f, 20.f, 20.f, 20.f, 20.f},   // compression-start gain.  Tweak these values up until it sounds bad!
+  {1.0, 1.0, 1.0,       1.0, 1.0, 1.0, 1.0, 1.0},           // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
+  {20.0, 20.0, 20.0,    34., 34., 34., 34., 34.},   // expansion-end kneepoint.  not relevant when there is no expansion or compression.
+  {30.f, 30.f, 30.f,     20.f, 20.f, 20.f, 20.f, 20.f},   // compression-start gain.  Tweak these values up until it sounds bad!
   {1.0, 1.0, 1.0,       1.0, 1.0, 1.0, 1.0, 1.0},           // compression ratio.  Set to 1.0 to defeat.
   {50.0, 50.0, 50.0,    50., 50., 50., 50., 50.},   // compression-start kneepoint (input dB SPL).  not relevant when there is no compression
   {200.0,200.0,200.0,   200.,200.,200.,200.,200.}   // output limiting threshold (comp ratio 10). set to large value to defeat.
@@ -59,5 +59,3 @@ BTNRH_WDRC::CHA_AFC afc_fullon = {
   0.9, //rho, smoothing factor for how fast the audio's envelope is tracked (bigger is a longer average)
   0.008 //eps, when estimating the audio envelope, this is the minimum allowed level (helps avoid divide-by-zero)
 };
-
-

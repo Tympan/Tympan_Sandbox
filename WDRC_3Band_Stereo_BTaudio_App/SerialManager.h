@@ -19,10 +19,18 @@ enum read_state_options {
   STREAM_DATA
 };
 
-//objects in the main sketch that I want to call from here
+
+//Extern variables (from main sketch file)
 extern Tympan myTympan;
 //extern AudioSDWriter_F32 audioSDWriter;
 extern State myState;
+
+//Extern Functions (from main sketch file)
+extern int setInputSource(int);
+//extern void setInputMixer(int);
+extern float incrementInputGain(float);
+//extern float incrementKnobGain(float);
+
 
 //now, define the Serial Manager class
 class SerialManager {
@@ -65,7 +73,11 @@ class SerialManager {
     void sendStreamAFC(const BTNRH_WDRC::CHA_AFC &this_afc);
     int readStreamIntArray(int idx, int* arr, int len);
     int readStreamFloatArray(int idx, float* arr, int len);
+
+    void printTympanRemoteLayout(void);
+    void printCPUtoGUI(unsigned long, unsigned long);
     void setFullGUIState(void);
+    void setInputConfigButtons(void);    
     void setButtonState_algPresets(void);
     void setButtonState_inputMixer(void);
     void setButtonState(String btnId, bool newState);
@@ -92,7 +104,7 @@ class SerialManager {
 #define MAX_CHANS 8
 void SerialManager::printChanUpMsg(int N_CHAN) {
   char fooChar[] = "12345678";
-  myTympan.print("   ");
+  myTympan.print(" ");
   for (int i=0;i<min(MAX_CHANS,N_CHAN);i++) {
     myTympan.print(fooChar[i]); 
     if (i < (N_CHAN-1)) myTympan.print(",");
@@ -115,30 +127,31 @@ void SerialManager::printChanDownMsg(int N_CHAN) {
 void SerialManager::printHelp(void) {  
   myTympan.println();
   myTympan.println("SerialManager Help: Available Commands:");
-  myTympan.println("   h: Print this help");
-  myTympan.println("   g: Print the gain settings of the device.");
-  myTympan.println("   c/C: Enable/disable printing of CPU and Memory");
-  myTympan.println("   l: Toggle printing of pre-gain per-channel signal levels (dBFS)");
-  myTympan.println("   L: Toggle printing of pre-gain per-channel signal levels (dBSPL, per DSL 'maxdB')");
-  myTympan.println("   A: Self-Generated Test: Amplitude sweep.  End-to-End Measurement.");
-  myTympan.println("   F: Self-Generated Test: Frequency sweep.  End-to-End Measurement.");
-  myTympan.println("   f: Self-Generated Test: Frequency sweep.  Measure filterbank.");
-  myTympan.print("   k: Increase the gain of all channels (ie, knob gain) by "); myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
-  myTympan.print("   K: Decrease the gain of all channels (ie, knob gain) by ");myTympan.println(" dB");
-  myTympan.println("   q,Q: Mute or Unmute the audio.");
-  myTympan.println("   s,S: Mono or Stereo Audio.");
+  myTympan.println(" h: Print this help");
+  myTympan.println(" g: Print the gain settings of the device.");
+  myTympan.println(" c/C: Enable/disable printing of CPU and Memory");
+  myTympan.println(" w/W/e/E: Inputs: Use PCBMics, Mic on Jack, Line on Jack, PDM Earpieces");
+  myTympan.println(" l: Toggle printing of pre-gain per-channel signal levels (dBFS)");
+  myTympan.println(" L: Toggle printing of pre-gain per-channel signal levels (dBSPL, per DSL 'maxdB')");
+  myTympan.println(" A: Self-Generated Test: Amplitude sweep.  End-to-End Measurement.");
+  myTympan.println(" F: Self-Generated Test: Frequency sweep.  End-to-End Measurement.");
+  myTympan.println(" f: Self-Generated Test: Frequency sweep.  Measure filterbank.");
+  myTympan.print(" k: Increase the gain of all channels (ie, knob gain) by "); myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
+  myTympan.print(" K: Decrease the gain of all channels (ie, knob gain) by ");myTympan.println(" dB");
+  myTympan.println(" q,Q: Mute or Unmute the audio.");
+  myTympan.println(" s,S: Mono or Stereo Audio.");
   printChanUpMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
   printChanDownMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
-  myTympan.print("   d,D: Switch to WDRC Preset A or Preset B");myTympan.println();
-  //myTympan.print("   p,P: Enable or Disable Adaptive Feedback Cancelation.");myTympan.println();
-  //myTympan.print("   m,M: Increase or Decrease AFC mu (currently "); myTympan.print(feedbackCanceler.getMu(),6) ; myTympan.println(").");
-  //myTympan.print("   r,R: Increase or Decrease AFC rho (currently "); myTympan.print(feedbackCanceler.getRho(),6) ; myTympan.println(").");
-  //myTympan.print("   e,E: Increase or Decrease AFC eps (currently "); myTympan.print(feedbackCanceler.getEps(),6) ; myTympan.println(").");
-  //myTympan.print("   x,X: Increase or Decrease AFC filter length (currently "); myTympan.print(feedbackCanceler.getAfl()) ; myTympan.println(").");
-  //myTympan.print("   u,U: Increase or Decrease Cutoff Frequency of HP Prefilter (currently "); myTympan.print(myTympan.getHPCutoff_Hz()); myTympan.println(" Hz).");
-  //myTympan.print("   z,Z: Increase or Decrease AFC N_Coeff_To_Zero (currently "); myTympan.print(feedbackCanceler.getNCoeffToZero()) ; myTympan.println(").");  
-  myTympan.println("   J: Print the JSON config object, for the Tympan Remote app");
-  myTympan.println("   ],}: Enable/Disable printing of data to plot.");
+  myTympan.print(" d,D: Switch to WDRC Preset A or Preset B");myTympan.println();
+  myTympan.print(" p,P: Enable or Disable Adaptive Feedback Cancelation.");myTympan.println();
+  //myTympan.print(" m,M: Increase or Decrease AFC mu (currently "); myTympan.print(feedbackCanceler.getMu(),6) ; myTympan.println(").");
+  //myTympan.print(" r,R: Increase or Decrease AFC rho (currently "); myTympan.print(feedbackCanceler.getRho(),6) ; myTympan.println(").");
+  //myTympan.print(" e,E: Increase or Decrease AFC eps (currently "); myTympan.print(feedbackCanceler.getEps(),6) ; myTympan.println(").");
+  //myTympan.print(" x,X: Increase or Decrease AFC filter length (currently "); myTympan.print(feedbackCanceler.getAfl()) ; myTympan.println(").");
+  //myTympan.print(" u,U: Increase or Decrease Cutoff Frequency of HP Prefilter (currently "); myTympan.print(myTympan.getHPCutoff_Hz()); myTympan.println(" Hz).");
+  //myTympan.print(" z,Z: Increase or Decrease AFC N_Coeff_To_Zero (currently "); myTympan.print(feedbackCanceler.getNCoeffToZero()) ; myTympan.println(").");  
+  myTympan.println(" J: Print the JSON config object, for the Tympan Remote app");
+  myTympan.println(" ],}: Enable/Disable printing of data to plot.");
   myTympan.println();
 }
 
@@ -280,11 +293,13 @@ void SerialManager::processSingleCharacter(char c) {
     case 'c':
       Serial.println("Received: printing memory and CPU.");
       myState.flag_printCPUandMemory = true;
+      myState.flag_printCPUtoGUI = true;
       setButtonState("cpuStart",true);
       break;
     case 'C':
       Serial.println("Received: stopping printing of memory and CPU.");
       myState.flag_printCPUandMemory = false;
+      myState.flag_printCPUtoGUI = false;
       setButtonState("cpuStart",false);
       break;
     case ']':
@@ -332,6 +347,30 @@ void SerialManager::processSingleCharacter(char c) {
       while (!freqSweepTester_filterbank.available()) {delay(100);};
       myTympan.println("Press 'h' for help...");
       break; 
+   case 'w':
+      myTympan.println("Received: Listen to PCB mics");
+      setInputSource(State::INPUT_PCBMICS);
+      //setInputMixer(State::MIC_AIC0_LR);  //PCB Mics are only on the main Tympan board
+      setFullGUIState();
+      break;
+    case 'W':
+      myTympan.println("Received: Mic jack as mic");
+      setInputSource(State::INPUT_MICJACK_MIC);
+      //setInputMixer(myState.analog_mic_config); //could be on either board, so remember the last-used state
+      setFullGUIState();
+      break;
+    case 'e':
+      myTympan.println("Received: Mic jack as line-in");
+      setInputSource(State::INPUT_MICJACK_LINEIN);
+      //setInputMixer(myState.analog_mic_config);
+      setFullGUIState();
+      break;     
+    case 'E':
+      myTympan.println("Received: Listen to PDM mics"); //digital mics
+      setInputSource(State::INPUT_PDMMICS);
+      //setInputMixer(myState.digital_mic_config);
+      setFullGUIState();
+      break;       
     case 'q':
       configureLeftRightMixer(State::INPUTMIX_MUTE);
       myTympan.println("Received: Muting audio.");
@@ -354,35 +393,9 @@ void SerialManager::processSingleCharacter(char c) {
       break;   
     case 'J':
     {
-      // Print the layout for the Tympan Remote app, in a JSON-ish string 
-      // (single quotes are used here, whereas JSON spec requires double quotes.  The app converts ' to " before parsing the JSON string).  
-      char jsonConfig[] = "JSON={"
-        "'pages':["
-          "{'title':'Presets','cards':["
-              "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'alg_preset0'},{'label': 'Linear', 'cmd': 'D', 'id': 'alg_preset1'}]},"
-              "{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mono','cmd': 's','id':'inp_mono','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'12'}]}"
-          "]},"   //include comma if NOT the last one
-          "{'title':'Tuner','cards':["
-              "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
-              "{'name':'High Gain', 'buttons':[{'label': '-', 'cmd': '#','width':'4'},{'id':'highGain', 'label': '', 'width':'4'},{'label': '+', 'cmd': '3','width':'4'}]},"
-              "{'name':'Mid Gain', 'buttons':[{'label': '-', 'cmd': '@','width':'4'},{'id':'midGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '2','width':'4'}]},"
-              "{'name':'Low Gain', 'buttons':[{'label': '-', 'cmd': '!','width':'4'},{'id':'lowGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '1','width':'4'}]}"                          
-          "]}," //include comma if NOT the last one
-          "{'title':'Globals','cards':["
-              "{'name':'CPU Reporting', 'buttons':[{'label': 'Start', 'cmd' :'c','id':'cpuStart'},{'label': 'Stop', 'cmd': 'C'}]},"
-              //"{'name':'Record Mics to SD Card','buttons':[{'label': 'Start', 'cmd': 'r', 'id':'recordStart'},{'label': 'Stop', 'cmd': 's'}]},"
-              "{'name':'Send Data to Plot', 'buttons':[{'label': 'Start', 'cmd' :']','id':'plotStart'},{'label': 'Stop', 'cmd': '}'}]}"
-             "]}" //no comma if last one
-        "],"
-        "'prescription':{'type':'BoysTown','pages':['serialMonitor','multiband','broadband','afc','plot']}"
-      "}";
-
-      myTympan.println(jsonConfig);
-      delay(100);
+      printTympanRemoteLayout();
+      delay(20);
       setFullGUIState();
-      setButtonText("highGain",0);
-      setButtonText("midGain",0);
-      setButtonText("lowGain",0);
       sendStreamDSL(myState.wdrc_perBand);
       sendStreamGHA(myState.wdrc_broadBand);
       sendStreamAFC(myState.afc);
@@ -396,15 +409,15 @@ void SerialManager::processSingleCharacter(char c) {
       myTympan.println("Received: toggle printing of per-band ave signal levels.");
       { bool as_dBSPL = true; togglePrintAveSignalLevels(as_dBSPL); }
       break;
-//    case 'p':
-//      myTympan.println("Received: enabling feedback cancelation.");
-//      feedbackCanceler.setEnable(true);feedbackCancelerR.setEnable(true);
-//      //feedbackCanceler.resetAFCfilter();
-//      break;
-//    case 'P':
-//      myTympan.println("Received: disabling feedback cancelation.");      
-//      feedbackCanceler.setEnable(false);feedbackCancelerR.setEnable(false);
-//      break;
+    case 'p':
+      myTympan.println("Received: enabling feedback cancelation.");
+      feedbackCanceler.setEnable(true);feedbackCancelerR.setEnable(true);
+      //feedbackCanceler.resetAFCfilter();
+      break;
+    case 'P':
+      myTympan.println("Received: disabling feedback cancelation.");      
+      feedbackCanceler.setEnable(false);feedbackCancelerR.setEnable(false);
+      break;
 //    case 'm':
 //      old_val = feedbackCanceler.getMu(); new_val = old_val * 2.0;
 //      myTympan.print("Received: increasing AFC mu to ");
@@ -499,6 +512,50 @@ void SerialManager::processSingleCharacter(char c) {
   }
 }
 
+// Print the layout for the Tympan Remote app, in a JSON-ish string
+// (single quotes are used here, whereas JSON spec requires double quotes.  The app converts ' to " before parsing the JSON string).
+// If you don't give a button an id, then it will be assigned the id 'default'.  IDs don't have to be unique; if two buttons have the same id,
+// then you always control them together and they'll always have the same state. 
+// Please don't put commas or colons in your ID strings!
+// The 'icon' is how the device appears in the app - could be an icon, could be a pic of the device.  Put the
+// image in the TympanRemote app in /src/assets/devIcon/ and set 'icon' to the filename.
+void SerialManager::printTympanRemoteLayout(void) {
+
+   // Print the layout for the Tympan Remote app, in a JSON-ish string 
+  // (single quotes are used here, whereas JSON spec requires double quotes.  The app converts ' to " before parsing the JSON string).  
+  char jsonConfig[] = "JSON={"
+    "'pages':["
+      "{'title':'Presets','cards':["
+          "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'alg_preset0'},{'label': 'Linear', 'cmd': 'D', 'id': 'alg_preset1'}]},"
+          "{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mono','cmd': 's','id':'inp_mono','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'12'}]}"
+      "]},"   //include comma if NOT the last one
+      "{'title':'Tuner','cards':["
+          "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
+          "{'name':'High Gain', 'buttons':[{'label': '-', 'cmd': '#','width':'4'},{'id':'highGain', 'label': '', 'width':'4'},{'label': '+', 'cmd': '3','width':'4'}]},"
+          "{'name':'Mid Gain', 'buttons':[{'label': '-', 'cmd': '@','width':'4'},{'id':'midGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '2','width':'4'}]},"
+          "{'name':'Low Gain', 'buttons':[{'label': '-', 'cmd': '!','width':'4'},{'id':'lowGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '1','width':'4'}]}"                          
+      "]}," //include comma if NOT the last one
+      "{'title':'Input Select','cards':["
+          "{'name':'Audio Source', 'buttons':["
+                                             "{'label':'Digital: Earpieces', 'cmd': 'E', 'id':'configPDMMic', 'width':'12'},"
+                                             "{'label':'Analog: PCB Mics',  'cmd': 'w', 'id':'configPCBMic',  'width':'12'},"
+                                             "{'label':'Analog: Mic Jack (Mic)',  'cmd': 'W', 'id':'configMicJack', 'width':'12'},"
+                                             "{'label':'Analog: Mic Jack (Line)',  'cmd': 'e', 'id':'configLineJack', 'width':'12'}" //add a comma if you also add the line below
+                                             //"{'label':'Analog: BT Audio', 'cmd': 'E', 'id':'configLineSE',  'width':'12'}" //don't have a trailing comma on this last one
+                                            "]}" //don't have a trailing comma on this last one
+     "]}," //include comma if NOT the last one
+      "{'title':'Globals','cards':["
+          "{'name':'CPU Usage (%)', 'buttons':[{'label': 'Start', 'cmd' :'c','id':'cpuStart','width':'4'},{'id':'cpuValue', 'label': '', 'width':'4'},{'label': 'Stop', 'cmd': 'C','width':'4'}]}"  //add comma if you add any lines below before this line's closing quote
+          //"{'name':'Record Mics to SD Card','buttons':[{'label': 'Start', 'cmd': 'r', 'id':'recordStart'},{'label': 'Stop', 'cmd': 's'}]},"
+          //"{'name':'Send Data to Plot', 'buttons':[{'label': 'Start', 'cmd' :']','id':'plotStart'},{'label': 'Stop', 'cmd': '}'}]}"
+         "]}" //no comma if last one
+    "],"
+    "'prescription':{'type':'BoysTown','pages':['serialMonitor','multiband','broadband','afc','plot']}"
+  "}";
+  
+  myTympan.println(jsonConfig);
+}
+
 void SerialManager::processStream(void) {
   int idx = 0;
   String streamType;
@@ -540,8 +597,11 @@ void SerialManager::interpretStreamGHA(int idx) {
 
   attack        = *((float*)(stream_data+idx)); idx=idx+4;
   release       = *((float*)(stream_data+idx)); idx=idx+4;
-  sampRate      = *((float*)(stream_data+idx)); idx=idx+4;
-  maxdB         = *((float*)(stream_data+idx)); idx=idx+4;
+  //sampRate      = *((float*)(stream_data+idx)); idx=idx+4;
+  //maxdB         = *((float*)(stream_data+idx)); idx=idx+4;
+  sampRate      = 24000.0;  //I'm pretty sure this is ignored
+  maxdB         = 115.0;   //temporary
+  Serial.print("SerialManager: interpretStreamGHA: no maxdB provided.  Assuming "); Serial.println(maxdB);
   compRatioLow  = *((float*)(stream_data+idx)); idx=idx+4;
   kneepoint     = *((float*)(stream_data+idx)); idx=idx+4;
   compStartGain = *((float*)(stream_data+idx)); idx=idx+4;
@@ -549,19 +609,19 @@ void SerialManager::interpretStreamGHA(int idx) {
   compRatioHigh = *((float*)(stream_data+idx)); idx=idx+4;
   threshold     = *((float*)(stream_data+idx)); idx=idx+4;
 
-  /* Printing too much causes the teensy to freeze. 
+  /* Printing too much causes the teensy to freeze. */
   myTympan.println("New WDRC:");
-  myTympan.print("  attack = "); myTympan.println(attack); 
-  myTympan.print("  release = "); myTympan.println(release);
-  myTympan.print("  sampRate = "); myTympan.println(sampRate); 
-  myTympan.print("  maxdB = "); myTympan.println(maxdB); 
-  myTympan.print("  compRatioLow = "); myTympan.println(compRatioLow); 
-  myTympan.print("  kneepoint = "); myTympan.println(kneepoint); 
-  myTympan.print("  compStartGain = "); myTympan.println(compStartGain); 
-  myTympan.print("  compStartKnee = "); myTympan.println(compStartKnee); 
-  myTympan.print("  compRatioHigh = "); myTympan.println(compRatioHigh); 
-  myTympan.print("  threshold = "); myTympan.println(threshold); 
-  */
+  myTympan.print("  attack = "); myTympan.println(attack); delay(5);
+  myTympan.print("  release = "); myTympan.println(release);delay(5);
+  myTympan.print("  sampRate = "); myTympan.println(sampRate); delay(5);
+  myTympan.print("  maxdB = "); myTympan.println(maxdB); delay(5);
+  myTympan.print("  compRatioLow = "); myTympan.println(compRatioLow); delay(5);
+  myTympan.print("  kneepoint = "); myTympan.println(kneepoint); delay(5);
+  myTympan.print("  compStartGain = "); myTympan.println(compStartGain); delay(5);
+  myTympan.print("  compStartKnee = "); myTympan.println(compStartKnee); delay(5);
+  myTympan.print("  compRatioHigh = "); myTympan.println(compRatioHigh); delay(5);
+  myTympan.print("  threshold = "); myTympan.println(threshold); delay(5);
+  
   
   myTympan.println("SUCCESS.");    
 
@@ -747,9 +807,25 @@ String SerialManager::channelGainAsString(int chan) {
   return String(FAKE_GAIN_LEVEL[chan],1);
 }
 
+void SerialManager::printCPUtoGUI(unsigned long curTime_millis = 0, unsigned long updatePeriod_millis = 0) {
+  static unsigned long lastUpdate_millis = 0;
+  //has enough time passed to update everything?
+  if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0; //handle wrap-around of the clock
+  if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
+    setButtonText("cpuValue", String(myState.getCPUUsage(),1));
+    lastUpdate_millis = curTime_millis; //we will use this value the next time around.
+  }
+}
+
 void SerialManager::setFullGUIState(void) {
   setButtonState_algPresets();
   setButtonState_inputMixer();
+  setInputConfigButtons();
+
+  //setButtonText("highGain",0);
+  //setButtonText("midGain",0);
+  //setButtonText("lowGain",0);
+    
   //add something here to send prescription values to the remote device
 
   //update buttons related to the "print" states
@@ -788,6 +864,29 @@ void SerialManager::setButtonState_inputMixer(void) {
     case (State::INPUTMIX_MUTE):
       setButtonState("inp_mute",true);  delay(10); break;
   }
+}
+
+void SerialManager::setInputConfigButtons(void) {
+  //clear out previous state of buttons
+  setButtonState("configPDMMic",false);  delay(10);
+  setButtonState("configPCBMic",false);  delay(10);
+  setButtonState("configMicJack",false); delay(10);
+  setButtonState("configLineJack",false);delay(10);
+  setButtonState("configLineSE",false);  delay(10);
+
+  //set the new state of the buttons
+  switch (myState.input_source) {
+    case (State::INPUT_PDMMICS):
+      setButtonState("configPDMMic",true);  delay(10); break;
+    case (State::INPUT_PCBMICS):
+      setButtonState("configPCBMic",true);  delay(10); break;
+    case (State::INPUT_MICJACK_MIC): 
+      setButtonState("configMicJack",true); delay(10); break;
+    case (State::INPUT_LINEIN_SE): 
+      setButtonState("configLineSE",true);  delay(10); break;
+    case (State::INPUT_MICJACK_LINEIN): 
+      setButtonState("configLineJack",true);delay(10); break;
+  }  
 }
 
 void SerialManager::setButtonState(String btnId, bool newState) {

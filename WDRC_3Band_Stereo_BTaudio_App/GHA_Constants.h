@@ -4,7 +4,7 @@
  *  "gha" (for broadband limiter at the end) below.  
  */
 
-#include <AudioEffectCompWDRC_F32.h>  //for CHA_DSL and CHA_WDRC data types
+#include <AudioEffectCompWDRC_F32.h>  //links to "BTNRH_WDRC_Types.h", which sets the CHA_DSL and CHA_WDRC data types
 
 // Here is the per-band prescription that is the default behavior of the multi-band
 // processing.  This sounded decent to WEA's ears but YMMV.
@@ -45,6 +45,3 @@ BTNRH_WDRC::CHA_AFC afc = {
   0.9, //rho, smoothing factor for how fast the audio's envelope is tracked (bigger is a longer average)
   0.008 //eps, when estimating the audio envelope, this is the minimum allowed level (helps avoid divide-by-zero)
 };
-
-
-

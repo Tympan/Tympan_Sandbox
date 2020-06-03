@@ -14,11 +14,17 @@ class State {
       local_serial = given_serial;
     }
     
-    //enum INPUTS {NO_STATE, INPUT_PCBMICS, INPUT_MICJACK, INPUT_LINEIN_SE, INPUT_MICJACK_LINEIN};
+    enum INPUTS {NO_STATE, INPUT_PCBMICS, INPUT_MICJACK_MIC, INPUT_LINEIN_SE, INPUT_MICJACK_LINEIN, INPUT_PDMMICS};
     //enum GAIN_TYPE {INPUT_GAIN_ID, DSL_GAIN_ID, GHA_GAIN_ID, OUTPUT_GAIN_ID};
+    enum MIC_CONFIG_TYPE {MIC_FRONT, MIC_REAR, MIC_BOTH_INPHASE, MIC_BOTH_INVERTED, MIC_AIC0_LR, MIC_AIC1_LR, MIC_BOTHAIC_LR};
+    
+    int input_source = NO_STATE;
+    int digital_mic_config = MIC_FRONT;
+    int analog_mic_config = MIC_AIC0_LR; //what state for the mic configuration when using analog inputs
+    
    
     //int input_source = NO_STATE;
-    //float inputGain_dB = 0.0;  //gain on the microphone
+    float inputGain_dB = 0.0;  //gain on the microphone
     //float vol_knob_gain_dB = 0.0;  //will be overwritten once the potentiometer is read
 
     //set input streo/mono configuration
@@ -34,6 +40,7 @@ class State {
 
     //printing of CPU and memory status
     bool flag_printCPUandMemory = false;
+    bool flag_printCPUtoGUI = false;
     void printCPUandMemory(unsigned long curTime_millis = 0, unsigned long updatePeriod_millis = 0) {
        static unsigned long lastUpdate_millis = 0;
       //has enough time passed to update everything?
@@ -61,6 +68,7 @@ class State {
       local_serial->print(FreeRam());
       local_serial->println();
     }
+    float getCPUUsage(void) { return local_audio_settings->processorUsage(); }
   
 //    void printGainSettings(void) {
 //      local_serial->print("Gains (dB): ");
