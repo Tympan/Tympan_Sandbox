@@ -26,10 +26,21 @@ extern Tympan myTympan;
 extern State myState;
 
 //Extern Functions (from main sketch file)
-extern int setInputSource(int);
+extern int setAnalogInputSource(int);
+extern int setInputAnalogVsPDM(int);
 //extern void setInputMixer(int);
 extern float incrementInputGain(float);
-//extern float incrementKnobGain(float);
+
+extern void incrementKnobGain(float);
+extern float getChannelLinearGain_dB(int chan);
+extern void printGainSettings(void);
+extern void togglePrintAveSignalLevels(bool);
+//extern void incrementDSLConfiguration(Stream *);
+extern void setDSLConfiguration(int);
+extern void updateDSL(BTNRH_WDRC::CHA_DSL &);
+extern void updateGHA(BTNRH_WDRC::CHA_WDRC &);
+extern void updateAFC(BTNRH_WDRC::CHA_AFC &);
+extern int configureLeftRightMixer(int);
 
 
 //now, define the Serial Manager class
@@ -80,6 +91,7 @@ class SerialManager {
     void setInputConfigButtons(void);    
     void setButtonState_algPresets(void);
     void setButtonState_inputMixer(void);
+    void setButtonState_gains(void);
     void setButtonState(String btnId, bool newState);
     void setButtonText(String btnId, String text);
     String channelGainAsString(int chan);
@@ -90,7 +102,7 @@ class SerialManager {
     char stream_data[MAX_DATASTREAM_LENGTH];
     int stream_length;
     int stream_chars_received;
-    float FAKE_GAIN_LEVEL[8] = {0.,0.,0.,0.,0.,0.,0.,0.};
+    //float FAKE_GAIN_LEVEL[8] = {0.,0.,0.,0.,0.,0.,0.,0.};
   private:
     GainAlgorithm_t *gain_algorithmsL;  //point to first element in array of expanders
     GainAlgorithm_t *gain_algorithmsR;  //point to first element in array of expanders
@@ -155,16 +167,7 @@ void SerialManager::printHelp(void) {
   myTympan.println();
 }
 
-//functions in the main sketch that I want to call from here
-extern void incrementKnobGain(float);
-extern void printGainSettings(void);
-extern void togglePrintAveSignalLevels(bool);
-//extern void incrementDSLConfiguration(Stream *);
-extern void setDSLConfiguration(int);
-extern void updateDSL(BTNRH_WDRC::CHA_DSL &);
-extern void updateGHA(BTNRH_WDRC::CHA_WDRC &);
-extern void updateAFC(BTNRH_WDRC::CHA_AFC &);
-extern void configureLeftRightMixer(int);
+
 
 //switch yard to determine the desired action
 void SerialManager::respondToByte(char c) {
@@ -230,53 +233,57 @@ void SerialManager::processSingleCharacter(char c) {
     case 'g': case 'G':
       printGainSettings(); break;
     case 'k':
-      incrementKnobGain(channelGainIncrement_dB); break;
+      incrementKnobGain(channelGainIncrement_dB); 
+      setButtonState_gains();
+      break;
     case 'K':   //which is "shift k"
-      incrementKnobGain(-channelGainIncrement_dB);  break;
+      incrementKnobGain(-channelGainIncrement_dB); 
+      setButtonState_gains(); 
+      break;
     case '1':
       incrementChannelGain(1-1, channelGainIncrement_dB);
-      setButtonText("lowGain",channelGainAsString(1-1));
+      setButtonState_gains();
       break;
     case '2':
       incrementChannelGain(2-1, channelGainIncrement_dB);
-      setButtonText("midGain",channelGainAsString(2-1));
+      setButtonState_gains();
       break;
     case '3':
       incrementChannelGain(3-1, channelGainIncrement_dB);
-      setButtonText("highGain",channelGainAsString(3-1));
+      setButtonState_gains();
       break;
     case '4':
-      incrementChannelGain(4-1, channelGainIncrement_dB); break;
+      incrementChannelGain(4-1, channelGainIncrement_dB); setButtonState_gains();break;
     case '5':
-      incrementChannelGain(5-1, channelGainIncrement_dB); break;
+      incrementChannelGain(5-1, channelGainIncrement_dB);setButtonState_gains(); break;
     case '6':
-      incrementChannelGain(6-1, channelGainIncrement_dB); break;
+      incrementChannelGain(6-1, channelGainIncrement_dB);setButtonState_gains(); break;
     case '7':
-      incrementChannelGain(7-1, channelGainIncrement_dB); break;
+      incrementChannelGain(7-1, channelGainIncrement_dB);setButtonState_gains(); break;
     case '8':      
-      incrementChannelGain(8-1, channelGainIncrement_dB); break;    
+      incrementChannelGain(8-1, channelGainIncrement_dB);setButtonState_gains(); break;    
     case '!':  //which is "shift 1"
       incrementChannelGain(1-1, -channelGainIncrement_dB);
-      setButtonText("lowGain",channelGainAsString(1-1));
+      setButtonState_gains();
       break;  
     case '@':  //which is "shift 2"
       incrementChannelGain(2-1, -channelGainIncrement_dB);
-      setButtonText("midGain",channelGainAsString(2-1));
+      setButtonState_gains();
       break;  
     case '#':  //which is "shift 3"
       incrementChannelGain(3-1, -channelGainIncrement_dB);
-      setButtonText("highGain",channelGainAsString(3-1));
+      setButtonState_gains();
       break;  
     case '$':  //which is "shift 4"
-      incrementChannelGain(4-1, -channelGainIncrement_dB); break;
+      incrementChannelGain(4-1, -channelGainIncrement_dB);setButtonState_gains(); break;
     case '%':  //which is "shift 5"
-      incrementChannelGain(5-1, -channelGainIncrement_dB); break;
+      incrementChannelGain(5-1, -channelGainIncrement_dB);setButtonState_gains(); break;
     case '^':  //which is "shift 6"
-      incrementChannelGain(6-1, -channelGainIncrement_dB); break;
+      incrementChannelGain(6-1, -channelGainIncrement_dB);setButtonState_gains(); break;
     case '&':  //which is "shift 7"
-      incrementChannelGain(7-1, -channelGainIncrement_dB); break;
+      incrementChannelGain(7-1, -channelGainIncrement_dB); setButtonState_gains();break;
     case '*':  //which is "shift 8"
-      incrementChannelGain(8-1, -channelGainIncrement_dB); break;          
+      incrementChannelGain(8-1, -channelGainIncrement_dB);setButtonState_gains(); break;          
     case 'A':
       //amplitude sweep test
       { //limit the scope of any variables that I create here
@@ -316,11 +323,15 @@ void SerialManager::processSingleCharacter(char c) {
       myTympan.println("Received: changing to Preset A");
       setDSLConfiguration(State::DSL_PRESET_A);
       setButtonState_algPresets();
+      setButtonState_gains(); //update the gain display because they've all changed
       break;      
     case 'D':
       myTympan.println("Received: changing to Preset B");
       setDSLConfiguration(State::DSL_PRESET_B);
-      setButtonState_algPresets();      break;
+      setButtonState_algPresets();      
+      setButtonState_gains(); //update the gain display because they've all changed
+      break;
+      
     case 'F':
       //frequency sweep test...end-to-end
       { //limit the scope of any variables that I create here
@@ -349,25 +360,28 @@ void SerialManager::processSingleCharacter(char c) {
       break; 
    case 'w':
       myTympan.println("Received: Listen to PCB mics");
-      setInputSource(State::INPUT_PCBMICS);
+      setInputAnalogVsPDM(State::INPUT_ANALOG);
+      setAnalogInputSource(State::INPUT_PCBMICS);
       //setInputMixer(State::MIC_AIC0_LR);  //PCB Mics are only on the main Tympan board
       setFullGUIState();
       break;
     case 'W':
       myTympan.println("Received: Mic jack as mic");
-      setInputSource(State::INPUT_MICJACK_MIC);
+      setInputAnalogVsPDM(State::INPUT_ANALOG);
+      setAnalogInputSource(State::INPUT_MICJACK_MIC);
       //setInputMixer(myState.analog_mic_config); //could be on either board, so remember the last-used state
       setFullGUIState();
       break;
     case 'e':
       myTympan.println("Received: Mic jack as line-in");
-      setInputSource(State::INPUT_MICJACK_LINEIN);
+      setInputAnalogVsPDM(State::INPUT_ANALOG);
+      setAnalogInputSource(State::INPUT_MICJACK_LINEIN);
       //setInputMixer(myState.analog_mic_config);
       setFullGUIState();
       break;     
     case 'E':
       myTympan.println("Received: Listen to PDM mics"); //digital mics
-      setInputSource(State::INPUT_PDMMICS);
+      setInputAnalogVsPDM(State::INPUT_PDM);
       //setInputMixer(myState.digital_mic_config);
       setFullGUIState();
       break;       
@@ -526,14 +540,14 @@ void SerialManager::printTympanRemoteLayout(void) {
   char jsonConfig[] = "JSON={"
     "'pages':["
       "{'title':'Presets','cards':["
-          "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'alg_preset0'},{'label': 'Linear', 'cmd': 'D', 'id': 'alg_preset1'}]},"
+          "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'alg_preset0'},{'label': 'Full-On Gain', 'cmd': 'D', 'id': 'alg_preset1'}]},"
           "{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mono','cmd': 's','id':'inp_mono','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'12'}]}"
       "]},"   //include comma if NOT the last one
       "{'title':'Tuner','cards':["
           "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
-          "{'name':'High Gain', 'buttons':[{'label': '-', 'cmd': '#','width':'4'},{'id':'highGain', 'label': '', 'width':'4'},{'label': '+', 'cmd': '3','width':'4'}]},"
-          "{'name':'Mid Gain', 'buttons':[{'label': '-', 'cmd': '@','width':'4'},{'id':'midGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '2','width':'4'}]},"
-          "{'name':'Low Gain', 'buttons':[{'label': '-', 'cmd': '!','width':'4'},{'id':'lowGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '1','width':'4'}]}"                          
+          "{'name':'High Gain (dB)', 'buttons':[{'label': '-', 'cmd': '#','width':'4'},{'id':'highGain', 'label': '', 'width':'4'},{'label': '+', 'cmd': '3','width':'4'}]},"
+          "{'name':'Mid Gain (dB)', 'buttons':[{'label': '-', 'cmd': '@','width':'4'},{'id':'midGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '2','width':'4'}]},"
+          "{'name':'Low Gain (dB)', 'buttons':[{'label': '-', 'cmd': '!','width':'4'},{'id':'lowGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '1','width':'4'}]}"                          
       "]}," //include comma if NOT the last one
       "{'title':'Input Select','cards':["
           "{'name':'Audio Source', 'buttons':["
@@ -799,12 +813,13 @@ void SerialManager::incrementChannelGain(int chan, float change_dB) {
     //add something here (?) to send updated prescription values to the remote device
     
     printGainSettings();  //in main sketch file
-    FAKE_GAIN_LEVEL[chan] += change_dB;
+    //FAKE_GAIN_LEVEL[chan] += change_dB;
   }
 }
 
-String SerialManager::channelGainAsString(int chan) {
-  return String(FAKE_GAIN_LEVEL[chan],1);
+String SerialManager::channelGainAsString(int chan) {  //channels start from zero
+  //return String(FAKE_GAIN_LEVEL[chan],1);
+  return String(getChannelLinearGain_dB(chan),1);
 }
 
 void SerialManager::printCPUtoGUI(unsigned long curTime_millis = 0, unsigned long updatePeriod_millis = 0) {
@@ -825,6 +840,7 @@ void SerialManager::setFullGUIState(void) {
   //setButtonText("highGain",0);
   //setButtonText("midGain",0);
   //setButtonText("lowGain",0);
+  setButtonState_gains();
     
   //add something here to send prescription values to the remote device
 
@@ -868,25 +884,37 @@ void SerialManager::setButtonState_inputMixer(void) {
 
 void SerialManager::setInputConfigButtons(void) {
   //clear out previous state of buttons
-  setButtonState("configPDMMic",false);  delay(10);
-  setButtonState("configPCBMic",false);  delay(10);
-  setButtonState("configMicJack",false); delay(10);
-  setButtonState("configLineJack",false);delay(10);
-  setButtonState("configLineSE",false);  delay(10);
+  setButtonState("configPDMMic",false);  delay(3);
+  setButtonState("configPCBMic",false);  delay(3);
+  setButtonState("configMicJack",false); delay(3);
+  setButtonState("configLineJack",false);delay(3);
+  setButtonState("configLineSE",false);  delay(3);
 
   //set the new state of the buttons
-  switch (myState.input_source) {
-    case (State::INPUT_PDMMICS):
-      setButtonState("configPDMMic",true);  delay(10); break;
-    case (State::INPUT_PCBMICS):
-      setButtonState("configPCBMic",true);  delay(10); break;
-    case (State::INPUT_MICJACK_MIC): 
-      setButtonState("configMicJack",true); delay(10); break;
-    case (State::INPUT_LINEIN_SE): 
-      setButtonState("configLineSE",true);  delay(10); break;
-    case (State::INPUT_MICJACK_LINEIN): 
-      setButtonState("configLineJack",true);delay(10); break;
-  }  
+  switch (myState.input_analogVsPDM) {
+    case (State::INPUT_PDM):
+      setButtonState("configPDMMic",true);  delay(3); break;
+    default:
+      switch (myState.input_analog_config) {
+        //case (State::INPUT_PDMMICS):
+        //  setButtonState("configPDMMic",true);  delay(10); break;
+        case (State::INPUT_PCBMICS):
+          setButtonState("configPCBMic",true);  delay(10); break;
+        case (State::INPUT_MICJACK_MIC): 
+          setButtonState("configMicJack",true); delay(10); break;
+        case (State::INPUT_LINEIN_SE): 
+          setButtonState("configLineSE",true);  delay(10); break;
+        case (State::INPUT_MICJACK_LINEIN): 
+          setButtonState("configLineJack",true);delay(10); break;
+      }  
+      break;
+  }
+}
+
+void SerialManager::setButtonState_gains(void) {
+  setButtonText("lowGain",channelGainAsString(1-1));
+  setButtonText("midGain",channelGainAsString(2-1));
+  setButtonText("highGain",channelGainAsString(3-1));
 }
 
 void SerialManager::setButtonState(String btnId, bool newState) {

@@ -13,18 +13,18 @@ class State {
       local_audio_settings = given_settings; 
       local_serial = given_serial;
     }
-    
-    enum INPUTS {NO_STATE, INPUT_PCBMICS, INPUT_MICJACK_MIC, INPUT_LINEIN_SE, INPUT_MICJACK_LINEIN, INPUT_PDMMICS};
+
+    enum ANALOG_VS_PDM {INPUT_ANALOG, INPUT_PDM};
+    enum ANALOG_INPUTS {INPUT_PCBMICS, INPUT_MICJACK_MIC, INPUT_LINEIN_SE, INPUT_MICJACK_LINEIN};
     //enum GAIN_TYPE {INPUT_GAIN_ID, DSL_GAIN_ID, GHA_GAIN_ID, OUTPUT_GAIN_ID};
-    enum MIC_CONFIG_TYPE {MIC_FRONT, MIC_REAR, MIC_BOTH_INPHASE, MIC_BOTH_INVERTED, MIC_AIC0_LR, MIC_AIC1_LR, MIC_BOTHAIC_LR};
-    
-    int input_source = NO_STATE;
-    int digital_mic_config = MIC_FRONT;
-    int analog_mic_config = MIC_AIC0_LR; //what state for the mic configuration when using analog inputs
-    
+    enum EARPIECE_CONFIG_TYPE {MIC_FRONT, MIC_REAR, MIC_BOTH_INPHASE, MIC_BOTH_INVERTED};
+
+    int input_analogVsPDM = INPUT_PDM;
+    int input_earpiece_config = MIC_FRONT;
+    int input_analog_config = INPUT_PCBMICS;
    
     //int input_source = NO_STATE;
-    float inputGain_dB = 0.0;  //gain on the microphone
+    float inputGain_dB = 0.0;  //gain on the analog inputs (ie, the AIC ignores this when in PDM mode, right?)
     //float vol_knob_gain_dB = 0.0;  //will be overwritten once the potentiometer is read
 
     //set input streo/mono configuration

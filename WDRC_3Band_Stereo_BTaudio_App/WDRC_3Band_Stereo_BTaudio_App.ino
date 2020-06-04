@@ -40,6 +40,10 @@ const float input_gain_dB = 15.0f; //gain on the microphone
 float vol_knob_gain_dB = 0.0; //will be overridden by volume knob
 int USE_VOLUME_KNOB = 0;  //set to 1 to use volume knob to override the default vol_knob_gain_dB set a few lines below
 const int LEFT = 0, RIGHT = 1;
+const int FRONT = 0, REAR = 1;
+const int PDM_LEFT_FRONT = 3, PDM_LEFT_REAR = 2, PDM_RIGHT_FRONT = 1, PDM_RIGHT_REAR = 0;  //notice the weird order
+const int LEFT_ANALOG = 0, RIGHT_ANALOG = 1, LEFT_EARPIECE = 2, RIGHT_EARPIECE = 3;
+const int ANALOG_IN = 0, PDM_IN = 1;
 
 //local files
 #include "AudioEffectFeedbackCancel_F32.h"
@@ -56,6 +60,8 @@ AudioSettings_F32   audio_settings(sample_rate_Hz, audio_block_samples);
 Tympan                        myTympan(TympanRev::D);   //use TympanRev::D or TympanRev::C
 AICShield                     earpieceShield(TympanRev::D,AICShieldRev::A);
 AudioInputI2SQuad_F32         i2s_in(audio_settings);   //Digital audio input from the ADC
+AudioMixer4_F32               earpieceMixer[2];         //mixes front-back earpiece mics
+AudioSummer4_F32              analogVsDigitalSwitch[2];  //switches between analog and PDM (a summer is cpu cheaper than a mixer, and we don't need to mix here)
 AudioMixer4_F32               leftRightMixer[2];        //mixers to control mono versus stereo
 AudioTestSignalGenerator_F32  audioTestGenerator(audio_settings); //keep this to be *after* the creation of the i2s_in object
 
@@ -83,11 +89,26 @@ AudioConnection_F32 *patchCord[N_MAX_CONNECTIONS];
 int makeAudioConnections(void) { //call this in setup() or somewhere like that
   int count = 0;
 
-  //connect input
-  patchCord[count++] = new AudioConnection_F32(i2s_in, LEFT, leftRightMixer[LEFT], LEFT); // (i2s_in,0) is left input
-  patchCord[count++] = new AudioConnection_F32(i2s_in, RIGHT, leftRightMixer[LEFT], RIGHT); // (i2s_in,1) is right input
-  patchCord[count++] = new AudioConnection_F32(i2s_in, LEFT, leftRightMixer[RIGHT], LEFT); // (i2s_in,0) is left input
-  patchCord[count++] = new AudioConnection_F32(i2s_in, RIGHT, leftRightMixer[RIGHT], RIGHT); // (i2s_in,0) is right input
+  //connect input to earpiece mixer
+  patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_LEFT_FRONT, earpieceMixer[LEFT], FRONT); 
+  patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_LEFT_REAR, earpieceMixer[LEFT], REAR); 
+  patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_RIGHT_FRONT, earpieceMixer[RIGHT], FRONT); 
+  patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_RIGHT_REAR, earpieceMixer[RIGHT], REAR); 
+
+  //analog versus earpiece switching
+  patchCord[count++] = new AudioConnection_F32(i2s_in, LEFT, analogVsDigitalSwitch[LEFT], ANALOG_IN); 
+  patchCord[count++] = new AudioConnection_F32(earpieceMixer[LEFT], 0, analogVsDigitalSwitch[LEFT], PDM_IN); 
+  patchCord[count++] = new AudioConnection_F32(i2s_in, RIGHT, analogVsDigitalSwitch[RIGHT], ANALOG_IN); 
+  patchCord[count++] = new AudioConnection_F32(earpieceMixer[RIGHT], 0, analogVsDigitalSwitch[RIGHT], PDM_IN); 
+ 
+  //connect analog and digital inputs for left side and then for the right side
+  patchCord[count++] = new AudioConnection_F32(analogVsDigitalSwitch[LEFT], 0, leftRightMixer[LEFT], LEFT);      //all possible connections intended for LEFT output
+  patchCord[count++] = new AudioConnection_F32(analogVsDigitalSwitch[RIGHT], 0, leftRightMixer[LEFT], RIGHT);    //all possible connections intended for LEFT output
+  patchCord[count++] = new AudioConnection_F32(analogVsDigitalSwitch[LEFT], 0, leftRightMixer[RIGHT], LEFT);     //all possible connections intended for RIGHT output
+  patchCord[count++] = new AudioConnection_F32(analogVsDigitalSwitch[RIGHT], 0, leftRightMixer[RIGHT], RIGHT);   //all possible connections intended for RIGHT output
+
+  //configure the mixer's default state until set later
+  configureEarpieceMixer(State::MIC_FRONT);
   configureLeftRightMixer(State::INPUTMIX_STEREO); //set left mixer to only listen to left, set right mixer to only listen to right
 
 
@@ -177,11 +198,14 @@ void setupTympanHardware(void) {
   float cutoff_Hz = 70.0;  //set the default cutoff frequency for the highpass filter
   myTympan.setHPFonADC(true, cutoff_Hz, audio_settings.sample_rate_Hz); //set to false to disable
 
-  //Choose the desired audio input on the Typman...this will be overridden by the serviceMicDetect() in loop()
-  //myTympan.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the on-board micropphones
-  //myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_MIC); myTympan.setEnableStereoExtMicBias(true); // use the microphone jack - defaults to mic bias 2.5V
-  //myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the microphone jack - defaults to mic bias OFF
-  setInputSource(State::INPUT_PCBMICS);
+  //Choose the default input
+  if (1) {
+    setAnalogInputSource(State::INPUT_PCBMICS);  //Choose the desired audio analog input on the Typman...this will be overridden by the serviceMicDetect() in loop()
+    setInputAnalogVsPDM(State::INPUT_PDM); //but then activate the PDM mics
+  } else {
+    //setAnalogInputSource(State::INPUT_PCBMICS);  //Choose the desired audio analog input on the Typman...this will be overridden by the serviceMicDetect() in loop()
+    setAnalogInputSource(State::INPUT_MICJACK_MIC);  //Choose the desired audio analog input on the Typman...this will be overridden by the serviceMicDetect() in loop()
+  }
   
   //Set the Bluetooth audio to go straight to the headphone amp, not through the Tympan software
   myTympan.mixBTAudioWithOutput(true);
@@ -191,24 +215,46 @@ void setupTympanHardware(void) {
   myTympan.setInputGain_dB(input_gain_dB); // set MICPGA volume, 0-47.5dB in 0.5dB setps
 }
 
+int setInputAnalogVsPDM(int input) {
+  int prev_val = myState.input_mixer_config; 
+  configureLeftRightMixer(State::INPUTMIX_MUTE); //mute the system
+  switch (input) {
+    case State::INPUT_PDM:
+      myTympan.enableDigitalMicInputs(true);  //two of the earpiece digital mics are routed here
+      earpieceShield.enableDigitalMicInputs(true);  //the other two of the earpiece digital mics are routed here
+      analogVsDigitalSwitch[LEFT].switchChannel(PDM_IN);
+      analogVsDigitalSwitch[RIGHT].switchChannel(PDM_IN);
+      myState.input_analogVsPDM = input;
+      break;
+    case State::INPUT_ANALOG:
+      myTympan.enableDigitalMicInputs(false);  //two of the earpiece digital mics are routed here
+      earpieceShield.enableDigitalMicInputs(false);  //the other two of the earpiece digital mics are routed here
+      analogVsDigitalSwitch[LEFT].switchChannel(ANALOG_IN);
+      analogVsDigitalSwitch[RIGHT].switchChannel(ANALOG_IN);
+      myState.input_analogVsPDM = input;
+      break;
+  }
+  configureLeftRightMixer(prev_val); //unmute the system
+  return myState.input_analogVsPDM;
+}
+
 //Choose the input to use
 //set the desired input source 
-int setInputSource(int input_config) { 
+int setAnalogInputSource(int input_config) { 
+  int prev_val = myState.input_mixer_config; 
+  configureLeftRightMixer(State::INPUTMIX_MUTE); //mute the system
+    
   switch (input_config) {
     case State::INPUT_PCBMICS:
       //Select Input
       myTympan.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the on-board microphones
       //earpieceShield.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC);  //this doesn't really exist
 
-      //Disable Digital Mic (enable analog inputs)
-      myTympan.enableDigitalMicInputs(false);
-      earpieceShield.enableDigitalMicInputs(false);
-
       //Set input gain in dB
       setInputGain_dB(15.0);
 
       //Store configuration
-      myState.input_source = input_config;
+      myState.input_analog_config = input_config;
       break;
       
     case State::INPUT_MICJACK_MIC:
@@ -216,15 +262,11 @@ int setInputSource(int input_config) {
       myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_MIC); // use the mic jack
       earpieceShield.inputSelect(TYMPAN_INPUT_JACK_AS_MIC);
 
-      //Disable Digital Mic (enable analog inputs)
-      myTympan.enableDigitalMicInputs(false);
-      earpieceShield.enableDigitalMicInputs(false);
-
       //Set input gain in dB
       setInputGain_dB(15.0);
 
       //Store configuration
-      myState.input_source = input_config;
+      myState.input_analog_config = input_config;
       break;
       
   case State::INPUT_MICJACK_LINEIN:
@@ -232,46 +274,26 @@ int setInputSource(int input_config) {
       myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the mic jack
       earpieceShield.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN);
 
-      //Disable Digital Mic (enable analog inputs)
-      myTympan.enableDigitalMicInputs(false);
-      earpieceShield.enableDigitalMicInputs(false);
-
       //Set input gain in dB
       setInputGain_dB(0.0);
 
       //Store configuration
-      myState.input_source = input_config;
+      myState.input_analog_config = input_config;
       break;     
     case State::INPUT_LINEIN_SE:      
       //Select Input
       myTympan.inputSelect(TYMPAN_INPUT_LINE_IN); // use the line-input through holes
       earpieceShield.inputSelect(TYMPAN_INPUT_LINE_IN);
 
-      //Disable Digital Mic (enable analog inputs)
-      myTympan.enableDigitalMicInputs(false);
-      earpieceShield.enableDigitalMicInputs(false);
-
       //Set input gain in dB
       setInputGain_dB(0.0);
 
       //Store configuration
-      myState.input_source = input_config;
-      break;
-      
-    case State::INPUT_PDMMICS:
-      //Set the AIC's ADC to digital mic mode. Assign MFP4 to output a clock for the PDM, and MFP3 as the input to the PDM data line
-      myTympan.enableDigitalMicInputs(true);  //two of the earpiece digital mics are routed here
-      earpieceShield.enableDigitalMicInputs(true);  //the other two of the earpiece digital mics are routed here
-      
-      //Set input gain in dB
-      setInputGain_dB(0.0);
-
-      //Store configuration
-      myState.input_source = input_config;
+      myState.input_analog_config = input_config;
       break;
   }
-
-  return myState.input_source;
+  configureLeftRightMixer(prev_val); //unmute the system
+  return myState.input_analog_config;
 }
 
 
@@ -337,17 +359,17 @@ void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDR
 
     //setup the broad band compressor (limiter)
     //Serial.print("setupFromDSLandGHAandAFC: disabling setting of broadband WDRC. Ear: ");Serial.println(Iear);
-    Serial.println("setupFromDSLandGHAandAFC: this_gha = ");
-    Serial.print("  attack: ");Serial.println(this_gha.attack);
-    Serial.print("  release: ");Serial.println(this_gha.release);
-    Serial.print("  fs: ");Serial.println(this_gha.fs);
-    Serial.print("  maxdB: ");Serial.println(this_gha.maxdB);
-    Serial.print("  exp_cr: ");Serial.println(this_gha.exp_cr);
-    Serial.print("  exp_end_knee: ");Serial.println(this_gha.exp_end_knee);
-    Serial.print("  tkgain: ");Serial.println(this_gha.tkgain);
-    Serial.print("  tk: ");Serial.println(this_gha.tk);
-    Serial.print("  cr: ");Serial.println(this_gha.cr);
-    Serial.print("  bolt: ");Serial.println(this_gha.bolt);
+//    Serial.println("setupFromDSLandGHAandAFC: this_gha = ");
+//    Serial.print("  attack: ");Serial.println(this_gha.attack);
+//    Serial.print("  release: ");Serial.println(this_gha.release);
+//    Serial.print("  fs: ");Serial.println(this_gha.fs);
+//    Serial.print("  maxdB: ");Serial.println(this_gha.maxdB);
+//    Serial.print("  exp_cr: ");Serial.println(this_gha.exp_cr);
+//    Serial.print("  exp_end_knee: ");Serial.println(this_gha.exp_end_knee);
+//    Serial.print("  tkgain: ");Serial.println(this_gha.tkgain);
+//    Serial.print("  tk: ");Serial.println(this_gha.tk);
+//    Serial.print("  cr: ");Serial.println(this_gha.cr);
+//    Serial.print("  bolt: ");Serial.println(this_gha.bolt);
     configureBroadbandWDRCs(settings.sample_rate_Hz, this_gha, vol_knob_gain_dB, compBroadband[Iear]);
   }
 
@@ -458,24 +480,52 @@ void configurePerBandWDRCs(int nchan, float fs_Hz,
   }
 }
 
-void configureLeftRightMixer(int val) {
+int configureEarpieceMixer(int val) {
   switch (val) {
+    case State::MIC_FRONT:
+      earpieceMixer[LEFT].gain(FRONT, 1.0);earpieceMixer[LEFT].gain(REAR, 0.0);
+      earpieceMixer[RIGHT].gain(FRONT, 1.0);earpieceMixer[RIGHT].gain(REAR, 0.0);
+      myState.input_earpiece_config = val;
+      break;
+    case State::MIC_REAR:
+      earpieceMixer[LEFT].gain(FRONT, 0.0);earpieceMixer[LEFT].gain(REAR, 1.0);
+      earpieceMixer[RIGHT].gain(FRONT, 0.0);earpieceMixer[RIGHT].gain(REAR, 1.0);
+      myState.input_earpiece_config = val;
+      break;
+    case State::MIC_BOTH_INPHASE:
+      earpieceMixer[LEFT].gain(FRONT, 0.5);earpieceMixer[LEFT].gain(REAR, 0.5);
+      earpieceMixer[RIGHT].gain(FRONT, 0.5);earpieceMixer[RIGHT].gain(REAR, 0.5);
+      myState.input_earpiece_config = val;
+      break;  
+    case State::MIC_BOTH_INVERTED:
+      earpieceMixer[LEFT].gain(FRONT, 1.0);earpieceMixer[LEFT].gain(REAR, -1.0);
+      earpieceMixer[RIGHT].gain(FRONT, 1.0);earpieceMixer[RIGHT].gain(REAR, -1.0);
+      myState.input_earpiece_config = val;
+      break;           
+  }
+  return myState.input_earpiece_config;
+}
+
+//int configureLeftRightMixer(void) { return configureLeftRightMixer(myState.input_mixer_config); } 
+int configureLeftRightMixer(int val) {  //call this if you want to change left-right mixing (or if the input source was changed)
+  switch (val) {  // now configure that mix for the analog inputs  
     case State::INPUTMIX_STEREO:
       myState.input_mixer_config = val;
-      leftRightMixer[LEFT].gain(LEFT,1.0);leftRightMixer[LEFT].gain(RIGHT,0.0);
-      leftRightMixer[RIGHT].gain(LEFT,0.0);leftRightMixer[RIGHT].gain(RIGHT,1.0);
+      leftRightMixer[LEFT].gain(LEFT,1.0);leftRightMixer[LEFT].gain(RIGHT,0.0);   //set what is sent left
+      leftRightMixer[RIGHT].gain(LEFT,0.0);leftRightMixer[RIGHT].gain(RIGHT,1.0); //set what is sent right
       break;
     case State::INPUTMIX_MONO:
       myState.input_mixer_config = val;
-      leftRightMixer[LEFT].gain(LEFT,0.5);leftRightMixer[LEFT].gain(RIGHT,0.5);
-      leftRightMixer[RIGHT].gain(LEFT,0.5);leftRightMixer[RIGHT].gain(RIGHT,0.5);
+      leftRightMixer[LEFT].gain(LEFT,0.5);leftRightMixer[LEFT].gain(RIGHT,0.5);   //set what is sent left
+      leftRightMixer[RIGHT].gain(LEFT,0.5);leftRightMixer[RIGHT].gain(RIGHT,0.5); //set what is sent right
       break;
     case State::INPUTMIX_MUTE:
       myState.input_mixer_config = val;
-      leftRightMixer[LEFT].gain(LEFT,0.0);leftRightMixer[LEFT].gain(RIGHT,0.0);
-      leftRightMixer[RIGHT].gain(LEFT,0.0);leftRightMixer[RIGHT].gain(RIGHT,0.0);
+      leftRightMixer[LEFT].gain(LEFT,0.0);leftRightMixer[LEFT].gain(RIGHT,0.0);     //set what is sent left
+      leftRightMixer[RIGHT].gain(LEFT,0.0);leftRightMixer[RIGHT].gain(RIGHT,0.0);   //set what is sent right
       break;
   }
+  return myState.input_mixer_config;
 }
 
 // ///////////////// Main setup() and loop() as required for all Arduino programs
@@ -511,7 +561,7 @@ void setup() {
 // define the loop() function, the function that is repeated over and over for the life of the device
 void loop() {
   //choose to sleep ("wait for interrupt") instead of spinning our wheels doing nothing but consuming power
-  asm(" WFI");  //ARM-specific.  Will wake on next interrupt.  The audio library issues tons of interrupts, so we wake up often.
+  //asm(" WFI");  //ARM-specific.  Will wake on next interrupt.  The audio library issues tons of interrupts, so we wake up often.
 
   //respond to Serial commands
   while (Serial.available()) serialManager.respondToByte((char)Serial.read());   //USB Serial
@@ -567,6 +617,14 @@ void servicePotentiometer(unsigned long curTime_millis,unsigned long updatePerio
 } //end servicePotentiometer();
 
 
+float getChannelLinearGain_dB(int chan) { //chan starts counting from zero
+  return getChannelLinearGain_dB(LEFT, chan);
+}
+float getChannelLinearGain_dB(int left_right,  int chan) { //chan starts counting from zero
+  left_right = min(max(left_right,LEFT), RIGHT);
+  chan = min(max(chan,0),N_CHAN-1);
+  return expCompLim[left_right][chan].getGain_dB();
+}
 void printGainSettings(void) {
   myTympan.print("Gain (dB): ");
   myTympan.print("Knob = "); myTympan.print(vol_knob_gain_dB, 1);
@@ -591,8 +649,6 @@ float setInputGain_dB(float gain_dB) {
   earpieceShield.setInputGain_dB(gain_dB);  //set the AIC on the Earpiece Sheild
   return myState.inputGain_dB;
 }
-
-
 
 extern void incrementKnobGain(float increment_dB) { //"extern" to make it available to other files, such as SerialManager.h
   setVolKnobGain_dB(vol_knob_gain_dB + increment_dB);
