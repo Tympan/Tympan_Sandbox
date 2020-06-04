@@ -141,7 +141,8 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
 
   //send the audio out
   for (int Iear=0; Iear <= RIGHT; Iear++) {
-    patchCord[count++] = new AudioConnection_F32(compBroadband[Iear], 0, i2s_out, Iear);  //left output
+    patchCord[count++] = new AudioConnection_F32(compBroadband[Iear], 0, i2s_out, Iear);    //send to the base Tympan headphone jack (0=left, 1=right)
+    patchCord[count++] = new AudioConnection_F32(compBroadband[Iear], 0, i2s_out, 2+Iear);  //also send to the earpiece shield (earpieces and its headphone jack) (2=left, 3=right)
   }
 
   //make the last connections for the audio test measurements
