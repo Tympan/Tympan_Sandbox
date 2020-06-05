@@ -307,26 +307,26 @@ float overall_cal_dBSPL_at0dBFS; //will be set later
 void setupAudioProcessing(void) {
   //make all of the audio connections
   makeAudioConnections();
-
+  
   //set the DC-blocking higpass filter cutoff
   preFilter.setHighpass(0, 40.0);  preFilterR.setHighpass(0, 40.0);
-
+  
   //setup processing based on the DSL and GHA prescriptions
   setDSLConfiguration(myState.current_dsl_config); //sets the Per Band, the Broad Band, and the AFC parameters using a preset
 }
-
-void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDRC &this_gha,
-                              BTNRH_WDRC::CHA_AFC &this_afc, const int n_chan_max, const AudioSettings_F32 &settings)
-{
+  
+void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_max, const AudioSettings_F32 &settings) {
   //int n_chan = n_chan_max;  //maybe change this to be the value in the DSL itself.  other logic would need to change, too.
   N_CHAN = max(1, min(n_chan_max, this_dsl.nchannel));
-
+  
+  Serial.print("setupFromDSLandGHAandAFC: N_CHAN = ");Serial.println(N_CHAN);
+  
   // //compute the per-channel filter coefficients
   //AudioConfigFIRFilterBank_F32 makeFIRcoeffs(n_chan, n_fir, settings.sample_rate_Hz, (float *)this_dsl.cross_freq, (float *)firCoeff);
-
+  
   // Loop over each ear
   for (int Iear = LEFT; Iear <= RIGHT; Iear++) {
-
+  
     //give the pre-computed coefficients to the IIR filters
     for (int Iband = 0; Iband < n_chan_max; Iband++) {
       if (Iband < N_CHAN) {
@@ -335,7 +335,7 @@ void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDR
         bpFilt[Iear][Iband].end();
       }
     }
-
+  
     //setup the per-channel delays
     for (int Iband = 0; Iband < n_chan_max; Iband++) {
       postFiltDelay[Iear][Iband].setSampleRate_Hz(audio_settings.sample_rate_Hz);
@@ -345,39 +345,50 @@ void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDR
         postFiltDelay[Iear][Iband].delay(0, 0); //from filter_coeff_sos.h.  milliseconds!!!
       }
     }
+  
+       //setup all of the per-channel compressors
+    //Serial.print("setupFromDSLandGHAandAFC: disabling setting of per-band WDRCs. Ear: ");Serial.println(Iear);
+    configurePerBandWDRCs(N_CHAN, settings.sample_rate_Hz, this_dsl, gha_tk, expCompLim[Iear]);
+  }
+  //overwrite the one-point calibration based on the dsl data structure
+  overall_cal_dBSPL_at0dBFS = this_dsl.maxdB;
+  
+  //save the state
+  myState.wdrc_perBand = this_dsl;  //shallow copy the contents of this_dsl into wdrc_perBand
+}
 
+void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDRC &this_gha,
+                              BTNRH_WDRC::CHA_AFC &this_afc, const int n_chan_max, const AudioSettings_F32 &settings)
+{
+  //setup all the DSL-based parameters (ie, the processing per frequency band)
+  setupFromDSL(this_dsl, (float)this_gha.tk, n_chan_max, settings);
+  
+  for (int Iear = LEFT; Iear <= RIGHT; Iear++) {
     //setup the AFC
     if (Iear == LEFT) {
       feedbackCancel.setParams(this_afc);
     } else {
       feedbackCancelR.setParams(this_afc);
     }
-
-    //setup all of the per-channel compressors
-    //Serial.print("setupFromDSLandGHAandAFC: disabling setting of per-band WDRCs. Ear: ");Serial.println(Iear);
-    configurePerBandWDRCs(N_CHAN, settings.sample_rate_Hz, this_dsl, this_gha, expCompLim[Iear]);
-
-    //setup the broad band compressor (limiter)
-    //Serial.print("setupFromDSLandGHAandAFC: disabling setting of broadband WDRC. Ear: ");Serial.println(Iear);
-//    Serial.println("setupFromDSLandGHAandAFC: this_gha = ");
-//    Serial.print("  attack: ");Serial.println(this_gha.attack);
-//    Serial.print("  release: ");Serial.println(this_gha.release);
-//    Serial.print("  fs: ");Serial.println(this_gha.fs);
-//    Serial.print("  maxdB: ");Serial.println(this_gha.maxdB);
-//    Serial.print("  exp_cr: ");Serial.println(this_gha.exp_cr);
-//    Serial.print("  exp_end_knee: ");Serial.println(this_gha.exp_end_knee);
-//    Serial.print("  tkgain: ");Serial.println(this_gha.tkgain);
-//    Serial.print("  tk: ");Serial.println(this_gha.tk);
-//    Serial.print("  cr: ");Serial.println(this_gha.cr);
-//    Serial.print("  bolt: ");Serial.println(this_gha.bolt);
-    configureBroadbandWDRCs(settings.sample_rate_Hz, this_gha, vol_knob_gain_dB, compBroadband[Iear]);
+    
+      //setup the broad band compressor (limiter)
+      //Serial.print("setupFromDSLandGHAandAFC: disabling setting of broadband WDRC. Ear: ");Serial.println(Iear);
+    //    Serial.println("setupFromDSLandGHAandAFC: this_gha = ");
+    //    Serial.print("  attack: ");Serial.println(this_gha.attack);
+    //    Serial.print("  release: ");Serial.println(this_gha.release);
+    //    Serial.print("  fs: ");Serial.println(this_gha.fs);
+    //    Serial.print("  maxdB: ");Serial.println(this_gha.maxdB);
+    //    Serial.print("  exp_cr: ");Serial.println(this_gha.exp_cr);
+    //    Serial.print("  exp_end_knee: ");Serial.println(this_gha.exp_end_knee);
+    //    Serial.print("  tkgain: ");Serial.println(this_gha.tkgain);
+    //    Serial.print("  tk: ");Serial.println(this_gha.tk);
+    //    Serial.print("  cr: ");Serial.println(this_gha.cr);
+    //    Serial.print("  bolt: ");Serial.println(this_gha.bolt);
+      configureBroadbandWDRCs(settings.sample_rate_Hz, this_gha, vol_knob_gain_dB, compBroadband[Iear]);
   }
-
-  //overwrite the one-point calibration based on the dsl data structure
-  overall_cal_dBSPL_at0dBFS = this_dsl.maxdB;
-
+  
+  
   //save the state
-  myState.wdrc_perBand = this_dsl;  //shallow copy the contents of this_dsl into wdrc_perBand
   myState.wdrc_broadBand = this_gha; //shallow copy into wdrc_broadBand
   myState.afc = this_afc;   //shallow copy into AFC
 
@@ -404,7 +415,8 @@ void setDSLConfiguration(int preset_ind) {
 }
 
 void updateDSL(BTNRH_WDRC::CHA_DSL &this_dsl) {
-  setupFromDSLandGHAandAFC(this_dsl, myState.wdrc_broadBand, myState.afc, N_CHAN_MAX, audio_settings);
+  //setupFromDSLandGHAandAFC(this_dsl, myState.wdrc_broadBand, myState.afc, N_CHAN_MAX, audio_settings);
+  setupFromDSL(this_dsl, myState.wdrc_broadBand.tk, N_CHAN_MAX, audio_settings);
 }
 
 void updateGHA(BTNRH_WDRC::CHA_WDRC &this_gha) {
@@ -444,7 +456,7 @@ void configureBroadbandWDRCs(float fs_Hz, const BTNRH_WDRC::CHA_WDRC &this_gha,
 }
 
 void configurePerBandWDRCs(int nchan, float fs_Hz,
-                           const BTNRH_WDRC::CHA_DSL &this_dsl, const BTNRH_WDRC::CHA_WDRC &this_gha,
+                           const BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk,
                            AudioEffectCompWDRC_F32 *WDRCs)
 {
   if (nchan > this_dsl.nchannel) {
@@ -470,7 +482,8 @@ void configurePerBandWDRCs(int nchan, float fs_Hz,
     float bolt = (float) this_dsl.bolt[i];
 
     // adjust BOLT
-    float cltk = (float)this_gha.tk;
+    //float cltk = (float)this_gha.tk;
+    float cltk = gha_tk;
     if (bolt > cltk) bolt = cltk;
     if (tkgain < 0) bolt = bolt + tkgain;
 
