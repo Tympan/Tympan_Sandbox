@@ -682,43 +682,43 @@ void SerialManager::interpretStreamDSL(int idx) {
   idx = readStreamFloatArray(idx, compStartKnee, numChannels);
   idx = readStreamFloatArray(idx, threshold, numChannels);
 
-  Serial.print("  attack = "); Serial.print(attack); Serial.print(", release = "); Serial.println(release);
-  Serial.print("  numChannels = "); Serial.print(numChannels); Serial.print(", maxdB = "); Serial.println(maxdB);
+//  Serial.print("  attack = "); Serial.print(attack); Serial.print(", release = "); Serial.println(release);
+//  Serial.print("  numChannels = "); Serial.print(numChannels); Serial.print(", maxdB = "); Serial.println(maxdB);
+//
+//  Serial.print("  freq = "); 
+//  for (i=0; i<maxChan; i++) {  Serial.print(freq[i]); Serial.print(", "); }
+//  Serial.println();
+//
+//  Serial.print("  lowSPLRatio = "); 
+//  for (i=0; i<maxChan; i++) { Serial.print(lowSPLRatio[i]);  myTympan.print(", ");  }
+//  Serial.println();
+//
+//  Serial.print("  expansionKnee = "); 
+//  for (i=0; i<maxChan; i++) { Serial.print(expansionKneepoint[i]);  myTympan.print(", ");  }
+//  Serial.println();
+//
+//  Serial.print("  compStartGain = "); 
+//  for (i=0; i<maxChan; i++) { Serial.print(compStartGain[i]);  myTympan.print(", ");  }
+//  Serial.println();
 
-  Serial.print("  freq = "); 
-  for (i=0; i<maxChan; i++) {  Serial.print(freq[i]); Serial.print(", "); }
-  Serial.println();
-
-  Serial.print("  lowSPLRatio = "); 
-  for (i=0; i<maxChan; i++) { Serial.print(lowSPLRatio[i]);  myTympan.print(", ");  }
-  Serial.println();
-
-  Serial.print("  expansionKnee = "); 
-  for (i=0; i<maxChan; i++) { Serial.print(expansionKneepoint[i]);  myTympan.print(", ");  }
-  Serial.println();
-
-  Serial.print("  compStartGain = "); 
-  for (i=0; i<maxChan; i++) { Serial.print(compStartGain[i]);  myTympan.print(", ");  }
-  Serial.println();
-
+  //put data into a DSL structure
+  BTNRH_WDRC::CHA_DSL dsl;
+  dsl.attack = attack;  // attack (ms)
+  dsl.release = release,  // release (ms)
+  dsl.nchannel = numChannels;
+  dsl.maxdB = maxdB;
+  for (i=0; i<dsl.nchannel; i++) { 
+    dsl.exp_cr[i] = lowSPLRatio[i];
+    dsl.exp_end_knee[i] = expansionKneepoint[i];
+    dsl.tkgain[i] = compStartGain[i];
+    dsl.tk[i] = compStartKnee[i];
+    dsl.cr[i] = compRatio[i];
+    dsl.bolt[i] = threshold[i];
+  }    
+  State::printPerBandSettings("interpretStreamDSL: printing new dsl:",dsl); //for debugging
   
-
-  BTNRH_WDRC::CHA_DSL dsl = {
-    attack,  // attack (ms)
-    release,  // release (ms)
-    maxdB,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
-    0,
-    numChannels,    //num channels used (must be less than MAX_CHAN constant set in the main program
-    *freq,   // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
-    *lowSPLRatio,   // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
-    *expansionKneepoint,   // expansion-end kneepoint
-    *compStartGain,   // compression-start gain
-    *compRatio,   // compression ratio
-    *compStartKnee,   // compression-start kneepoint (input dB SPL)
-    *threshold    // output limiting threshold (comp ratio 10)
-  };
   updateDSL(dsl);
-  
+  setFullGUIState();
   myTympan.println("SUCCESS.");      
 }
 

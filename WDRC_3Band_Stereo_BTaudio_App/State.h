@@ -38,6 +38,31 @@ class State {
     BTNRH_WDRC::CHA_WDRC wdrc_broadBand;
     BTNRH_WDRC::CHA_AFC afc;
 
+    void printPerBandSettings(void) {   printPerBandSettings("myState: printing per-band settings:",wdrc_perBand);  }
+    static void printPerBandSettings(String s, BTNRH_WDRC::CHA_DSL &this_dsl) {
+      Serial.println(s);
+      Serial.print("  : attack = ");Serial.print(this_dsl.attack); Serial.print(", release = ");Serial.println(this_dsl.release);
+      Serial.print("  : maxdB = ");Serial.print(this_dsl.maxdB); Serial.print(", numChan = ");Serial.println(this_dsl.nchannel);
+      int nchan = min(this_dsl.nchannel,8);
+      Serial.print("  : freq = "); for (int i=0;i < nchan; i++) { Serial.print(this_dsl.cross_freq[i]); Serial.print(" "); }; Serial.println();
+      Serial.print("  : lowSPL CR = "); for (int i=0;i < nchan; i++) { Serial.print(this_dsl.exp_cr[i]); Serial.print(" "); }; Serial.println(); 
+      Serial.print("  : lowSPL knee = "); for (int i=0;i < nchan; i++) { Serial.print(this_dsl.exp_end_knee[i]); Serial.print(" "); }; Serial.println(); 
+      Serial.print("  : linear gain = "); for (int i=0;i < nchan; i++) { Serial.print(this_dsl.tkgain[i]); Serial.print(" "); }; Serial.println(); 
+      Serial.print("  : Comp CR = "); for (int i=0;i < nchan; i++) { Serial.print(this_dsl.cr[i]); Serial.print(" "); }; Serial.println(); 
+      Serial.print("  : Comp knee = "); for (int i=0;i < nchan; i++) { Serial.print(this_dsl.tk[i]); Serial.print(" "); }; Serial.println(); 
+      Serial.print("  : Lim Thresh = "); for (int i=0;i < nchan; i++) { Serial.print(this_dsl.bolt[i]); Serial.print(" "); }; Serial.println(); 
+    } 
+    void printBroadbandSettings(void) {   printBroadbandSettings(wdrc_broadBand);  }
+    static void printBroadbandSettings(BTNRH_WDRC::CHA_WDRC &this_gha) {
+      Serial.println("myState: printing broadband settings:");
+      Serial.print("  : attack = ");Serial.print(this_gha.attack); Serial.print(", release = ");Serial.println(this_gha.release);
+      Serial.print("  : maxdB = ");Serial.println(this_gha.maxdB); 
+      Serial.print("  : lowSPL CR = ");Serial.print(this_gha.exp_cr); Serial.print(", Exp Knee = ");Serial.println(this_gha.exp_end_knee);
+      Serial.print("  : linear gain = ");Serial.println(this_gha.tkgain);
+      Serial.print("  : Comp CR = ");Serial.print(this_gha.cr); Serial.print(", Comp Knee = ");Serial.println(this_gha.tk);
+      Serial.print("  : Lim Thresh = "); Serial.println(this_gha.bolt); 
+    }      
+
     //printing of CPU and memory status
     bool flag_printCPUandMemory = false;
     bool flag_printCPUtoGUI = false;

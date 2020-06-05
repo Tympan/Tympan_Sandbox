@@ -316,10 +316,9 @@ void setupAudioProcessing(void) {
 }
   
 void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_max, const AudioSettings_F32 &settings) {
+  
   //int n_chan = n_chan_max;  //maybe change this to be the value in the DSL itself.  other logic would need to change, too.
   N_CHAN = max(1, min(n_chan_max, this_dsl.nchannel));
-  
-  Serial.print("setupFromDSLandGHAandAFC: N_CHAN = ");Serial.println(N_CHAN);
   
   // //compute the per-channel filter coefficients
   //AudioConfigFIRFilterBank_F32 makeFIRcoeffs(n_chan, n_fir, settings.sample_rate_Hz, (float *)this_dsl.cross_freq, (float *)firCoeff);
@@ -355,13 +354,14 @@ void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_
   
   //save the state
   myState.wdrc_perBand = this_dsl;  //shallow copy the contents of this_dsl into wdrc_perBand
+  //myState.printPerBandSettings();  //debugging!
 }
 
 void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDRC &this_gha,
                               BTNRH_WDRC::CHA_AFC &this_afc, const int n_chan_max, const AudioSettings_F32 &settings)
 {
   //setup all the DSL-based parameters (ie, the processing per frequency band)
-  setupFromDSL(this_dsl, (float)this_gha.tk, n_chan_max, settings);
+  setupFromDSL(this_dsl, (float)this_gha.tk, n_chan_max, settings);  //this also sets the current dsl state to the given DSL
   
   for (int Iear = LEFT; Iear <= RIGHT; Iear++) {
     //setup the AFC
@@ -391,7 +391,7 @@ void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDR
   //save the state
   myState.wdrc_broadBand = this_gha; //shallow copy into wdrc_broadBand
   myState.afc = this_afc;   //shallow copy into AFC
-
+  myState.printBroadbandSettings();
 }
 
 
@@ -679,6 +679,7 @@ void setVolKnobGain_dB(float gain_dB) {
       expCompLim[Iear][i].setGain_dB(myState.wdrc_perBand.tkgain[i]);  //but, we need to maintain the state
     }
   }
+  //myState.printPerBandSettings(); //debugging!
   printGainSettings();
 }
 
