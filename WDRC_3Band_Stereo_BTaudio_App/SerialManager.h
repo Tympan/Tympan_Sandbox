@@ -648,41 +648,60 @@ void SerialManager::interpretStreamGHA(int idx) {
 void SerialManager::interpretStreamDSL(int idx) {
   float attack, release, maxdB;
   int numChannels, i;
+  const int maxChan = 8;
 
-  float freq[8];
-  float lowSPLRatio[8];
-  float expansionKneepoint[8];
-  float compStartGain[8];
-  float compRatio[8];
-  float compStartKnee[8];
-  float threshold[8];
+  float freq[maxChan];  
+  float lowSPLRatio[maxChan];
+  float expansionKneepoint[maxChan];
+  float compStartGain[maxChan];
+  float compRatio[maxChan];
+  float compStartKnee[maxChan];
+  float threshold[maxChan];
+
+  //initialize to zero
+  for (int i=0; i<maxChan; i++){
+    freq[i]=0.0; 
+    lowSPLRatio[i]=0.0;
+    expansionKneepoint[i]=0.0;
+    compStartGain[i]=0.0;
+    compRatio[i]=0.0;
+    compStartKnee[i]=0.0;
+    threshold[i]=0.0;
+  }
 
   attack        = *((float*)(stream_data+idx)); idx=idx+4;
   release       = *((float*)(stream_data+idx)); idx=idx+4;
   numChannels   = *((int*)(stream_data+idx)); idx=idx+4;
   maxdB         = *((float*)(stream_data+idx)); idx=idx+4;
+  
+  idx = readStreamFloatArray(idx, freq, numChannels);
+  idx = readStreamFloatArray(idx, lowSPLRatio, numChannels);
+  idx = readStreamFloatArray(idx, expansionKneepoint, numChannels);
+  idx = readStreamFloatArray(idx, compStartGain, numChannels);
+  idx = readStreamFloatArray(idx, compRatio, numChannels);
+  idx = readStreamFloatArray(idx, compStartKnee, numChannels);
+  idx = readStreamFloatArray(idx, threshold, numChannels);
 
-  idx = readStreamFloatArray(idx, freq, 8);
-  idx = readStreamFloatArray(idx, lowSPLRatio, 8);
-  idx = readStreamFloatArray(idx, expansionKneepoint, 8);
-  idx = readStreamFloatArray(idx, compStartGain, 8);
-  idx = readStreamFloatArray(idx, compRatio, 8);
-  idx = readStreamFloatArray(idx, compStartKnee, 8);
-  idx = readStreamFloatArray(idx, threshold, 8);
+  Serial.print("  attack = "); Serial.print(attack); Serial.print(", release = "); Serial.println(release);
+  Serial.print("  numChannels = "); Serial.print(numChannels); Serial.print(", maxdB = "); Serial.println(maxdB);
 
-  myTympan.print("  freq = {"); 
-  myTympan.print(freq[0]); 
-  for (i=1; i<8; i++) {
-    myTympan.print(", "); myTympan.print(freq[i]);
-  }
-  myTympan.println("}");
+  Serial.print("  freq = "); 
+  for (i=0; i<maxChan; i++) {  Serial.print(freq[i]); Serial.print(", "); }
+  Serial.println();
 
-  myTympan.print("  lowSPLRatio = {"); 
-  myTympan.print(lowSPLRatio[0]); 
-  for (i=1; i<8; i++) {
-    myTympan.print(", "); myTympan.print(lowSPLRatio[i]);
-  }
-  myTympan.println("}");
+  Serial.print("  lowSPLRatio = "); 
+  for (i=0; i<maxChan; i++) { Serial.print(lowSPLRatio[i]);  myTympan.print(", ");  }
+  Serial.println();
+
+  Serial.print("  expansionKnee = "); 
+  for (i=0; i<maxChan; i++) { Serial.print(expansionKneepoint[i]);  myTympan.print(", ");  }
+  Serial.println();
+
+  Serial.print("  compStartGain = "); 
+  for (i=0; i<maxChan; i++) { Serial.print(compStartGain[i]);  myTympan.print(", ");  }
+  Serial.println();
+
+  
 
   BTNRH_WDRC::CHA_DSL dsl = {
     attack,  // attack (ms)
