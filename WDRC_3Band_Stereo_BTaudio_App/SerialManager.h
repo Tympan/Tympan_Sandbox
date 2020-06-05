@@ -607,119 +607,63 @@ void SerialManager::processStream(void) {
 }
 
 void SerialManager::interpretStreamGHA(int idx) {
-  float attack, release, sampRate, maxdB, compRatioLow, kneepoint, compStartGain, compStartKnee, compRatioHigh, threshold;
+  //float attack, release, sampRate, maxdB, compRatioLow, kneepoint, compStartGain, compStartKnee, compRatioHigh, threshold;
 
-  attack        = *((float*)(stream_data+idx)); idx=idx+4;
-  release       = *((float*)(stream_data+idx)); idx=idx+4;
-  //sampRate      = *((float*)(stream_data+idx)); idx=idx+4;
-  //maxdB         = *((float*)(stream_data+idx)); idx=idx+4;
-  sampRate      = 24000.0;  //I'm pretty sure this is ignored
-  maxdB         = 115.0;   //temporary
-  Serial.print("SerialManager: interpretStreamGHA: no maxdB provided.  Assuming "); Serial.println(maxdB);
-  compRatioLow  = *((float*)(stream_data+idx)); idx=idx+4;
-  kneepoint     = *((float*)(stream_data+idx)); idx=idx+4;
-  compStartGain = *((float*)(stream_data+idx)); idx=idx+4;
-  compStartKnee = *((float*)(stream_data+idx)); idx=idx+4;
-  compRatioHigh = *((float*)(stream_data+idx)); idx=idx+4;
-  threshold     = *((float*)(stream_data+idx)); idx=idx+4;
+  //interpret the values
+  BTNRH_WDRC::CHA_WDRC gha;
+  gha.attack        = *((float*)(stream_data+idx)); idx=idx+4; 
+  gha.release       = *((float*)(stream_data+idx)); idx=idx+4;
+  gha.maxdB         = 115.0;   Serial.print("SerialManager: interpretStreamGHA: no maxdB provided.  Assuming "); Serial.println(gha.maxdB);
+  gha.exp_cr        = *((float*)(stream_data+idx)); idx=idx+4;
+  gha.exp_end_knee  = *((float*)(stream_data+idx)); idx=idx+4;
+  gha.tkgain        = *((float*)(stream_data+idx)); idx=idx+4;
+  gha.tk            = *((float*)(stream_data+idx)); idx=idx+4;
+  gha.cr            = *((float*)(stream_data+idx)); idx=idx+4;
+  gha.bolt          = *((float*)(stream_data+idx)); idx=idx+4;
 
-  /* Printing too much causes the teensy to freeze. */
-  myTympan.println("New WDRC:");
-  myTympan.print("  attack = "); myTympan.println(attack); delay(5);
-  myTympan.print("  release = "); myTympan.println(release);delay(5);
-  myTympan.print("  sampRate = "); myTympan.println(sampRate); delay(5);
-  myTympan.print("  maxdB = "); myTympan.println(maxdB); delay(5);
-  myTympan.print("  compRatioLow = "); myTympan.println(compRatioLow); delay(5);
-  myTympan.print("  kneepoint = "); myTympan.println(kneepoint); delay(5);
-  myTympan.print("  compStartGain = "); myTympan.println(compStartGain); delay(5);
-  myTympan.print("  compStartKnee = "); myTympan.println(compStartKnee); delay(5);
-  myTympan.print("  compRatioHigh = "); myTympan.println(compRatioHigh); delay(5);
-  myTympan.print("  threshold = "); myTympan.println(threshold); delay(5);
-  
-  
-  myTympan.println("SUCCESS.");    
+  //print out values for debugging
+  State::printBroadbandSettings("SerialManager::interpretStreamGHA: received broadband settings",gha);
 
-  BTNRH_WDRC::CHA_WDRC gha = {attack, release, sampRate, maxdB, 
-    compRatioLow, kneepoint, compStartGain, compStartKnee, compRatioHigh, threshold};
-
+  // send to the tympan
   updateGHA(gha);
+  setFullGUIState(); //update the App's GUI
+  sendStreamGHA(myState.wdrc_broadBand); //send the GHA back to ensure the GUI shows the right thing
+  //myTympan.println("SUCCESS.");    
 }
 
 void SerialManager::interpretStreamDSL(int idx) {
-  float attack, release, maxdB;
-  int numChannels, i;
-  const int maxChan = 8;
+  const int maxChan = DSL_MXCH; //this #define is in BTNRH_WDRC_Types.h via AudioEffectCompWDRC_F32.h
+ 
+  BTNRH_WDRC::CHA_DSL dsl;
+  dsl.attack        = *((float*)(stream_data+idx)); idx=idx+4;
+  dsl.release       = *((float*)(stream_data+idx)); idx=idx+4;
+  dsl.nchannel      = *((int*)(stream_data+idx)); idx=idx+4;
+  dsl.maxdB         = *((float*)(stream_data+idx)); idx=idx+4;
 
-  float freq[maxChan];  
-  float lowSPLRatio[maxChan];
-  float expansionKneepoint[maxChan];
-  float compStartGain[maxChan];
-  float compRatio[maxChan];
-  float compStartKnee[maxChan];
-  float threshold[maxChan];
-
-  //initialize to zero
-  for (int i=0; i<maxChan; i++){
-    freq[i]=0.0; 
-    lowSPLRatio[i]=0.0;
-    expansionKneepoint[i]=0.0;
-    compStartGain[i]=0.0;
-    compRatio[i]=0.0;
-    compStartKnee[i]=0.0;
-    threshold[i]=0.0;
+  if (dsl.nchannel > maxChan) {
+    Serial.println("SerialManager::interpretStreamDSL: *** ERROR ***");
+    Serial.print  ("  : App says numChannels = "); Serial.print(dsl.nchannel); Serial.print(", which is larger than "); Serial.println(maxChan);
+    Serial.println("  : Ignoring DSL given by the App.  Returning.");
+    return;
   }
 
-  attack        = *((float*)(stream_data+idx)); idx=idx+4;
-  release       = *((float*)(stream_data+idx)); idx=idx+4;
-  numChannels   = *((int*)(stream_data+idx)); idx=idx+4;
-  maxdB         = *((float*)(stream_data+idx)); idx=idx+4;
+  //interpret the rest of the values
+  idx = readStreamFloatArray(idx, dsl.cross_freq, dsl.nchannel );
+  idx = readStreamFloatArray(idx, dsl.exp_cr, dsl.nchannel );
+  idx = readStreamFloatArray(idx, dsl.exp_end_knee, dsl.nchannel );
+  idx = readStreamFloatArray(idx, dsl.tkgain, dsl.nchannel );
+  idx = readStreamFloatArray(idx, dsl.cr, dsl.nchannel );
+  idx = readStreamFloatArray(idx, dsl.tk, dsl.nchannel );
+  idx = readStreamFloatArray(idx, dsl.bolt, dsl.nchannel );    
   
-  idx = readStreamFloatArray(idx, freq, numChannels);
-  idx = readStreamFloatArray(idx, lowSPLRatio, numChannels);
-  idx = readStreamFloatArray(idx, expansionKneepoint, numChannels);
-  idx = readStreamFloatArray(idx, compStartGain, numChannels);
-  idx = readStreamFloatArray(idx, compRatio, numChannels);
-  idx = readStreamFloatArray(idx, compStartKnee, numChannels);
-  idx = readStreamFloatArray(idx, threshold, numChannels);
-
-//  Serial.print("  attack = "); Serial.print(attack); Serial.print(", release = "); Serial.println(release);
-//  Serial.print("  numChannels = "); Serial.print(numChannels); Serial.print(", maxdB = "); Serial.println(maxdB);
-//
-//  Serial.print("  freq = "); 
-//  for (i=0; i<maxChan; i++) {  Serial.print(freq[i]); Serial.print(", "); }
-//  Serial.println();
-//
-//  Serial.print("  lowSPLRatio = "); 
-//  for (i=0; i<maxChan; i++) { Serial.print(lowSPLRatio[i]);  myTympan.print(", ");  }
-//  Serial.println();
-//
-//  Serial.print("  expansionKnee = "); 
-//  for (i=0; i<maxChan; i++) { Serial.print(expansionKneepoint[i]);  myTympan.print(", ");  }
-//  Serial.println();
-//
-//  Serial.print("  compStartGain = "); 
-//  for (i=0; i<maxChan; i++) { Serial.print(compStartGain[i]);  myTympan.print(", ");  }
-//  Serial.println();
-
-  //put data into a DSL structure
-  BTNRH_WDRC::CHA_DSL dsl;
-  dsl.attack = attack;  // attack (ms)
-  dsl.release = release,  // release (ms)
-  dsl.nchannel = numChannels;
-  dsl.maxdB = maxdB;
-  for (i=0; i<dsl.nchannel; i++) { 
-    dsl.exp_cr[i] = lowSPLRatio[i];
-    dsl.exp_end_knee[i] = expansionKneepoint[i];
-    dsl.tkgain[i] = compStartGain[i];
-    dsl.tk[i] = compStartKnee[i];
-    dsl.cr[i] = compRatio[i];
-    dsl.bolt[i] = threshold[i];
-  }    
+  //print to serial for debugging
   State::printPerBandSettings("interpretStreamDSL: printing new dsl:",dsl); //for debugging
-  
-  updateDSL(dsl);
-  setFullGUIState();
-  myTympan.println("SUCCESS.");      
+
+  //send this new data to the rest of the system
+  updateDSL(dsl);    //send it to the Tympan for setting the algorithms
+  setFullGUIState(); //update the App's GUI
+  sendStreamDSL(myState.wdrc_perBand); //send the DSL back to ensure the GUI shows the right thing
+  //myTympan.println("SUCCESS.");      
 }
 
 void SerialManager::interpretStreamAFC(int idx) {
@@ -747,7 +691,6 @@ int SerialManager::readStreamIntArray(int idx, int* arr, int len) {
     arr[i] = *((int*)(stream_data+idx)); 
     idx=idx+4;
   }
-
   return idx;
 }
 

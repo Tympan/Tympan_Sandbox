@@ -391,7 +391,7 @@ void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDR
   //save the state
   myState.wdrc_broadBand = this_gha; //shallow copy into wdrc_broadBand
   myState.afc = this_afc;   //shallow copy into AFC
-  myState.printBroadbandSettings();
+  //myState.printBroadbandSettings();
 }
 
 

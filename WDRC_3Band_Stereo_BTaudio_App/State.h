@@ -52,9 +52,9 @@ class State {
       Serial.print("  : Comp knee = "); for (int i=0;i < nchan; i++) { Serial.print(this_dsl.tk[i]); Serial.print(" "); }; Serial.println(); 
       Serial.print("  : Lim Thresh = "); for (int i=0;i < nchan; i++) { Serial.print(this_dsl.bolt[i]); Serial.print(" "); }; Serial.println(); 
     } 
-    void printBroadbandSettings(void) {   printBroadbandSettings(wdrc_broadBand);  }
-    static void printBroadbandSettings(BTNRH_WDRC::CHA_WDRC &this_gha) {
-      Serial.println("myState: printing broadband settings:");
+    void printBroadbandSettings(void) {   printBroadbandSettings("myState: printing broadband settings:",wdrc_broadBand);  }
+    static void printBroadbandSettings(String s, BTNRH_WDRC::CHA_WDRC &this_gha) {
+      Serial.println(s);
       Serial.print("  : attack = ");Serial.print(this_gha.attack); Serial.print(", release = ");Serial.println(this_gha.release);
       Serial.print("  : maxdB = ");Serial.println(this_gha.maxdB); 
       Serial.print("  : lowSPL CR = ");Serial.print(this_gha.exp_cr); Serial.print(", Exp Knee = ");Serial.println(this_gha.exp_end_knee);
