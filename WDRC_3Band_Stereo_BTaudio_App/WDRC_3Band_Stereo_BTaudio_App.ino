@@ -661,7 +661,9 @@ void setVolKnobGain_dB(float gain_dB) {
   for (int i = 0; i < N_CHAN_MAX; i++) {
     for (int Iear=LEFT; Iear <= RIGHT; Iear++) {
       linear_gain_dB = vol_knob_gain_dB + (expCompLim[Iear][i].getGain_dB() - prev_vol_knob_gain_dB);
-      expCompLim[Iear][i].setGain_dB(linear_gain_dB);
+      //expCompLim[Iear][i].setGain_dB(linear_gain_dB); // simple and direct but doesn't seem to maintain state correctly
+      myState.wdrc_perBand.tkgain[i] = linear_gain_dB;  //but, we need to maintain the state
+      expCompLim[Iear][i].setGain_dB(myState.wdrc_perBand.tkgain[i]);  //but, we need to maintain the state
     }
   }
   printGainSettings();

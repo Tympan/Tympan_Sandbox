@@ -837,9 +837,6 @@ void SerialManager::setFullGUIState(void) {
   setButtonState_inputMixer();
   setInputConfigButtons();
 
-  //setButtonText("highGain",0);
-  //setButtonText("midGain",0);
-  //setButtonText("lowGain",0);
   setButtonState_gains();
     
   //add something here to send prescription values to the remote device
