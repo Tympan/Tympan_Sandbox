@@ -617,9 +617,9 @@ void SerialManager::interpretStreamGHA(int idx) {
   BTNRH_WDRC::CHA_WDRC gha;
   gha.attack        = *((float*)(stream_data+idx)); idx=idx+4; 
   gha.release       = *((float*)(stream_data+idx)); idx=idx+4;
-  gha.maxdB         = 115.0;   Serial.print("SerialManager: interpretStreamGHA: no maxdB provided.  Assuming "); Serial.println(gha.maxdB);
-  gha.exp_cr        = *((float*)(stream_data+idx)); idx=idx+4;
-  gha.exp_end_knee  = *((float*)(stream_data+idx)); idx=idx+4;
+  gha.maxdB         = *((float*)(stream_data+idx)); idx=idx+4;
+  gha.exp_cr        =  1.0;  Serial.print("SerialManager: interpretStreamGHA: no Expansion Ratio.  Assuming "); Serial.println(gha.exp_cr);
+  gha.exp_end_knee  =  -100.0;  Serial.print("SerialManager: interpretStreamGHA: no Exansion Knee.  Assuming "); Serial.println(gha.exp_end_knee);
   gha.tkgain        = *((float*)(stream_data+idx)); idx=idx+4;
   gha.tk            = *((float*)(stream_data+idx)); idx=idx+4;
   gha.cr            = *((float*)(stream_data+idx)); idx=idx+4;
