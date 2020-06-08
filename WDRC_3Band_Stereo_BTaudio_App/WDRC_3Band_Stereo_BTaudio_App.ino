@@ -32,13 +32,15 @@
 // Include all the of the needed libraries
 #include <Tympan_Library.h>
 
-// Define the overall setup
+// Define parameters relating to the overall setup
 String overall_name = String("Tympan: Stereo, 3-Band IIR WDRC, BTAudio, App Control");
 const int N_CHAN_MAX = 3;  //number of frequency bands (channels)
 int N_CHAN = N_CHAN_MAX;  //will be changed to user-selected number of channels later
-const float input_gain_dB = 15.0f; //gain on the microphone
+const float input_gain_dB = 15.0f; //gain on the analog microphones...does not affect the PDM microphone
 float vol_knob_gain_dB = 0.0; //will be overridden by volume knob
 int USE_VOLUME_KNOB = 0;  //set to 1 to use volume knob to override the default vol_knob_gain_dB set a few lines below
+
+//define some constants for use later
 const int LEFT = 0, RIGHT = 1;
 const int FRONT = 0, REAR = 1;
 const int PDM_LEFT_FRONT = 3, PDM_LEFT_REAR = 2, PDM_RIGHT_FRONT = 1, PDM_RIGHT_REAR = 0;  //notice the weird order
@@ -50,6 +52,7 @@ const int ANALOG_IN = 0, PDM_IN = 1;
 #include "AudioEffectAFC_BTNRH_F32.h"
 #include "SerialManager.h"
 
+//define the sample rate and audio block size
 const float sample_rate_Hz = 22050.0f ; //16000, 24000 or 44117.64706f (or other frequencies in the table in AudioOutputI2S_F32
 const int audio_block_samples = 16;  //do not make bigger than AUDIO_BLOCK_SAMPLES from AudioStream.h (which is 128)
 AudioSettings_F32   audio_settings(sample_rate_Hz, audio_block_samples);
