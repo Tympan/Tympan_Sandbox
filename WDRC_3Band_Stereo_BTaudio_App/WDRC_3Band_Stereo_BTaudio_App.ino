@@ -71,7 +71,9 @@ AudioTestSignalGenerator_F32  audioTestGenerator(audio_settings); //keep this to
 //create audio objects for the algorithm
 AudioFilterBiquad_F32      preFilter(audio_settings), preFilterR(audio_settings);  //remove low frequencies near DC
 AudioEffectAFC_BTNRH_F32   feedbackCancel(audio_settings), feedbackCancelR(audio_settings);  //original adaptive feedback cancelation from BTNRH
-AudioFilterBiquad_F32      bpFilt[2][N_CHAN_MAX];         //here are the filters to break up the audio into multiple bands
+//AudioFilterBiquad_F32      bpFilt[2][N_CHAN_MAX];         //here are the filters to break up the audio into multiple bands
+AudioConfigIIRFilterBank_F32 filterBankCalculator(audio_settings);  //this computes the filter coefficients
+AudioFilterIIR_F32         bpFilt[2][N_CHAN_MAX];           //here are the filters to break up the audio into multiple bands
 AudioEffectDelay_F32       postFiltDelay[2][N_CHAN_MAX];  //Here are the delay modules that we'll use to time-align the output of the filters
 AudioEffectCompWDRC_F32    expCompLim[2][N_CHAN_MAX];     //here are the per-band compressors
 AudioMixer8_F32            mixerFilterBank[2];                     //mixer to reconstruct the broadband audio
@@ -304,27 +306,45 @@ int setAnalogInputSource(int input_config) {
 //define functions to setup the audio processing parameters
 #include "GHA_Constants.h"  //this sets dsl and gha settings, which will be the defaults
 #include "GHA_Alternates.h"  //this sets alternate dsl and gha, which can be switched in via commands
-#include "filter_coeff_sos.h"  //IIR filter coefficients for our filterbank
+//include "filter_coeff_sos.h"  //IIR filter coefficients for our filterbank
 float overall_cal_dBSPL_at0dBFS; //will be set later
 
 void setupAudioProcessing(void) {
   //make all of the audio connections
   makeAudioConnections();
   
-  //set the DC-blocking higpass filter cutoff
+  //set the DC-blocking higpass filter cutoff...this is the filter done here in software, not the one done in the AIC DSP hardware
   preFilter.setHighpass(0, 40.0);  preFilterR.setHighpass(0, 40.0);
   
   //setup processing based on the DSL and GHA prescriptions
   setDSLConfiguration(myState.current_dsl_config); //sets the Per Band, the Broad Band, and the AFC parameters using a preset
 }
-  
+
+
+// define filter parameters
+#define MAX_IIR_FILT_ORDER 6 //filter order
+#define N_IIR_COEFF (MAX_IIR_FILT_ORDER+1)
+#define N_ELEMENTS (N_CHAN_MAX*N_IIR_COEFF)
+float  filter_bcoeff[N_ELEMENTS], filter_acoeff[N_ELEMENTS];  //filter b, a
+int    filter_delay[N_CHAN_MAX]; //added delay (samples?) for each filter (int[8])
+
+// setup the per-band processing
 void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_max, const AudioSettings_F32 &settings) {
   
   //int n_chan = n_chan_max;  //maybe change this to be the value in the DSL itself.  other logic would need to change, too.
   N_CHAN = max(1, min(n_chan_max, this_dsl.nchannel));
-  
+
+  // filterbank parameters
+  int n_chan = N_CHAN;          //number of channels
+  int n_iir = MAX_IIR_FILT_ORDER;  //filter order
+  float sample_rate_Hz = audio_settings.sample_rate_Hz; //sample rate Hz)
+  float td_msec = 2.5f;          //allowed time delay (msec)
+  float *crossover_freq = this_dsl.cross_freq;  //crossover frequencies (Hz)
+ 
   // //compute the per-channel filter coefficients
   //AudioConfigFIRFilterBank_F32 makeFIRcoeffs(n_chan, n_fir, settings.sample_rate_Hz, (float *)this_dsl.cross_freq, (float *)firCoeff);
+  filterBankCalculator.createFilterCoeff(n_chan, n_iir, sample_rate_Hz, td_msec, crossover_freq,  // these are the inputs
+        filter_bcoeff, filter_acoeff, filter_delay);  //these are the outputs
   
   // Loop over each ear
   for (int Iear = LEFT; Iear <= RIGHT; Iear++) {
@@ -332,7 +352,12 @@ void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_
     //give the pre-computed coefficients to the IIR filters
     for (int Iband = 0; Iband < n_chan_max; Iband++) {
       if (Iband < N_CHAN) {
-        bpFilt[Iear][Iband].setFilterCoeff_Matlab_sos(&(all_matlab_sos[Iband][0]), SOS_N_BIQUADS_PER_FILTER);  //from filter_coeff_sos.h.  Also calls begin().
+        //bpFilt[Iear][Iband].setFilterCoeff_Matlab_sos(&(all_matlab_sos[Iband][0]), SOS_N_BIQUADS_PER_FILTER);  //from filter_coeff_sos.h.  Also calls begin().
+        float *b = &(filter_bcoeff[Iband*N_IIR_COEFF]);
+        float *a = &(filter_acoeff[Iband*N_IIR_COEFF]);
+        Serial.print("setupFromDSL: Band ");Serial.print(Iband); Serial.print(": b=["); for (int i=0; i<N_IIR_COEFF; i++){ Serial.print(b[i],4);Serial.print(", ");}; Serial.println("]");
+        Serial.print("                    ");                    Serial.print(": a=["); for (int i=0; i<N_IIR_COEFF; i++){ Serial.print(a[i],4);Serial.print(", ");}; Serial.println("]");
+        bpFilt[Iear][Iband].begin(b,a,N_IIR_COEFF);
       } else {
         bpFilt[Iear][Iband].end();
       }
@@ -342,14 +367,14 @@ void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_
     for (int Iband = 0; Iband < n_chan_max; Iband++) {
       postFiltDelay[Iear][Iband].setSampleRate_Hz(audio_settings.sample_rate_Hz);
       if (Iband < N_CHAN) {
-        postFiltDelay[Iear][Iband].delay(0, all_matlab_sos_delay_msec[Iband]); //from filter_coeff_sos.h.  milliseconds!!!
+        //postFiltDelay[Iear][Iband].delay(0, all_matlab_sos_delay_msec[Iband]); //from filter_coeff_sos.h.  milliseconds!!!
+        postFiltDelay[Iear][Iband].delay(0, ((float)filter_delay[Iband]/sample_rate_Hz)*1000.0f); //from filter_coeff_sos.h.  milliseconds!!!
       } else {
         postFiltDelay[Iear][Iband].delay(0, 0); //from filter_coeff_sos.h.  milliseconds!!!
       }
     }
   
-       //setup all of the per-channel compressors
-    //Serial.print("setupFromDSLandGHAandAFC: disabling setting of per-band WDRCs. Ear: ");Serial.println(Iear);
+    //setup all of the per-channel compressors
     configurePerBandWDRCs(N_CHAN, settings.sample_rate_Hz, this_dsl, gha_tk, expCompLim[Iear]);
   }
   //overwrite the one-point calibration based on the dsl data structure
