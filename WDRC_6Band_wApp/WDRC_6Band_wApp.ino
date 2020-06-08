@@ -1,11 +1,11 @@
 /*
-  WDRC_3BandIIR_wBT_wAFC
+  WDRC_6Band_wApp
 
-  Created: Chip Audette (OpenAudio), 2018
+  Created: Chip Audette (OpenAudio), 2020
     Primarly built upon CHAPRO "Generic Hearing Aid" from
     Boys Town National Research Hospital (BTNRH): https://github.com/BTNRH/chapro
 
-  Purpose: Implements 3-band WDRC compressor with adaptive feedback cancelation (AFC)
+  Purpose: Implements 6-band WDRC compressor with adaptive feedback cancelation (AFC)
       based on the work of BTNRH.
 
   Filters: The BTNRH filterbank was implemented in the frequency-domain, whereas
@@ -21,6 +21,7 @@
     from their CHAPRO repository: https://github.com/BoysTownorg/chapro
 
   Connectivity: Communicates via USB Serial and via Bluetooth Serial
+     Use the TympanRemote App from the Android Play Store: https://play.google.com/store/apps/details?id=com.creare.tympanRemote&hl=en_US
 
   User Controls:
     Potentiometer on Tympan controls the algorithm gain.
@@ -33,7 +34,7 @@
 #include <Tympan_Library.h>
 
 // Define parameters relating to the overall setup
-String overall_name = String("Tympan: Stereo, 3-Band IIR WDRC, BTAudio, App Control");
+String overall_name = String("Tympan: 6-Band IIR WDRC (Left only), with App Control");
 const int N_CHAN_MAX = 6;  //number of frequency bands (channels)
 int N_CHAN = N_CHAN_MAX;  //will be changed to user-selected number of channels later
 const float input_gain_dB = 15.0f; //gain on the analog microphones...does not affect the PDM microphone
@@ -365,16 +366,16 @@ void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_
         filter_bcoeff, filter_acoeff, filter_delay);  //these are the outputs
   
   // Loop over each ear
-  for (int Iear = LEFT; Iear <= RIGHT; Iear++) {
+  for (int Iear = 0; Iear <= N_EARPIECES; Iear++) {
   
     //give the pre-computed coefficients to the IIR filters
     for (int Iband = 0; Iband < n_chan_max; Iband++) {
       if (Iband < N_CHAN) {
         //bpFilt[Iear][Iband].setFilterCoeff_Matlab_sos(&(all_matlab_sos[Iband][0]), SOS_N_BIQUADS_PER_FILTER);  //from filter_coeff_sos.h.  Also calls begin().
         float *b = &(filter_bcoeff[Iband*N_IIR_COEFF]);
-        float *a = &(filter_acoeff[Iband*N_IIR_COEFF]);
+        float *a = &(filter_acoeff[Iband*N_IIR_COEFF]); //
         Serial.print("setupFromDSL: Band ");Serial.print(Iband); Serial.print(": b=["); for (int i=0; i<N_IIR_COEFF; i++){ Serial.print(b[i],4);Serial.print(", ");}; Serial.println("]");
-        Serial.print("                    ");                    Serial.print(": a=["); for (int i=0; i<N_IIR_COEFF; i++){ Serial.print(a[i],4);Serial.print(", ");}; Serial.println("]");
+        Serial.print("                    ");                    Serial.print(": a=["); for (int i=0; i<N_IIR_COEFF; i++){ Serial.print(a[i],5);Serial.print(", ");}; Serial.println("]");
         bpFilt[Iear][Iband].begin(b,a,N_IIR_COEFF);
       } else {
         bpFilt[Iear][Iband].end();
