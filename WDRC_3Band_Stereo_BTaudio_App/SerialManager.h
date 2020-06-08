@@ -145,7 +145,7 @@ void SerialManager::printHelp(void) {
   myTympan.println(" w/W/e/E: Inputs: Use PCBMics, Mic on Jack, Line on Jack, PDM Earpieces");
   myTympan.println(" l: Toggle printing of pre-gain per-channel signal levels (dBFS)");
   myTympan.println(" L: Toggle printing of pre-gain per-channel signal levels (dBSPL, per DSL 'maxdB')");
-  myTympan.println(" A: Self-Generated Test: Amplitude sweep.  End-to-End Measurement.");
+  myTympan.println(" A/a: Self-Generated Test: Amplitude sweep (1kHz/250Hz).  End-to-End Measurement.");
   myTympan.println(" F: Self-Generated Test: Frequency sweep.  End-to-End Measurement.");
   myTympan.println(" f: Self-Generated Test: Frequency sweep.  Measure filterbank.");
   myTympan.print(" k: Increase the gain of all channels (ie, knob gain) by "); myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
@@ -284,10 +284,14 @@ void SerialManager::processSingleCharacter(char c) {
       incrementChannelGain(7-1, -channelGainIncrement_dB); setButtonState_gains();break;
     case '*':  //which is "shift 8"
       incrementChannelGain(8-1, -channelGainIncrement_dB);setButtonState_gains(); break;          
-    case 'A':
+    case 'A':case 'a':
       //amplitude sweep test
       { //limit the scope of any variables that I create here
-        ampSweepTester.setSignalFrequency_Hz(1000.f);
+        if (c == 'a') {
+          ampSweepTester.setSignalFrequency_Hz(250.f);
+        } else {
+          ampSweepTester.setSignalFrequency_Hz(1000.f);
+        }
         float start_amp_dB = -100.0f, end_amp_dB = 0.0f, step_amp_dB = 5.0f;
         ampSweepTester.setStepPattern(start_amp_dB, end_amp_dB, step_amp_dB);
         ampSweepTester.setTargetDurPerStep_sec(1.0);
