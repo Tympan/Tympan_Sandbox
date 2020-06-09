@@ -364,18 +364,23 @@ void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_
   //AudioConfigFIRFilterBank_F32 makeFIRcoeffs(n_chan, n_fir, settings.sample_rate_Hz, (float *)this_dsl.cross_freq, (float *)firCoeff);
   filterBankCalculator.createFilterCoeff(n_chan, n_iir, sample_rate_Hz, td_msec, crossover_freq,  // these are the inputs
         filter_bcoeff, filter_acoeff, filter_delay);  //these are the outputs
+
+  // plot the coefficients (for debugging)
+  for (int Iband = 0; Iband < n_chan_max; Iband++) {
+    float *b = &(filter_bcoeff[Iband*N_IIR_COEFF]);
+    float *a = &(filter_acoeff[Iband*N_IIR_COEFF]); 
+    Serial.print("setupFromDSL: Band ");Serial.print(Iband); Serial.print(": b=["); for (int i=0; i<N_IIR_COEFF; i++){ Serial.print(b[i],7);Serial.print(", ");}; Serial.println("]");
+    Serial.print("                    ");                    Serial.print(": a=["); for (int i=0; i<N_IIR_COEFF; i++){ Serial.print(a[i],5);Serial.print(", ");}; Serial.println("]");
+  }    
   
   // Loop over each ear
   for (int Iear = 0; Iear <= N_EARPIECES; Iear++) {
-  
     //give the pre-computed coefficients to the IIR filters
     for (int Iband = 0; Iband < n_chan_max; Iband++) {
       if (Iband < N_CHAN) {
         //bpFilt[Iear][Iband].setFilterCoeff_Matlab_sos(&(all_matlab_sos[Iband][0]), SOS_N_BIQUADS_PER_FILTER);  //from filter_coeff_sos.h.  Also calls begin().
         float *b = &(filter_bcoeff[Iband*N_IIR_COEFF]);
-        float *a = &(filter_acoeff[Iband*N_IIR_COEFF]); //
-        Serial.print("setupFromDSL: Band ");Serial.print(Iband); Serial.print(": b=["); for (int i=0; i<N_IIR_COEFF; i++){ Serial.print(b[i],4);Serial.print(", ");}; Serial.println("]");
-        Serial.print("                    ");                    Serial.print(": a=["); for (int i=0; i<N_IIR_COEFF; i++){ Serial.print(a[i],5);Serial.print(", ");}; Serial.println("]");
+        float *a = &(filter_acoeff[Iband*N_IIR_COEFF]); 
         bpFilt[Iear][Iband].begin(b,a,N_IIR_COEFF);
       } else {
         bpFilt[Iear][Iband].end();
@@ -410,7 +415,7 @@ void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDR
   //setup all the DSL-based parameters (ie, the processing per frequency band)
   setupFromDSL(this_dsl, (float)this_gha.tk, n_chan_max, settings);  //this also sets the current dsl state to the given DSL
   
-  for (int Iear = LEFT; Iear <= RIGHT; Iear++) {
+  for (int Iear = 0; Iear <= N_EARPIECES; Iear++) {
     //setup the AFC
     if (Iear == LEFT) {
       feedbackCancel.setParams(this_afc);
@@ -719,7 +724,7 @@ void setVolKnobGain_dB(float gain_dB) {
   vol_knob_gain_dB = gain_dB;
   float linear_gain_dB;
   for (int i = 0; i < N_CHAN_MAX; i++) {
-    for (int Iear=LEFT; Iear <= RIGHT; Iear++) {
+    for (int Iear=0; Iear <= N_EARPIECES; Iear++) {
       linear_gain_dB = vol_knob_gain_dB + (expCompLim[Iear][i].getGain_dB() - prev_vol_knob_gain_dB);
       //expCompLim[Iear][i].setGain_dB(linear_gain_dB); // simple and direct but doesn't seem to maintain state correctly
       myState.wdrc_perBand.tkgain[i] = linear_gain_dB;  //but, we need to maintain the state
@@ -762,7 +767,7 @@ void updateAveSignalLevels(unsigned long curTime_millis) {
   //is it time to update the calculations
   if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0; //handle wrap-around of the clock
   if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
-    for (int Iear=LEFT; Iear <= RIGHT; Iear++) {
+    for (int Iear=0; Iear <= N_EARPIECES; Iear++) {
       for (int i = 0; i < N_CHAN_MAX; i++) { //loop over each band
         aveSignalLevels_dBFS[Iear][i] = (1.0 - update_coeff) * aveSignalLevels_dBFS[Iear][i] + update_coeff * expCompLim[Iear][i].getCurrentLevel_dB(); //running average
       }
