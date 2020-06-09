@@ -6,8 +6,7 @@
 
 #include <AudioEffectCompWDRC_F32.h>  //links to "BTNRH_WDRC_Types.h", which sets the CHA_DSL and CHA_WDRC data types
 
-// Here is the per-band prescription that is the default behavior of the multi-band
-// processing.  This sounded decent to WEA's ears but YMMV.
+// Here is the per-band prescription that is the default behavior of the multi-band processing.
 BTNRH_WDRC::CHA_DSL dsl = {
   5.0,  // attack (ms)
   300.0,  // release (ms)
@@ -24,8 +23,6 @@ BTNRH_WDRC::CHA_DSL dsl = {
 };
 
 // Here are the settings for the broadband limiter at the end.
-// Again, it sounds OK to WEA, but YMMV.
-//from GHA_Demo.c  from "amplify()"   Used for broad-band limiter.
 BTNRH_WDRC::CHA_WDRC gha = {
   5.0, // attack time (ms)
   300.0,    // release time (ms)
