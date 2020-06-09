@@ -78,9 +78,9 @@ AudioTestSignalGenerator_F32  audioTestGenerator(audio_settings); //keep this to
 //create audio objects for the algorithm
 AudioFilterBiquad_F32      preFilter(audio_settings), preFilterR(audio_settings);  //remove low frequencies near DC
 AudioEffectAFC_BTNRH_F32   feedbackCancel(audio_settings), feedbackCancelR(audio_settings);  //original adaptive feedback cancelation from BTNRH
-//AudioFilterBiquad_F32      bpFilt[2][N_CHAN_MAX];         //here are the filters to break up the audio into multiple bands
+AudioFilterBiquad_F32      bpFilt[2][N_CHAN_MAX];         //here are the filters to break up the audio into multiple bands
 AudioConfigIIRFilterBank_F32 filterBankCalculator(audio_settings);  //this computes the filter coefficients
-AudioFilterIIR_F32         bpFilt[2][N_CHAN_MAX];           //here are the filters to break up the audio into multiple bands
+//AudioFilterIIR_F32         bpFilt[2][N_CHAN_MAX];           //here are the filters to break up the audio into multiple bands
 AudioEffectDelay_F32       postFiltDelay[2][N_CHAN_MAX];  //Here are the delay modules that we'll use to time-align the output of the filters
 AudioEffectCompWDRC_F32    expCompLim[2][N_CHAN_MAX];     //here are the per-band compressors
 AudioMixer8_F32            mixerFilterBank[2];                     //mixer to reconstruct the broadband audio
@@ -342,10 +342,14 @@ void setupAudioProcessing(void) {
 
 // define filter parameters
 #define MAX_IIR_FILT_ORDER 6 //filter order
-#define N_IIR_COEFF (MAX_IIR_FILT_ORDER+1)
-#define N_ELEMENTS (N_CHAN_MAX*N_IIR_COEFF)
-float  filter_bcoeff[N_ELEMENTS], filter_acoeff[N_ELEMENTS];  //filter b, a
+#define N_BIQUAD_PER_FILT (MAX_IIR_FILT_ORDER/2)
+#define COEFF_PER_BIQUAD  6  //3 "b" coefficients and 3 "a" coefficients
+//define N_IIR_COEFF (MAX_IIR_FILT_ORDER+1)
+//#define N_ELEMENTS (N_CHAN_MAX*N_IIR_COEFF)
+//float  filter_bcoeff[N_ELEMENTS], filter_acoeff[N_ELEMENTS];  //filter b, a
+float  filter_sos[N_CHAN_MAX][N_BIQUAD_PER_FILT * COEFF_PER_BIQUAD];
 int    filter_delay[N_CHAN_MAX]; //added delay (samples?) for each filter (int[8])
+
 
 // setup the per-band processing
 void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_max, const AudioSettings_F32 &settings) {
@@ -361,32 +365,29 @@ void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_
   float *crossover_freq = this_dsl.cross_freq;  //crossover frequencies (Hz)
  
   // //compute the per-channel filter coefficients
-  //AudioConfigFIRFilterBank_F32 makeFIRcoeffs(n_chan, n_fir, settings.sample_rate_Hz, (float *)this_dsl.cross_freq, (float *)firCoeff);
-  filterBankCalculator.createFilterCoeff(n_chan, n_iir, sample_rate_Hz, td_msec, crossover_freq,  // these are the inputs
-        filter_bcoeff, filter_acoeff, filter_delay);  //these are the outputs
+  filterBankCalculator.createFilterCoeff_SOS(n_chan, n_iir, sample_rate_Hz, td_msec, crossover_freq,  // these are the inputs
+        (float *)filter_sos, filter_delay);  //these are the outputs
 
-  // plot the coefficients (for debugging)
-  for (int Iband = 0; Iband < n_chan_max; Iband++) {
-    float *b = &(filter_bcoeff[Iband*N_IIR_COEFF]);
-    float *a = &(filter_acoeff[Iband*N_IIR_COEFF]); 
-    Serial.print("setupFromDSL: Band ");Serial.print(Iband); Serial.print(": b=["); for (int i=0; i<N_IIR_COEFF; i++){ Serial.print(b[i],7);Serial.print(", ");}; Serial.println("]");
-    Serial.print("                    ");                    Serial.print(": a=["); for (int i=0; i<N_IIR_COEFF; i++){ Serial.print(a[i],5);Serial.print(", ");}; Serial.println("]");
-  }    
+//  for (int Iband = 0; Iband < n_chan_max; Iband++) {
+//    Serial.print("setupFromDSL: Band ");Serial.println(Iband);
+//    for (int Ibiquad = 0; Ibiquad < N_BIQUAD_PER_FILT; Ibiquad++) {
+//      Serial.print(": Biquad "); Serial.print(Ibiquad); 
+//      for (int i=0; i<COEFF_PER_BIQUAD; i++){ Serial.print(filter_sos[Iband][(Ibiquad*COEFF_PER_BIQUAD)+i],7);Serial.print(", ");};
+//      Serial.println();
+//    } 
+//  }
   
   // Loop over each ear
   for (int Iear = 0; Iear <= N_EARPIECES; Iear++) {
     //give the pre-computed coefficients to the IIR filters
     for (int Iband = 0; Iband < n_chan_max; Iband++) {
       if (Iband < N_CHAN) {
-        //bpFilt[Iear][Iband].setFilterCoeff_Matlab_sos(&(all_matlab_sos[Iband][0]), SOS_N_BIQUADS_PER_FILTER);  //from filter_coeff_sos.h.  Also calls begin().
-        float *b = &(filter_bcoeff[Iband*N_IIR_COEFF]);
-        float *a = &(filter_acoeff[Iband*N_IIR_COEFF]); 
-        bpFilt[Iear][Iband].begin(b,a,N_IIR_COEFF);
+        bpFilt[Iear][Iband].setFilterCoeff_Matlab_sos(&(filter_sos[Iband][0]), N_BIQUAD_PER_FILT);  //from filter_coeff_sos.h.  Also calls begin().
       } else {
         bpFilt[Iear][Iband].end();
       }
     }
-  
+    
     //setup the per-channel delays
     for (int Iband = 0; Iband < n_chan_max; Iband++) {
       postFiltDelay[Iear][Iband].setSampleRate_Hz(audio_settings.sample_rate_Hz);
