@@ -14,7 +14,7 @@ BTNRH_WDRC::CHA_DSL dsl_fullon = {
   300.0,  // release (ms)
   120.0,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
   0,    // 0=left, 1=right...ignored
-  6,    //num channels used (must be less than MAX_CHAN constant set in the main program
+  5,    //num channels used (must be less than MAX_CHAN constant set in the main program
   {   840.0,  1420.,  2378.,  4000.,      1.e4, 1.e4, 1.e4, 1.e4}, // cross frequencies (Hz...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
   { 1.0,   1.0,    1.0,    1.0,    1.0,       1.0,  1.0,  1.0},   // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
   {30.0,  30.0,   30.0,   30.0,   30.0,      30.0, 30.0, 30.0},   // expansion-end kneepoint
