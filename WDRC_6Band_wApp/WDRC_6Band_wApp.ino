@@ -341,15 +341,11 @@ void setupAudioProcessing(void) {
 
 
 // define filter parameters
-#define MAX_IIR_FILT_ORDER 6 //filter order
-#define N_BIQUAD_PER_FILT (MAX_IIR_FILT_ORDER/2)
-#define COEFF_PER_BIQUAD  6  //3 "b" coefficients and 3 "a" coefficients
-//define N_IIR_COEFF (MAX_IIR_FILT_ORDER+1)
-//#define N_ELEMENTS (N_CHAN_MAX*N_IIR_COEFF)
-//float  filter_bcoeff[N_ELEMENTS], filter_acoeff[N_ELEMENTS];  //filter b, a
-float  filter_sos[N_CHAN_MAX][N_BIQUAD_PER_FILT * COEFF_PER_BIQUAD];
-int    filter_delay[N_CHAN_MAX]; //added delay (samples?) for each filter (int[8])
-
+#define MAX_IIR_FILT_ORDER 6                        //filter order (note: in Matlab, an "N=3" bandpass is actually a 6th-order filter
+#define N_BIQUAD_PER_FILT (MAX_IIR_FILT_ORDER/2)    //how many biquads per filter?  If the filter order is 6, there will be 3 biquads
+#define COEFF_PER_BIQUAD  6                         //3 "b" coefficients and 3 "a" coefficients per biquad
+float  filter_sos[N_CHAN_MAX][N_BIQUAD_PER_FILT * COEFF_PER_BIQUAD];   //this holds all the biquad filter coefficients
+int    filter_delay[N_CHAN_MAX];                    //added delay (samples) for each filter (int[8])
 
 // setup the per-band processing
 void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_max, const AudioSettings_F32 &settings) {
@@ -425,18 +421,6 @@ void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDR
     }
     
       //setup the broad band compressor (limiter)
-      //Serial.print("setupFromDSLandGHAandAFC: disabling setting of broadband WDRC. Ear: ");Serial.println(Iear);
-    //    Serial.println("setupFromDSLandGHAandAFC: this_gha = ");
-    //    Serial.print("  attack: ");Serial.println(this_gha.attack);
-    //    Serial.print("  release: ");Serial.println(this_gha.release);
-    //    Serial.print("  fs: ");Serial.println(this_gha.fs);
-    //    Serial.print("  maxdB: ");Serial.println(this_gha.maxdB);
-    //    Serial.print("  exp_cr: ");Serial.println(this_gha.exp_cr);
-    //    Serial.print("  exp_end_knee: ");Serial.println(this_gha.exp_end_knee);
-    //    Serial.print("  tkgain: ");Serial.println(this_gha.tkgain);
-    //    Serial.print("  tk: ");Serial.println(this_gha.tk);
-    //    Serial.print("  cr: ");Serial.println(this_gha.cr);
-    //    Serial.print("  bolt: ");Serial.println(this_gha.bolt);
       configureBroadbandWDRCs(settings.sample_rate_Hz, this_gha, vol_knob_gain_dB, compBroadband[Iear]);
   }
   
