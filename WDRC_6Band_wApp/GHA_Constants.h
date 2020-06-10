@@ -20,7 +20,7 @@ BTNRH_WDRC::CHA_DSL dsl = {
   { 0.0,   10.0,   20.0,   10.0,   20.0,   30.0,     10.f, 10.f},   // compression-start gain
   { 1.5,    1.5,    1.5,    1.5,    1.5,    1.5,     1.5f, 1.5f},   // compression ratio
   {50.0,   50.0,   50.0,   50.0,   50.0,   50.0,     50.0, 50.0},   // compression-start kneepoint (input dB SPL)
-  {95.0,   95.0,   95.0,   95.0,   95.0,   95.0,     95.0, 95.0,  } // output limiting threshold (comp ratio 10)
+  {95.0,   95.0,   95.0,   95.0,   95.0,   95.0,     95.0, 95.0} // output limiting threshold (comp ratio 10)
 };
 
 // Here are the settings for the broadband limiter at the end.
