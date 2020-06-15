@@ -18,7 +18,7 @@ BTNRH_WDRC::CHA_DSL dsl_fullon = {
   {   500.0,  840.0,  1420.,  2378.,  4000.,     1.e4, 1.e4, 1.e4}, // cross frequencies (Hz...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
   { 1.0,   1.0,    1.0,    1.0,    1.0,    1.0,      1.0,  1.0},   // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
   {30.0,  30.0,   30.0,   30.0,   30.0,   30.0,     30.0, 30.0},   // expansion-end kneepoint
-  {40.0,  40.0,   40.0,   40.0,   40.0,   40.0,     10.0, 10.0},   // compression-start gain
+  {32.5,  32.5,   32.5,   32.5,   32.5,   32.5,     10.0, 10.0},   // compression-start gain
   { 1.0,   1.0,    1.0,    1.0,    1.0,    1.0,     1.0,   1.0},   // compression ratio
   {50.0,  50.0,   50.0,   50.0,   50.0,   50.0,     50.0, 50.0},   // compression-start kneepoint (input dB SPL)
   {200.,  200.,   200.,   200.,   200.,   200.,     200., 200.}    // output limiting threshold (comp ratio 10)
@@ -42,8 +42,8 @@ BTNRH_WDRC::CHA_WDRC gha_fullon = {
 // Here are the settings for the adaptive feedback cancelation
 BTNRH_WDRC::CHA_AFC afc_fullon = {   
   0, //enable AFC at startup?  Set to 1 to default to active.  Set to 0 to default to disabled
-  100, //afl, length (samples) of adaptive filter for modeling feedback path.  Max allowed is probably 256 samples.
-  1.0e-3, //mu, scale factor for how fast the adaptive filter adapts (bigger is faster)
-  0.9, //rho, smoothing factor for how fast the audio's envelope is tracked (bigger is a longer average)
-  0.008 //eps, when estimating the audio envelope, this is the minimum allowed level (helps avoid divide-by-zero)
+  100, //afl (100?), length (samples) of adaptive filter for modeling feedback path.  Max allowed is probably 256 samples.
+  1.0e-3, //mu (1.0e-3?), scale factor for how fast the adaptive filter adapts (bigger is faster)
+  0.9, //rho (0.9?), smoothing factor for how fast the audio's envelope is tracked (bigger is a longer average)
+  0.008 //eps (0.008?), when estimating the audio envelope, this is the minimum allowed level (helps avoid divide-by-zero)
 };

@@ -2,16 +2,16 @@
 #ifndef _AudioEffectAFC_BTNRH_F32_h
 #define _AudioEffectAFC_BTNRH_F32_h
 
-#include "AudioEffectFeedbackCancel_F32.h"
+#include "AudioEffectFeedbackCancel_Local_F32.h"
 
-//Purpose: Make an AFC class that is closer to what BTNRH originall wrote
+//Purpose: Make an AFC class that is closer to what BTNRH originally wrote
 //Author: Chip Audette  2018-06-08
 
-class AudioEffectAFC_BTNRH_F32 : public AudioEffectFeedbackCancel_F32 {
+class AudioEffectAFC_BTNRH_F32 : public AudioEffectFeedbackCancel_Local_F32 {
   public:
     //constructor
-    AudioEffectAFC_BTNRH_F32(void) : AudioEffectFeedbackCancel_F32() { }
-    AudioEffectAFC_BTNRH_F32(const AudioSettings_F32 &settings) : AudioEffectFeedbackCancel_F32(settings) { };
+    AudioEffectAFC_BTNRH_F32(void) : AudioEffectFeedbackCancel_Local_F32() { }
+    AudioEffectAFC_BTNRH_F32(const AudioSettings_F32 &settings) : AudioEffectFeedbackCancel_Local_F32(settings) { };
 
     virtual void cha_afc(float32_t *x, //input audio array
                          float32_t *y, //output audio array
@@ -56,20 +56,20 @@ class AudioEffectAFC_BTNRH_F32 : public AudioEffectFeedbackCancel_F32 {
         //    fbs += ring[ij] * sfbp[j];  //feedback signal
         //}
 
-        // estimate feedback
-        fbe = 0;
-        for (j = 0; j < afl; j++) {
-          ij = (ii - j + rsz) & mask;
-          fbe += ring[ij] * efbp[j];
+        // using our estimated feedback model (efbp), let's estimate feedback signal that we think that we should be receiving
+        fbe = 0; //initialize to zero
+        for (j = 0; j < afl; j++) {    //loop over each AFC filter indices
+          ij = (ii - j + rsz) & mask;  //compute index into ring buffer of previous audio data
+          fbe += ring[ij] * efbp[j];   //apply the estimated feedback model (efbp) to the audio data to estimate the current feedback signal
         }
 
-        // apply feedback to input signal
+        // apply the simulated feedback to input signal and remove the estimated feedback signal
         //s1 = s0 + fbs - fbe;
 
         // remove estimated feedback from input signal
         s1 = s0 - fbe;
 
-        // calculate instantaneous power
+        // calculate instantaneous power of the original and the canceled signal
         ipwr = s0 * s0 + s1 * s1;
 
         // update adaptive feedback coefficients
@@ -79,7 +79,7 @@ class AudioEffectAFC_BTNRH_F32 : public AudioEffectFeedbackCancel_F32 {
         int ii_rsz = ii + rsz;
         for (j = 0; j < afl; j++) {
           //ij = (ii - j + rsz) & mask;
-          ij = (ii_rsz - j) & mask;
+          ij = (ii_rsz - j) & mask;     //calc index into ringbuffer
           //efbp[j] += mum * ring[ij] * s1;  //update the estimated feedback coefficients
           efbp[j] += foo * ring[ij];  //update the estimated feedback coefficients
         }
@@ -93,6 +93,13 @@ class AudioEffectAFC_BTNRH_F32 : public AudioEffectFeedbackCancel_F32 {
         //    }
         //    merr[i] = dm / fbm;
         //}
+
+        if (n_coeff_to_zero > 0) {
+          //zero out the first feedback coefficients
+          for (int j=0; j < n_coeff_to_zero; j++) {
+            efbp[j] = 0.0;
+          }
+        }
 
         // copy AFC signal to output
         y[i] = s1;

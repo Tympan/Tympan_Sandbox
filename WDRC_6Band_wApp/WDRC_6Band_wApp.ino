@@ -61,7 +61,7 @@ const int ANALOG_IN = 0, PDM_IN = 1;
 
 //define the sample rate and audio block size
 const float sample_rate_Hz = 22050.0f ; //16000, 24000 or 44117.64706f (or other frequencies in the table in AudioOutputI2S_F32
-const int audio_block_samples = 16;  //do not make bigger than AUDIO_BLOCK_SAMPLES from AudioStream.h (which is 128)
+const int audio_block_samples = 128;  //do not make bigger than AUDIO_BLOCK_SAMPLES from AudioStream.h (which is 128)
 AudioSettings_F32   audio_settings(sample_rate_Hz, audio_block_samples);
 
 // /////////// Define audio objects...they are configured later
@@ -85,7 +85,8 @@ AudioEffectDelay_F32       postFiltDelay[2][N_CHAN_MAX];  //Here are the delay m
 AudioEffectCompWDRC_F32    expCompLim[2][N_CHAN_MAX];     //here are the per-band compressors
 AudioMixer8_F32            mixerFilterBank[2];                     //mixer to reconstruct the broadband audio
 AudioEffectCompWDRC_F32    compBroadband[2];              //broad band compressor
-AudioEffectFeedbackCancel_LoopBack_F32 feedbackLoopBack(audio_settings), feedbackLoopBackR(audio_settings);
+AudioEffectFeedbackCancel_LoopBack_Local_F32 feedbackLoopBack(audio_settings), feedbackLoopBackR(audio_settings);
+AudioSDWriter_F32             audioSDWriter(audio_settings); //this is stereo by default
 AudioOutputI2SQuad_F32      i2s_out(audio_settings);    //Digital audio output to the DAC.  Should be last.
 
 //complete the creation of the tester objects
@@ -136,7 +137,7 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
   patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, audioTestMeasurement_filterbank, 0); //connect test generator to the test measurement filterbank
 
   //start the algorithms with the feedback cancallation block
-  #if 0  //set to zero to discable the adaptive feedback cancelation
+  #if 1  //set to zero to discable the adaptive feedback cancelation
     patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, feedbackCancel, 0); //remember, even the normal audio is coming through the audioTestGenerator
   #endif
 
@@ -144,13 +145,13 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
   for (int Iear = 0; Iear < N_EARPIECES; Iear++) { //loop over channels
     for (int Iband = 0; Iband < N_CHAN_MAX; Iband++) {
       if (Iear == LEFT) {
-        #if 0  //set to zero to discable the adaptive feedback cancelation
+        #if 1  //set to zero to discable the adaptive feedback cancelation
           patchCord[count++] = new AudioConnection_F32(feedbackCancel, 0, bpFilt[Iear][Iband], 0); //connect to Feedback canceler //perhaps 
         #else
           patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, bpFilt[Iear][Iband], 0); //input is coming from the audio test generator
         #endif
       } else {
-        #if 0  //set to zero to discable the adaptive feedback cancelation
+        #if 1  //set to zero to discable the adaptive feedback cancelation
           patchCord[count++] = new AudioConnection_F32(feedbackCancelR, 0, bpFilt[Iear][Iband], 0); //connect to Feedback canceler
         #else
           patchCord[count++] = new AudioConnection_F32(leftRightMixer[RIGHT], 0, bpFilt[Iear][Iband], 0); //input is coming directly from i2s_in
@@ -174,7 +175,7 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
   feedbackLoopBack.setTargetAFC(&feedbackCancel);   //left ear
   if (RUN_STEREO) feedbackLoopBackR.setTargetAFC(&feedbackCancelR); //right ear
   
-  #if 0  // set to zero to disable the adaptive feedback canceler
+  #if 1  // set to zero to disable the adaptive feedback canceler
     patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, feedbackLoopBack, 0); //loopback to the adaptive feedback canceler
     patchCord[count++] = new AudioConnection_F32(compBroadband[RIGHT], 0, feedbackLoopBackR, 0); //loopback to the adaptive feedback canceler
   #endif
@@ -191,9 +192,12 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
     }
   }
 
-  //make the last connections for the audio test measurements
+  //make the last connections for the audio test measurements and SD writer
   patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, audioTestMeasurement, 0);
   patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, audioTestMeasurement, 1);
+  patchCord[count++] = new AudioConnection_F32(leftRightMixer[LEFT], 0, audioSDWriter, 0);
+  patchCord[count++] = new AudioConnection_F32(i2s_out, 0, audioSDWriter, 1);
+  
 
   return count;
 }
@@ -226,10 +230,12 @@ void setupTympanHardware(void) {
   //Choose the default input
   if (1) {
     setAnalogInputSource(State::INPUT_PCBMICS);  //Choose the desired audio analog input on the Typman...this will be overridden by the serviceMicDetect() in loop()
-    setInputAnalogVsPDM(State::INPUT_PDM); //but then activate the PDM mics
+    setInputAnalogVsPDM(State::INPUT_PDM); // ****but*** then activate the PDM mics
+    Serial.println("setupTympanHardware: PDM Earpiece is the active input.");
   } else {
     //setAnalogInputSource(State::INPUT_PCBMICS);  //Choose the desired audio analog input on the Typman...this will be overridden by the serviceMicDetect() in loop()
     setAnalogInputSource(State::INPUT_MICJACK_MIC);  //Choose the desired audio analog input on the Typman...this will be overridden by the serviceMicDetect() in loop()
+    Serial.println("setupTympanHardware: analog input is the active input.");
   }
   
   //Set the Bluetooth audio to go straight to the headphone amp, not through the Tympan software
@@ -331,11 +337,13 @@ float overall_cal_dBSPL_at0dBFS; //will be set later
 void setupAudioProcessing(void) {
   //make all of the audio connections
   makeAudioConnections();
+  Serial.println("setupAudioProcessing: makeAudioConnections() is complete.");
   
   //set the DC-blocking higpass filter cutoff...this is the filter done here in software, not the one done in the AIC DSP hardware
-  preFilter.setHighpass(0, 40.0);  preFilterR.setHighpass(0, 40.0);
+  preFilter.setHighpass(0, 500.0);  preFilterR.setHighpass(0, 500.0);  //was 40Hz
   
   //setup processing based on the DSL and GHA prescriptions
+  Serial.println("setupAudioProcessing: starting setDSLConfiguration()");
   setDSLConfiguration(myState.current_dsl_config); //sets the Per Band, the Broad Band, and the AFC parameters using a preset
 }
 
@@ -361,19 +369,24 @@ void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_
   float *crossover_freq = this_dsl.cross_freq;  //crossover frequencies (Hz)
  
   // //compute the per-channel filter coefficients
+  Serial.println("setupFromDSL: computing SOS filter coefficients...");
   filterBankCalculator.createFilterCoeff_SOS(n_chan, n_iir, sample_rate_Hz, td_msec, crossover_freq,  // these are the inputs
         (float *)filter_sos, filter_delay);  //these are the outputs
 
-//  for (int Iband = 0; Iband < n_chan_max; Iband++) {
-//    Serial.print("setupFromDSL: Band ");Serial.println(Iband);
-//    for (int Ibiquad = 0; Ibiquad < N_BIQUAD_PER_FILT; Ibiquad++) {
-//      Serial.print(": Biquad "); Serial.print(Ibiquad); 
-//      for (int i=0; i<COEFF_PER_BIQUAD; i++){ Serial.print(filter_sos[Iband][(Ibiquad*COEFF_PER_BIQUAD)+i],7);Serial.print(", ");};
-//      Serial.println();
-//    } 
-//  }
+  #if 0
+  //plot coefficients (for debugging)
+  for (int Iband = 0; Iband < n_chan_max; Iband++) {
+    Serial.print("setupFromDSL: Band ");Serial.println(Iband);
+    for (int Ibiquad = 0; Ibiquad < N_BIQUAD_PER_FILT; Ibiquad++) {
+      Serial.print(": Biquad "); Serial.print(Ibiquad); 
+      for (int i=0; i<COEFF_PER_BIQUAD; i++){ Serial.print(filter_sos[Iband][(Ibiquad*COEFF_PER_BIQUAD)+i],7);Serial.print(", ");};
+      Serial.println();
+    } 
+  }
+  #endif
   
   // Loop over each ear
+  Serial.println("setupFromDSL: deploying SOS filter coefficients to the filter objects...");
   for (int Iear = 0; Iear <= N_EARPIECES; Iear++) {
     //give the pre-computed coefficients to the IIR filters
     for (int Iband = 0; Iband < n_chan_max; Iband++) {
@@ -438,13 +451,13 @@ void setDSLConfiguration(int preset_ind) {
       myState.current_dsl_config = preset_ind;
       //myTympan.println("setDSLConfiguration: Using DSL Preset A");
       setupFromDSLandGHAandAFC(dsl, gha, afc, N_CHAN_MAX, audio_settings);
-      myTympan.setRedLED(true);  myTympan.setAmberLED(false);
+      //myTympan.setRedLED(true);  myTympan.setAmberLED(false);
       break;
     case (State::DSL_PRESET_B):
       myState.current_dsl_config = preset_ind;
       //myTympan.println("setDSLConfiguration: Using DSL Preset B");
       setupFromDSLandGHAandAFC(dsl_fullon, gha_fullon, afc_fullon, N_CHAN_MAX, audio_settings);
-      myTympan.setRedLED(false);  myTympan.setAmberLED(true);
+      //myTympan.setRedLED(false);  myTympan.setAmberLED(true);
       break;
   }
   configureLeftRightMixer(State::INPUTMIX_STEREO);
@@ -589,16 +602,46 @@ void setup() {
   myTympan.print("Audio Block Size (samples): "); myTympan.println(audio_settings.audio_block_samples);
 
   // Audio connections require memory
-  AudioMemory_F32_wSettings(150, audio_settings); //allocate Float32 audio data blocks (primary memory used for audio processing)
+  AudioMemory_F32_wSettings(70, audio_settings); //allocate Float32 audio data blocks (primary memory used for audio processing)
 
   // Enable the audio shield, select input, and enable output
+  Serial.println("setup: starting setupTympanHardware()");
   setupTympanHardware();
 
   //setup filters and mixers
+  Serial.println("setup: starting setupAudioProcessing()");
   setupAudioProcessing();
 
   //update the potentiometer settings
   if (USE_VOLUME_KNOB) servicePotentiometer(millis(),0);  //the "0" forces it to read the pot now
+
+  //prepare the SD writer for the format that we want and any error statements
+  audioSDWriter.setSerial(&myTympan);
+  audioSDWriter.setNumWriteChannels(2);             //four channels for this quad recorder, but you could set it to 2
+  int ret_val = -999;
+  ret_val = audioSDWriter.setWriteDataType(AudioSDWriter::WriteDataType::INT16);  //this is the built-in the default, but here you could change it to FLOAT32
+  Serial.print("setup: setWriteDataType() yielded return code: "); 
+  Serial.print(ret_val); 
+  if (ret_val < 0) { 
+    Serial.println(": ERROR!"); 
+  } else { 
+    Serial.println(": OK"); 
+  }
+  #if 1
+  ret_val = audioSDWriter.allocateBuffer(75000);  //I believe that 150000 is the default, but we might not have that much available RAM in this sketch
+  Serial.print("setup: allocating SD buffer yields return code: ");Serial.print(ret_val); Serial.print(": "); 
+  if (ret_val == -2) {
+    Serial.println("BUFF_WRITER NOT CREATED YET.");
+  } else if (ret_val < 0) { 
+    Serial.println("ERROR"); 
+  } else if (ret_val > 0) {
+    Serial.println("SUCCESS!!");
+  } else { 
+    Serial.println("OK"); 
+  };
+  #endif
+  myTympan.print("Configured for "); myTympan.print(audioSDWriter.getNumWriteChannels()); myTympan.println(" channels to SD.");
+
 
   //End of setup
   printGainSettings();
@@ -620,6 +663,12 @@ void loop() {
   //service the potentiometer...if enough time has passed
   if (USE_VOLUME_KNOB) servicePotentiometer(millis(),100); //service the pot every 100 msec
 
+  //service the SD recording
+  serviceSD();
+
+  //service the LEDs
+  serviceLEDs();   //Remember that the LEDs on the Tympan board are not visible with CCP shield in-place.
+
   //check the mic_detect signal
   serviceMicDetect(millis(), 500);  //service the MicDetect every 500 msec
 
@@ -632,13 +681,112 @@ void loop() {
   if (enable_printAveSignalLevels) printAveSignalLevels(millis(), printAveSignalLevels_as_dBSPL);
 
   //print plottable data
-  if (myState.flag_printPlottableData) printPlottableData(millis(), 250);  //print values every 250msec
+  //if (myState.flag_printPlottableData) printPlottableData(millis(), 250);  //print values every 250msec
+  if (myState.flag_printPlottableData) printPlottableData(millis(), 1000);  //print values every 250msec
 
 
 } //end loop()
 
 
 // ///////////////// Servicing routines
+
+
+//serviceLEDs: This toggles the big blue LED on the CCP shield differently based on state.
+void serviceLEDs(void) {
+  static int loop_count = 0;
+  loop_count++;
+  
+  if (audioSDWriter.getState() == AudioSDWriter::STATE::UNPREPARED) {
+    if (loop_count > 200000) {  //slow toggle
+      loop_count = 0;
+      toggleLEDs(true,true); //blink both
+    }
+  } else if (audioSDWriter.getState() == AudioSDWriter::STATE::RECORDING) {
+
+    //let's flicker the LEDs while writing
+    loop_count++;
+    if (loop_count > 20000) { //fast toggle
+      loop_count = 0;
+      toggleLEDs(true,true); //blink both
+    }
+  } else {
+    //myTympan.setRedLED(HIGH); myTympan.setAmberLED(LOW); //Go Red
+    if (loop_count > 200000) { //slow toggle
+      loop_count = 0;
+      toggleLEDs(false,true); //just blink the red
+    }
+  }
+}
+
+void toggleLEDs(void) {
+  toggleLEDs(true,true);  //toggle both
+}
+void toggleLEDs(const bool &useAmber, const bool &useRed) {
+  static bool LED = false;
+  LED = !LED;
+  if (LED) {
+    if (useAmber) myTympan.setAmberLED(true);
+    if (useRed) myTympan.setRedLED(false);
+  } else {
+    if (useAmber) myTympan.setAmberLED(false);
+    if (useRed) myTympan.setRedLED(true);
+  }
+
+  if (!useAmber) myTympan.setAmberLED(false);
+  if (!useRed) myTympan.setRedLED(false);
+}
+
+
+
+#define PRINT_OVERRUN_WARNING 1   //set to 1 to print a warning that the there's been a hiccup in the writing to the SD.
+void serviceSD(void) {
+  static int max_max_bytes_written = 0; //for timing diagnotstics
+  static int max_bytes_written = 0; //for timing diagnotstics
+  static int max_dT_micros = 0; //for timing diagnotstics
+  static int max_max_dT_micros = 0; //for timing diagnotstics
+
+  unsigned long dT_micros = micros();  //for timing diagnotstics
+  int bytes_written = audioSDWriter.serviceSD();
+  dT_micros = micros() - dT_micros;  //timing calculation
+
+  if ( bytes_written > 0 ) {
+
+    max_bytes_written = max(max_bytes_written, bytes_written);
+    max_dT_micros = max((int)max_dT_micros, (int)dT_micros);
+
+    if (dT_micros > 10000) {  //if the write took a while, print some diagnostic info
+
+      max_max_bytes_written = max(max_bytes_written, max_max_bytes_written);
+      max_max_dT_micros = max(max_dT_micros, max_max_dT_micros);
+
+      Serial.print("serviceSD: bytes written = ");
+      Serial.print(bytes_written); Serial.print(", ");
+      Serial.print(max_bytes_written); Serial.print(", ");
+      Serial.print(max_max_bytes_written); Serial.print(", ");
+      Serial.print("dT millis = ");
+      Serial.print((float)dT_micros / 1000.0, 1); Serial.print(", ");
+      Serial.print((float)max_dT_micros / 1000.0, 1); Serial.print(", ");
+      Serial.print((float)max_max_dT_micros / 1000.0, 1); Serial.print(", ");
+      Serial.println();
+      max_bytes_written = 0;
+      max_dT_micros = 0;
+    }
+
+    //print a warning if there has been an SD writing hiccup
+    if (PRINT_OVERRUN_WARNING) {
+      //if (audioSDWriter.getQueueOverrun() || i2s_in.get_isOutOfMemory()) {
+      if (i2s_in.get_isOutOfMemory()) {
+        float approx_time_sec = ((float)(millis() - audioSDWriter.getStartTimeMillis())) / 1000.0;
+        if (approx_time_sec > 0.1) {
+          myTympan.print("SD Write Warning: there was a hiccup in the writing.");//  Approx Time (sec): ");
+          myTympan.println(approx_time_sec );
+        }
+      }
+    }
+    i2s_in.clear_isOutOfMemory();
+  }
+}
+
 
 //servicePotentiometer: listens to the blue potentiometer and sends the new pot value
 //  to the audio processing algorithm as a control parameter
@@ -810,13 +958,21 @@ void printPlottableData(unsigned long curTime_millis, unsigned long updatePeriod
 
 void printData(Print *s, bool printLeadingChar, int counter) {
   if (printLeadingChar)  s->print("P");          //Let's assume that all plottable data starts with a "P"
-  s->print(counter);      //Let's plot a counter
-  s->print(",");
-  s->print(audio_settings.processorUsage(), 1);  //let's plot the CPU being used (should be 0-100)
-  s->print(",");
-  s->print(aveSignalLevels_dBFS[LEFT][0] + overall_cal_dBSPL_at0dBFS, 1); //let's plot the ave signal level for the first channel
-  s->println();
+  #if 0
+    s->print(counter);      //Let's plot a counter
+    s->print(",");
+    s->print(audio_settings.processorUsage(), 1);  //let's plot the CPU being used (should be 0-100)
+    s->print(",");
+    s->print(aveSignalLevels_dBFS[LEFT][0] + overall_cal_dBSPL_at0dBFS, 1); //let's plot the ave signal level for the first channel
+    s->println();
+  #else
+    s->println(-2);s->println(2); //put a blip in the data so that you know when new data is being sent
+    feedbackCancel.printEstimatedFeedbackImpulseResponse(s,true);  //the true puts a line feed after each datapoint
+  #endif
 }
+
+
+
 // // I don't think that this is really needed to receive audio from the BT Module...WEA 2019-11-27
 //
 // #include <SparkFunbc127.h>  //from https://github.com/sparkfun/SparkFun_BC127_Bluetooth_Module_Arduino_Library
