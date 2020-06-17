@@ -61,7 +61,7 @@ const int ANALOG_IN = 0, PDM_IN = 1;
 
 //define the sample rate and audio block size
 const float sample_rate_Hz = 22050.0f ; //16000, 24000 or 44117.64706f (or other frequencies in the table in AudioOutputI2S_F32
-const int audio_block_samples = 128;  //do not make bigger than AUDIO_BLOCK_SAMPLES from AudioStream.h (which is 128)
+const int audio_block_samples = 16;  //do not make bigger than AUDIO_BLOCK_SAMPLES from AudioStream.h (which is 128)
 AudioSettings_F32   audio_settings(sample_rate_Hz, audio_block_samples);
 
 // /////////// Define audio objects...they are configured later

@@ -149,8 +149,7 @@ void SerialManager::printHelp(void) {
   myTympan.println(" A/a: Self-Generated Test: Amplitude sweep (1kHz/250Hz).  End-to-End Measurement.");
   myTympan.println(" F: Self-Generated Test: Frequency sweep.  End-to-End Measurement.");
   myTympan.println(" f: Self-Generated Test: Frequency sweep.  Measure filterbank.");
-  myTympan.print(" k: Increase the gain of all channels (ie, knob gain) by "); myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
-  myTympan.print(" K: Decrease the gain of all channels (ie, knob gain) by ");myTympan.println(" dB");
+  myTympan.print(" k/K: Increase/Decrease gain of all channels (ie, knob gain) by "); myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
   myTympan.println(" q,Q: Mute or Unmute the audio.");
   //myTympan.println(" s,S: Mono or Stereo Audio.");
   printChanUpMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
@@ -163,7 +162,7 @@ void SerialManager::printHelp(void) {
   //myTympan.print(" x,X: Increase or Decrease AFC filter length (currently "); myTympan.print(feedbackCanceler.getAfl()) ; myTympan.println(").");
   //myTympan.print(" u,U: Increase or Decrease Cutoff Frequency of HP Prefilter (currently "); myTympan.print(myTympan.getHPCutoff_Hz()); myTympan.println(" Hz).");
   myTympan.print(" z,Z: Increase or Decrease AFC N_Coeff_To_Zero (currently "); myTympan.print(feedbackCanceler.getNCoeffToZero()) ; myTympan.println(").");  
-  myTympan.print(" |: Print estimated feedback impulse response.");
+  myTympan.println(" |: Print estimated feedback impulse response.");
   //myTympan.println(" J: Print the JSON config object, for the Tympan Remote app");
   myTympan.println(" ],}: Enable/Disable printing of data to plot.");
   myTympan.println(" `,~,|: SD: begin/stop/deleteAll recording");  
