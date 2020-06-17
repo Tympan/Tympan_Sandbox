@@ -17,7 +17,7 @@ BTNRH_WDRC::CHA_DSL dsl = {
   {   500.0,  840.0,  1420.,  2378.,  4000.,      1.e4, 1.e4, 1.e4}, // cross frequencies (Hz)
   {0.57,   0.57,   0.57,   0.57,   0.57,   0.57,     1.0, 1.0},     // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
   {30.0,   30.0,   30.0,   30.0,   30.0,   30.0,     30.0, 30.0},   // expansion-end kneepoint
-  { 0.0,   10.0,   20.0,   10.0,   20.0,   30.0,     10.f, 10.f},   // compression-start gain
+  { 0.0,   10.0,   10.0,   10.0,   15.0,   15.0,     10.f, 10.f},   // compression-start gain
   { 1.5,    1.5,    1.5,    1.5,    1.5,    1.5,     1.5f, 1.5f},   // compression ratio
   {50.0,   50.0,   50.0,   50.0,   50.0,   50.0,     50.0, 50.0},   // compression-start kneepoint (input dB SPL)
   {95.0,   95.0,   95.0,   95.0,   95.0,   95.0,     95.0, 95.0} // output limiting threshold (comp ratio 10)

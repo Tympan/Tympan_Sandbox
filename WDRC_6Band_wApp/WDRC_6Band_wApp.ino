@@ -125,6 +125,11 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
     patchCord[count++] = new AudioConnection_F32(analogVsDigitalSwitch[LEFT], 0, leftRightMixer[RIGHT], LEFT);     //all possible connections intended for RIGHT output
     patchCord[count++] = new AudioConnection_F32(analogVsDigitalSwitch[RIGHT], 0, leftRightMixer[RIGHT], RIGHT);   //all possible connections intended for RIGHT output
   }
+
+  //add prefilters
+  patchCord[count++] = new AudioConnection_F32(leftRightMixer[LEFT],0,preFilter,0);
+  patchCord[count++] = new AudioConnection_F32(leftRightMixer[RIGHT],0,preFilterR,0);
+  
   
   //configure the mixer's default state until set later
   configureEarpieceMixer(State::MIC_FRONT);
@@ -132,7 +137,7 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
 
 
   //make the connection for the audio test measurements...only relevant when the audio test functions are being invoked by the engineer/user
-  patchCord[count++] = new AudioConnection_F32(leftRightMixer[LEFT], 0, audioTestGenerator, 0); // set output of left mixer to the audioTestGenerator (which is will then pass through)
+  patchCord[count++] = new AudioConnection_F32(preFilter, 0, audioTestGenerator, 0); // set output of left mixer to the audioTestGenerator (which is will then pass through)
   patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, audioTestMeasurement, 0); // connect test generator to test measurements
   patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, audioTestMeasurement_filterbank, 0); //connect test generator to the test measurement filterbank
 
@@ -154,7 +159,7 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
         #if 1  //set to zero to discable the adaptive feedback cancelation
           patchCord[count++] = new AudioConnection_F32(feedbackCancelR, 0, bpFilt[Iear][Iband], 0); //connect to Feedback canceler
         #else
-          patchCord[count++] = new AudioConnection_F32(leftRightMixer[RIGHT], 0, bpFilt[Iear][Iband], 0); //input is coming directly from i2s_in
+          patchCord[count++] = new AudioConnection_F32(preFilterR, 0, bpFilt[Iear][Iband], 0); //input is coming directly from i2s_in
         #endif
       }
       patchCord[count++] = new AudioConnection_F32(bpFilt[Iear][Iband], 0, postFiltDelay[Iear][Iband], 0);  //connect to delay
@@ -224,8 +229,9 @@ void setupTympanHardware(void) {
   myTympan.enableMicDetect(true);
 
   //setup DC-blocking highpass filter running in the ADC hardware itself
-  float cutoff_Hz = 70.0;  //set the default cutoff frequency for the highpass filter
+  float cutoff_Hz = 40.0;  //set the default cutoff frequency for the highpass filter
   myTympan.setHPFonADC(true, cutoff_Hz, audio_settings.sample_rate_Hz); //set to false to disable
+  earpieceShield.setHPFonADC(true, cutoff_Hz, audio_settings.sample_rate_Hz); //set to false to disable
 
   //Choose the default input
   if (1) {
@@ -340,7 +346,7 @@ void setupAudioProcessing(void) {
   Serial.println("setupAudioProcessing: makeAudioConnections() is complete.");
   
   //set the DC-blocking higpass filter cutoff...this is the filter done here in software, not the one done in the AIC DSP hardware
-  preFilter.setHighpass(0, 500.0);  preFilterR.setHighpass(0, 500.0);  //was 40Hz
+  preFilter.setHighpass(0, 60.0);  preFilterR.setHighpass(0, 60.0); 
   
   //setup processing based on the DSL and GHA prescriptions
   Serial.println("setupAudioProcessing: starting setDSLConfiguration()");
