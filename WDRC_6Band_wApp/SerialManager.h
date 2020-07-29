@@ -197,9 +197,7 @@ void SerialManager::respondToByte(char c) {
       //Serial.println(c, HEX);
       if (c == DATASTREAM_SEPARATOR) {
         // Get the datastream length:
-        //stream_length = *((int*)(stream_data));
         stream_length = ((int)stream_data[0] << 0) + ((int)stream_data[1] << 8) + ((int)stream_data[2] << 16) + ((int)stream_data[3] << 24);
-        Serial.print("Stream Length: "); Serial.println(stream_length);
         serial_read_state = STREAM_DATA;
         stream_chars_received = 0;
         Serial.print("Stream length = ");
@@ -792,8 +790,8 @@ void SerialManager::sendStreamDSL(const BTNRH_WDRC::CHA_DSL &this_dsl) {
   for (i=0; i<this_dsl.nchannel; i++) { myTympan.print(this_dsl.exp_cr[i], num_digits); myTympan.print(","); }
   for (i=0; i<this_dsl.nchannel; i++) { myTympan.print(this_dsl.exp_end_knee[i], num_digits); myTympan.print(","); }
   for (i=0; i<this_dsl.nchannel; i++) { myTympan.print(this_dsl.tkgain[i], num_digits); myTympan.print(","); }
-  for (i=0; i<this_dsl.nchannel; i++) { myTympan.print(this_dsl.cr[i], num_digits); myTympan.print(","); }
   for (i=0; i<this_dsl.nchannel; i++) { myTympan.print(this_dsl.tk[i], num_digits); myTympan.print(","); }
+    for (i=0; i<this_dsl.nchannel; i++) { myTympan.print(this_dsl.cr[i], num_digits); myTympan.print(","); }
   for (i=0; i<this_dsl.nchannel; i++) { myTympan.print(this_dsl.bolt[i], num_digits); myTympan.print(","); }
 
   myTympan.println(DSL_MXCH); // We can double-check this on the other end to confirm we got the right thing
