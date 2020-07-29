@@ -32,8 +32,8 @@ class State {
     int input_mixer_config = INPUTMIX_STEREO;
     
     //algorithm settings
-    enum DSL_CONFIG {DSL_PRESET_A, DSL_PRESET_B};
-    int current_dsl_config = DSL_PRESET_A; //default to whatever the first algorithm is
+    enum DSL_CONFIG {ALG_PRESET_A, ALG_PRESET_B, ALG_PRESET_C};
+    int current_alg_config = ALG_PRESET_A; //default to whatever the first algorithm is
     BTNRH_WDRC::CHA_DSL wdrc_perBand;
     BTNRH_WDRC::CHA_WDRC wdrc_broadBand;
     BTNRH_WDRC::CHA_AFC afc;

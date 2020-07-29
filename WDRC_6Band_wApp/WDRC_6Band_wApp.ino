@@ -336,7 +336,8 @@ int setAnalogInputSource(int input_config) {
 // /////////// setup the audio processing
 //define functions to setup the audio processing parameters
 #include "GHA_Constants.h"  //this sets dsl and gha settings, which will be the defaults
-#include "GHA_Alternates.h"  //this sets alternate dsl and gha, which can be switched in via commands
+#include "GHA_FullOn.h"     //this sets alternate dsl and gha, which can be switched in via commands
+#include "GHA_RTS.h"        //this sets a third dsl and gha, which can be switched in via commands
 float overall_cal_dBSPL_at0dBFS; //will be set later
 
 void setupAudioProcessing(void) {
@@ -348,8 +349,8 @@ void setupAudioProcessing(void) {
   preFilter.setHighpass(0, 60.0);  preFilterR.setHighpass(0, 60.0); 
   
   //setup processing based on the DSL and GHA prescriptions
-  Serial.println("setupAudioProcessing: starting setDSLConfiguration()");
-  setDSLConfiguration(myState.current_dsl_config); //sets the Per Band, the Broad Band, and the AFC parameters using a preset
+  Serial.println("setupAudioProcessing: starting setAlgorithmPreset()");
+  setAlgorithmPreset(myState.current_alg_config); //sets the Per Band, the Broad Band, and the AFC parameters using a preset
 }
 
 
@@ -450,22 +451,28 @@ void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDR
 }
 
 
-void setDSLConfiguration(int preset_ind) {
+void setAlgorithmPreset(int preset_ind) {
   switch (preset_ind) {
-    case (State::DSL_PRESET_A):
-      myState.current_dsl_config = preset_ind;
-      //myTympan.println("setDSLConfiguration: Using DSL Preset A");
+    case (State::ALG_PRESET_A):
+      myState.current_alg_config = preset_ind;
+      //myTympan.println("setAlgorithmPreset: Using DSL Preset A");
       setupFromDSLandGHAandAFC(dsl, gha, afc, N_CHAN_MAX, audio_settings);
       //myTympan.setRedLED(true);  myTympan.setAmberLED(false);
       break;
-    case (State::DSL_PRESET_B):
-      myState.current_dsl_config = preset_ind;
-      //myTympan.println("setDSLConfiguration: Using DSL Preset B");
+    case (State::ALG_PRESET_B):
+      myState.current_alg_config = preset_ind;
+      //myTympan.println("setAlgorithmPreset: Using DSL Preset B");
       setupFromDSLandGHAandAFC(dsl_fullon, gha_fullon, afc_fullon, N_CHAN_MAX, audio_settings);
       //myTympan.setRedLED(false);  myTympan.setAmberLED(true);
       break;
+    case (State::ALG_PRESET_C):
+      myState.current_alg_config = preset_ind;
+      //myTympan.println("setAlgorithmPreset: Using DSL Preset C");
+      setupFromDSLandGHAandAFC(dsl_rts, gha_rts, afc_rts, N_CHAN_MAX, audio_settings);
+      //myTympan.setRedLED(false);  myTympan.setAmberLED(true);
+      break;      
   }
-  configureLeftRightMixer(State::INPUTMIX_STEREO);
+  //configureLeftRightMixer(State::INPUTMIX_STEREO);
   
 }
 
@@ -594,6 +601,13 @@ int configureLeftRightMixer(int val) {  //call this if you want to change left-r
       break;
   }
   return myState.input_mixer_config;
+}
+
+bool enableAFC(bool enable) {
+  myState.afc.default_to_active = enable;
+  feedbackCancel.setEnable(enable);
+  feedbackCancelR.setEnable(enable);
+  return myState.afc.default_to_active ;
 }
 
 // ///////////////// Main setup() and loop() as required for all Arduino programs

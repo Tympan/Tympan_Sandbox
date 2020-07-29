@@ -36,11 +36,12 @@ extern float getChannelLinearGain_dB(int chan);
 extern void printGainSettings(void);
 extern void togglePrintAveSignalLevels(bool);
 //extern void incrementDSLConfiguration(Stream *);
-extern void setDSLConfiguration(int);
+extern void setAlgorithmPreset(int);
 extern void updateDSL(BTNRH_WDRC::CHA_DSL &);
 extern void updateGHA(BTNRH_WDRC::CHA_WDRC &);
 extern void updateAFC(BTNRH_WDRC::CHA_AFC &);
 extern int configureLeftRightMixer(int);
+extern bool enableAFC(bool);
 
 
 //now, define the Serial Manager class
@@ -90,6 +91,7 @@ class SerialManager {
     void setFullGUIState(void);
     void setInputConfigButtons(void);    
     void setButtonState_algPresets(void);
+    void setButtonState_afc(void);
     void setButtonState_inputMixer(void);
     void setButtonState_gains(void);
     void setSDRecordingButtons(void);  
@@ -154,7 +156,7 @@ void SerialManager::printHelp(void) {
   //myTympan.println(" s,S: Mono or Stereo Audio.");
   printChanUpMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
   printChanDownMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
-  myTympan.print(" d,D: Switch to WDRC Preset A or Preset B");myTympan.println();
+  myTympan.print(" d,D,G: Switch to WDRC Preset A, Full-On, RTS");myTympan.println();
   myTympan.print(" p,P: Enable or Disable Adaptive Feedback Cancelation.");myTympan.println();
   myTympan.print(" m,M: Increase or Decrease AFC mu (currently "); myTympan.print(feedbackCanceler.getMu(),6) ; myTympan.println(").");
   myTympan.print(" r,R: Increase or Decrease AFC rho (currently "); myTympan.print(feedbackCanceler.getRho(),6) ; myTympan.println(").");
@@ -234,7 +236,7 @@ void SerialManager::processSingleCharacter(char c) {
   switch (c) {
     case 'h': case '?':
       printHelp(); break;
-    case 'g': case 'G':
+    case 'g':
       printGainSettings(); break;
     case 'k':
       incrementKnobGain(channelGainIncrement_dB); 
@@ -328,20 +330,23 @@ void SerialManager::processSingleCharacter(char c) {
       setButtonState("printStart",false);
       break;        
     case 'd':
-      myTympan.println("Received: changing to Preset A");
-      setDSLConfiguration(State::DSL_PRESET_A);
-      setButtonState_algPresets();
-      setButtonState_gains(); //update the gain display because they've all changed
+      myTympan.println("Received: changing to WDRC Preset");
+      setAlgorithmPreset(State::ALG_PRESET_A);
+      setFullGUIState();
       sendStreamDSL(myState.wdrc_perBand);      sendStreamGHA(myState.wdrc_broadBand);      sendStreamAFC(myState.afc);      
       break;      
     case 'D':
-      myTympan.println("Received: changing to Preset B");
-      setDSLConfiguration(State::DSL_PRESET_B);
-      setButtonState_algPresets();      
-      setButtonState_gains(); //update the gain display because they've all changed
+      myTympan.println("Received: changing to Full-On Gain");
+      setAlgorithmPreset(State::ALG_PRESET_B);
+      setFullGUIState();
       sendStreamDSL(myState.wdrc_perBand);      sendStreamGHA(myState.wdrc_broadBand);      sendStreamAFC(myState.afc);
       break;
-      
+     case 'G':
+      myTympan.println("Received: changing to RTS Preset");
+      setAlgorithmPreset(State::ALG_PRESET_C);
+      setFullGUIState();
+      sendStreamDSL(myState.wdrc_perBand);      sendStreamGHA(myState.wdrc_broadBand);      sendStreamAFC(myState.afc);
+      break;     
     case 'F':
       //frequency sweep test...end-to-end
       { //limit the scope of any variables that I create here
@@ -419,10 +424,10 @@ void SerialManager::processSingleCharacter(char c) {
     {
       printTympanRemoteLayout();
       delay(20);
-      setFullGUIState();
       sendStreamDSL(myState.wdrc_perBand);
       sendStreamGHA(myState.wdrc_broadBand);
       sendStreamAFC(myState.afc);
+      setFullGUIState();
       break;
     }
     case 'l':
@@ -435,12 +440,16 @@ void SerialManager::processSingleCharacter(char c) {
       break;
     case 'p':
       myTympan.println("Received: enabling feedback cancelation.");
-      feedbackCanceler.setEnable(true);feedbackCancelerR.setEnable(true);
+      //feedbackCanceler.setEnable(true);feedbackCancelerR.setEnable(true);
+      enableAFC(true);
       //feedbackCanceler.resetAFCfilter();
+      setButtonState_afc();
       break;
     case 'P':
       myTympan.println("Received: disabling feedback cancelation.");      
-      feedbackCanceler.setEnable(false);feedbackCancelerR.setEnable(false);
+      //feedbackCanceler.setEnable(false);feedbackCancelerR.setEnable(false);
+      enableAFC(false);
+      setButtonState_afc();
       break;
     //case '|':
     //  feedbackCanceler.printEstimatedFeedbackImpulseResponse();
@@ -573,7 +582,8 @@ void SerialManager::printTympanRemoteLayout(void) {
       "{'title':'Presets','cards':["
           //"{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mono','cmd': 's','id':'inp_mono','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'12'}]},"
           "{'name':'Overall Audio','buttons':[{'label': 'Active','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'6'}]},"
-          "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'alg_preset0'},{'label': 'Full-On Gain', 'cmd': 'D', 'id': 'alg_preset1'}]}"
+          "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'alg_preset0'},{'label': 'Full-On Gain', 'cmd': 'D', 'id': 'alg_preset1'},{'label': 'RTS Gain', 'cmd': 'G', 'id': 'alg_preset2'}]},"
+          "{'name':'Feedback Cancellation','buttons':[{'label': 'On', 'cmd': 'p', 'id': 'afc_on'},{'label': 'Off', 'cmd': 'P', 'id': 'afc_off'}]}"
       "]},"   //include comma if NOT the last one
       "{'title':'Tuner','cards':["
           "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
@@ -835,6 +845,7 @@ void SerialManager::printCPUtoGUI(unsigned long curTime_millis = 0, unsigned lon
 
 void SerialManager::setFullGUIState(void) {
   setButtonState_algPresets();
+  setButtonState_afc();
   setButtonState_inputMixer();
   setInputConfigButtons();
 
@@ -857,27 +868,36 @@ void SerialManager::setFullGUIState(void) {
 }
 
 void SerialManager::setButtonState_algPresets(void) {
-  setButtonState("alg_preset0",false);  delay(10);
-  setButtonState("alg_preset1",false); delay(10);
-  switch (myState.current_dsl_config) {
-    case (State::DSL_PRESET_A):
-      setButtonState("alg_preset0",true);  delay(10); break;
-    case (State::DSL_PRESET_B):
-      setButtonState("alg_preset1",true); delay(10); break;
+  setButtonState("alg_preset0",false);  delay(3);
+  setButtonState("alg_preset1",false); delay(3);
+  setButtonState("alg_preset2",false); delay(3);
+  switch (myState.current_alg_config) {
+    case (State::ALG_PRESET_A):
+      setButtonState("alg_preset0",true);  delay(3); break;
+    case (State::ALG_PRESET_B):
+      setButtonState("alg_preset1",true); delay(3); break;
+    case (State::ALG_PRESET_C):
+      setButtonState("alg_preset2",true); delay(3); break;      
   }
 }
 
 void SerialManager::setButtonState_inputMixer(void) {
-  setButtonState("inp_stereo",false);  delay(10);
-  setButtonState("inp_mono",false); delay(10);
-  setButtonState("inp_mute",false);delay(10);
   switch (myState.input_mixer_config) {
     case (State::INPUTMIX_STEREO):
-      setButtonState("inp_stereo",true);  delay(10); break;
+      setButtonState("inp_mute",false);delay(3);
+      setButtonState("inp_mono",false); delay(3);
+      setButtonState("inp_stereo",true);  delay(3); 
+      break;
     case (State::INPUTMIX_MONO):
-      setButtonState("inp_mono",true); delay(10); break;
+      setButtonState("inp_mute",false);delay(3);
+      setButtonState("inp_mono",true); delay(3);
+      setButtonState("inp_stereo",false);  delay(3); 
+      break;
     case (State::INPUTMIX_MUTE):
-      setButtonState("inp_mute",true);  delay(10); break;
+      setButtonState("inp_mute",true);  delay(3); 
+      setButtonState("inp_mono",false); delay(3); 
+      setButtonState("inp_stereo",false);  delay(3);
+      break;
   }
 }
 
@@ -896,18 +916,28 @@ void SerialManager::setInputConfigButtons(void) {
     default:
       switch (myState.input_analog_config) {
         //case (State::INPUT_PDMMICS):
-        //  setButtonState("configPDMMic",true);  delay(10); break;
+        //  setButtonState("configPDMMic",true);  delay(3); break;
         case (State::INPUT_PCBMICS):
-          setButtonState("configPCBMic",true);  delay(10); break;
+          setButtonState("configPCBMic",true);  delay(3); break;
         case (State::INPUT_MICJACK_MIC): 
-          setButtonState("configMicJack",true); delay(10); break;
+          setButtonState("configMicJack",true); delay(3); break;
         case (State::INPUT_LINEIN_SE): 
-          setButtonState("configLineSE",true);  delay(10); break;
+          setButtonState("configLineSE",true);  delay(3); break;
         case (State::INPUT_MICJACK_LINEIN): 
-          setButtonState("configLineJack",true);delay(10); break;
+          setButtonState("configLineJack",true);delay(3); break;
       }  
       break;
   }
+}
+
+void SerialManager::setButtonState_afc(void) {
+  if (myState.afc.default_to_active) {
+    setButtonState("afc_on",true);
+    setButtonState("afc_off",false);
+  } else {
+    setButtonState("afc_on",false);
+    setButtonState("afc_off",true);
+  }   
 }
 
 void SerialManager::setButtonState_gains(void) {
