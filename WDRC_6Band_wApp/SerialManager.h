@@ -197,7 +197,9 @@ void SerialManager::respondToByte(char c) {
       //Serial.println(c, HEX);
       if (c == DATASTREAM_SEPARATOR) {
         // Get the datastream length:
-        stream_length = *((int*)(stream_data));
+        //stream_length = *((int*)(stream_data));
+        stream_length = ((int)stream_data[0] << 0) + ((int)stream_data[1] << 8) + ((int)stream_data[2] << 16) + ((int)stream_data[3] << 24);
+        Serial.print("Stream Length: "); Serial.println(stream_length);
         serial_read_state = STREAM_DATA;
         stream_chars_received = 0;
         Serial.print("Stream length = ");
@@ -598,10 +600,10 @@ void SerialManager::printTympanRemoteLayout(void) {
           "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
           "{'name':'Linear Gain Per Band (dB)', 'buttons':["
                       "{'label':'LOW','width':'3'},{'label': '-', 'cmd': '!','width':'3'},{'id':'gain1', 'label': '', 'width':'3'},{'label': '+', 'cmd': '1','width':'3'},"
-                      "{'label':'2','width':'3'},{'label': '-', 'cmd': '@','width':'3'},{'id':'gain2', 'label': '', 'width':'3'},{'label': '+', 'cmd': '2','width':'3'},"
-                      "{'label':'3','width':'3'},{'label': '-', 'cmd': '#','width':'3'},{'id':'gain3', 'label': '', 'width':'3'},{'label': '+', 'cmd': '3','width':'3'},"
-                      "{'label':'4','width':'3'},{'label': '-', 'cmd': '$','width':'3'},{'id':'gain4', 'label': '', 'width':'3'},{'label': '+', 'cmd': '4','width':'3'},"
-                      "{'label':'5','width':'3'},{'label': '-', 'cmd': '%','width':'3'},{'id':'gain5', 'label': '', 'width':'3'},{'label': '+', 'cmd': '5','width':'3'},"
+                      "{'label':'Band2','width':'3'},{'label': '-', 'cmd': '@','width':'3'},{'id':'gain2', 'label': '', 'width':'3'},{'label': '+', 'cmd': '2','width':'3'},"
+                      "{'label':'Band3','width':'3'},{'label': '-', 'cmd': '#','width':'3'},{'id':'gain3', 'label': '', 'width':'3'},{'label': '+', 'cmd': '3','width':'3'},"
+                      "{'label':'Band4','width':'3'},{'label': '-', 'cmd': '$','width':'3'},{'id':'gain4', 'label': '', 'width':'3'},{'label': '+', 'cmd': '4','width':'3'},"
+                      "{'label':'Band5','width':'3'},{'label': '-', 'cmd': '%','width':'3'},{'id':'gain5', 'label': '', 'width':'3'},{'label': '+', 'cmd': '5','width':'3'},"
                       "{'label':'HIGH','width':'3'},{'label': '-', 'cmd': '^','width':'3'},{'id':'gain6', 'label': '', 'width':'3'},{'label': '+', 'cmd': '6','width':'3'}"  // //no comma if the last one, which this one is in tis button group
                   "]}"        //no comma if the last one, which this one is for this card group
       "]}," //include comma if NOT the last one      
@@ -615,12 +617,12 @@ void SerialManager::printTympanRemoteLayout(void) {
 //                                            "]}" //don't have a trailing comma on this last one
 //     "]}," //include comma if NOT the last one
       "{'title':'Globals','cards':["
-          "{'name':'Audio Source', 'buttons':["
-                                               "{'label':'Digital: Earpieces', 'cmd': 'E', 'id':'configPDMMic', 'width':'12'},"
-                                               "{'label':'Analog: PCB Mics',  'cmd': 'w', 'id':'configPCBMic',  'width':'12'},"
-                                               "{'label':'Analog: Mic Jack (Mic)',  'cmd': 'W', 'id':'configMicJack', 'width':'12'},"
-                                               "{'label':'Analog: Mic Jack (Line)',  'cmd': 'e', 'id':'configLineJack', 'width':'12'}" //add a comma if you also add the line below
-                                             "]}," //include trailing comma because there are more button groups below
+//          "{'name':'Input Source', 'buttons':["
+//                                               "{'label':'Digital: Earpieces', 'cmd': 'E', 'id':'configPDMMic', 'width':'12'},"
+//                                               "{'label':'Analog: PCB Mics',  'cmd': 'w', 'id':'configPCBMic',  'width':'12'},"
+//                                               "{'label':'Analog: Mic Jack (Mic)',  'cmd': 'W', 'id':'configMicJack', 'width':'12'},"
+//                                               "{'label':'Analog: Mic Jack (Line)',  'cmd': 'e', 'id':'configLineJack', 'width':'12'}" //add a comma if you also add the line below
+//                                             "]}," //include trailing comma because there are more button groups below
           "{'name':'CPU Usage (%)', 'buttons':[{'label': 'Start', 'cmd' :'c','id':'cpuStart','width':'4'},{'id':'cpuValue', 'label': '', 'width':'4'},{'label': 'Stop', 'cmd': 'C','width':'4'}]},"  //add comma if you add any lines below before this line's closing quote
           "{'name':'Record Mics to SD Card','buttons':[{'label': 'Start', 'cmd': '`', 'id':'recordStart','width':'6'},{'label': 'Stop', 'cmd': '~','width':'6'},"
                                                     "{'label': '', 'id':'sdFname','width':'12'}]}"
