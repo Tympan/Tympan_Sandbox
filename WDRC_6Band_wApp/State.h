@@ -62,7 +62,15 @@ class State {
       Serial.print("  : Comp CR = ");Serial.print(this_gha.cr); Serial.print(", Comp Knee = ");Serial.println(this_gha.tk);
       Serial.print("  : Lim Thresh = "); Serial.println(this_gha.bolt); 
     }      
-
+    void printAFCSettings(void) {   printAFCSettings("myState: printing AFC settings:",afc);  }
+    static void printAFCSettings(String s, BTNRH_WDRC::CHA_AFC &this_afc) {
+      Serial.println(s);
+      Serial.print("  : Enabled = ");Serial.println(this_afc.default_to_active);
+      Serial.print("  : Filter Length = ");Serial.println(this_afc.afl); 
+      Serial.print("  : Adaptation Speed (mu) = ");Serial.println(this_afc.mu,6); 
+      Serial.print("  : Smoothing Factor (rho) = ");Serial.println(this_afc.rho,3);
+      Serial.print("  : Min Level (eps) = ");Serial.println(this_afc.eps,6); 
+    } 
     //printing of CPU and memory status
     bool flag_printCPUandMemory = false;
     bool flag_printCPUtoGUI = false;

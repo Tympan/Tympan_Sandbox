@@ -332,12 +332,14 @@ void SerialManager::processSingleCharacter(char c) {
       setDSLConfiguration(State::DSL_PRESET_A);
       setButtonState_algPresets();
       setButtonState_gains(); //update the gain display because they've all changed
+      sendStreamDSL(myState.wdrc_perBand);      sendStreamGHA(myState.wdrc_broadBand);      sendStreamAFC(myState.afc);      
       break;      
     case 'D':
       myTympan.println("Received: changing to Preset B");
       setDSLConfiguration(State::DSL_PRESET_B);
       setButtonState_algPresets();      
       setButtonState_gains(); //update the gain display because they've all changed
+      sendStreamDSL(myState.wdrc_perBand);      sendStreamGHA(myState.wdrc_broadBand);      sendStreamAFC(myState.afc);
       break;
       
     case 'F':
@@ -569,8 +571,9 @@ void SerialManager::printTympanRemoteLayout(void) {
   char jsonConfig[] = "JSON={"
     "'pages':["
       "{'title':'Presets','cards':["
-          "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'alg_preset0'},{'label': 'Full-On Gain', 'cmd': 'D', 'id': 'alg_preset1'}]},"
-          "{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mono','cmd': 's','id':'inp_mono','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'12'}]}"
+          //"{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mono','cmd': 's','id':'inp_mono','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'12'}]},"
+          "{'name':'Overall Audio','buttons':[{'label': 'Active','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'6'}]},"
+          "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'alg_preset0'},{'label': 'Full-On Gain', 'cmd': 'D', 'id': 'alg_preset1'}]}"
       "]},"   //include comma if NOT the last one
       "{'title':'Tuner','cards':["
           "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
@@ -711,9 +714,14 @@ void SerialManager::interpretStreamAFC(int idx) {
   eps               = *((float*)(stream_data+idx)); idx=idx+4;
 
   BTNRH_WDRC::CHA_AFC afc = {default_to_active, afl, mu, rho, eps};
+
+  //print to serial for debugging
+  State::printAFCSettings("interpretStreamAFC: printing new afc:",afc); //for debugging
+
+  //now update the actual values being used
   updateAFC(afc);
-  
-  myTympan.println("SUCCESS.");
+  sendStreamAFC(myState.afc); //send the DSL back to ensure the GUI shows the right thing 
+  //myTympan.println("SUCCESS.");
 }
 
 int SerialManager::readStreamIntArray(int idx, int* arr, int len) {
