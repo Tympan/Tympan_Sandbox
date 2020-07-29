@@ -249,25 +249,28 @@ void SerialManager::processSingleCharacter(char c) {
     case '1':
       incrementChannelGain(1-1, channelGainIncrement_dB);
       setButtonState_gains();
+      sendStreamDSL(myState.wdrc_perBand);  
       break;
     case '2':
       incrementChannelGain(2-1, channelGainIncrement_dB);
       setButtonState_gains();
+      sendStreamDSL(myState.wdrc_perBand);  
       break;
     case '3':
       incrementChannelGain(3-1, channelGainIncrement_dB);
       setButtonState_gains();
+      sendStreamDSL(myState.wdrc_perBand);  
       break;
     case '4':
-      incrementChannelGain(4-1, channelGainIncrement_dB); setButtonState_gains();break;
+      incrementChannelGain(4-1, channelGainIncrement_dB); setButtonState_gains();sendStreamDSL(myState.wdrc_perBand);  break;
     case '5':
-      incrementChannelGain(5-1, channelGainIncrement_dB);setButtonState_gains(); break;
+      incrementChannelGain(5-1, channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand);   break;
     case '6':
-      incrementChannelGain(6-1, channelGainIncrement_dB);setButtonState_gains(); break;
+      incrementChannelGain(6-1, channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand);   break;
     case '7':
-      incrementChannelGain(7-1, channelGainIncrement_dB);setButtonState_gains(); break;
+      incrementChannelGain(7-1, channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand);   break;
     case '8':      
-      incrementChannelGain(8-1, channelGainIncrement_dB);setButtonState_gains(); break;    
+      incrementChannelGain(8-1, channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand);   break;    
     case '!':  //which is "shift 1"
       incrementChannelGain(1-1, -channelGainIncrement_dB);
       setButtonState_gains();
@@ -585,12 +588,23 @@ void SerialManager::printTympanRemoteLayout(void) {
           "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'alg_preset0'},{'label': 'Full-On Gain', 'cmd': 'D', 'id': 'alg_preset1'},{'label': 'RTS Gain', 'cmd': 'G', 'id': 'alg_preset2'}]},"
           "{'name':'Feedback Cancellation','buttons':[{'label': 'On', 'cmd': 'p', 'id': 'afc_on'},{'label': 'Off', 'cmd': 'P', 'id': 'afc_off'}]}"
       "]},"   //include comma if NOT the last one
+//      "{'title':'Tuner','cards':["
+//          "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
+//          "{'name':'High Gain (dB)', 'buttons':[{'label': '-', 'cmd': '#','width':'4'},{'id':'highGain', 'label': '', 'width':'4'},{'label': '+', 'cmd': '3','width':'4'}]},"
+//          "{'name':'Mid Gain (dB)', 'buttons':[{'label': '-', 'cmd': '@','width':'4'},{'id':'midGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '2','width':'4'}]},"
+//          "{'name':'Low Gain (dB)', 'buttons':[{'label': '-', 'cmd': '!','width':'4'},{'id':'lowGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '1','width':'4'}]}"                          
+//      "]}," //include comma if NOT the last one
       "{'title':'Tuner','cards':["
           "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
-          "{'name':'High Gain (dB)', 'buttons':[{'label': '-', 'cmd': '#','width':'4'},{'id':'highGain', 'label': '', 'width':'4'},{'label': '+', 'cmd': '3','width':'4'}]},"
-          "{'name':'Mid Gain (dB)', 'buttons':[{'label': '-', 'cmd': '@','width':'4'},{'id':'midGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '2','width':'4'}]},"
-          "{'name':'Low Gain (dB)', 'buttons':[{'label': '-', 'cmd': '!','width':'4'},{'id':'lowGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '1','width':'4'}]}"                          
-      "]}," //include comma if NOT the last one
+          "{'name':'Linear Gain Per Band (dB)', 'buttons':["
+                      "{'label':'LOW','width':'3'},{'label': '-', 'cmd': '!','width':'3'},{'id':'gain1', 'label': '', 'width':'3'},{'label': '+', 'cmd': '1','width':'3'},"
+                      "{'label':'2','width':'3'},{'label': '-', 'cmd': '@','width':'3'},{'id':'gain2', 'label': '', 'width':'3'},{'label': '+', 'cmd': '2','width':'3'},"
+                      "{'label':'3','width':'3'},{'label': '-', 'cmd': '#','width':'3'},{'id':'gain3', 'label': '', 'width':'3'},{'label': '+', 'cmd': '3','width':'3'},"
+                      "{'label':'4','width':'3'},{'label': '-', 'cmd': '$','width':'3'},{'id':'gain4', 'label': '', 'width':'3'},{'label': '+', 'cmd': '4','width':'3'},"
+                      "{'label':'5','width':'3'},{'label': '-', 'cmd': '%','width':'3'},{'id':'gain5', 'label': '', 'width':'3'},{'label': '+', 'cmd': '5','width':'3'},"
+                      "{'label':'HIGH','width':'3'},{'label': '-', 'cmd': '^','width':'3'},{'id':'gain6', 'label': '', 'width':'3'},{'label': '+', 'cmd': '6','width':'3'}"  // //no comma if the last one, which this one is in tis button group
+                  "]}"        //no comma if the last one, which this one is for this card group
+      "]}," //include comma if NOT the last one      
       "{'title':'Input Select','cards':["
           "{'name':'Audio Source', 'buttons':["
                                              "{'label':'Digital: Earpieces', 'cmd': 'E', 'id':'configPDMMic', 'width':'12'},"
@@ -941,9 +955,13 @@ void SerialManager::setButtonState_afc(void) {
 }
 
 void SerialManager::setButtonState_gains(void) {
-  setButtonText("lowGain",channelGainAsString(1-1));
-  setButtonText("midGain",channelGainAsString(2-1));
-  setButtonText("highGain",channelGainAsString(3-1));
+  setButtonText("gain1",channelGainAsString(1-1));
+  setButtonText("gain2",channelGainAsString(2-1));
+  setButtonText("gain3",channelGainAsString(3-1));
+  setButtonText("gain4",channelGainAsString(4-1));
+  setButtonText("gain5",channelGainAsString(5-1));
+  setButtonText("gain6",channelGainAsString(6-1));
+ 
 }
 
 void SerialManager::setSDRecordingButtons(void) {
