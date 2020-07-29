@@ -50,8 +50,11 @@ int USE_VOLUME_KNOB = 0;  //set to 1 to use volume knob to override the default 
 #endif
 const int LEFT = 0, RIGHT = (LEFT+1);
 const int FRONT = 0, REAR = 1;
-const int PDM_LEFT_FRONT = 3, PDM_LEFT_REAR = 2, PDM_RIGHT_FRONT = 1, PDM_RIGHT_REAR = 0;  //notice the weird order
+//const int PDM_LEFT_FRONT = 3, PDM_LEFT_REAR = 2, PDM_RIGHT_FRONT = 1, PDM_RIGHT_REAR = 0;  //notice the weird order
+const int PDM_RIGHT_FRONT = 3, PDM_RIGHT_REAR = 2, PDM_LEFT_FRONT = 1, PDM_LEFT_REAR = 0;  //Front/Rear is weird.  Left/Right matches the enclosure labeling.
 const int LEFT_ANALOG = 0, RIGHT_ANALOG = 1, LEFT_EARPIECE = 2, RIGHT_EARPIECE = 3;
+const int  OUTPUT_LEFT_EARPIECE = 3, OUTPUT_RIGHT_EARPIECE = 2;  //Left/Right matches the enclosure...but is backwards from ideal
+const int  OUTPUT_LEFT_TYMPAN = 0, OUTPUT_RIGHT_TYMPAN = 1;  //left/right for headphone jack on main tympan board
 const int ANALOG_IN = 0, PDM_IN = 1;
 
 //local files
@@ -68,7 +71,7 @@ AudioSettings_F32   audio_settings(sample_rate_Hz, audio_block_samples);
 
 //create audio library objects for handling the audio
 Tympan                        myTympan(TympanRev::D);   //use TympanRev::D or TympanRev::C
-AICShield                     earpieceShield(TympanRev::D,AICShieldRev::A);
+AICShield                     earpieceShield(TympanRev::D, AICShieldRev::A);
 AudioInputI2SQuad_F32         i2s_in(audio_settings);   //Digital audio input from the ADC
 AudioMixer4_F32               earpieceMixer[2];         //mixes front-back earpiece mics
 AudioSummer4_F32              analogVsDigitalSwitch[2];  //switches between analog and PDM (a summer is cpu cheaper than a mixer, and we don't need to mix here)
@@ -186,22 +189,18 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
   #endif
 
   //send the audio out
-  for (int Iear=0; Iear <= N_EARPIECES; Iear++) {
-    patchCord[count++] = new AudioConnection_F32(compBroadband[Iear], 0, i2s_out, Iear);    //send to the base Tympan headphone jack (0=left, 1=right)
-    patchCord[count++] = new AudioConnection_F32(compBroadband[Iear], 0, i2s_out, 2+Iear);  //also send to the earpiece shield (earpieces and its headphone jack) (2=left, 3=right)
-    
-    if (!RUN_STEREO) {
-      //for left-only input, copy the processed audio to the right output, as well
-      patchCord[count++] = new AudioConnection_F32(compBroadband[Iear], 0, i2s_out, Iear+1);    //send to the base Tympan headphone jack (0=left, 1=right)
-      patchCord[count++] = new AudioConnection_F32(compBroadband[Iear], 0, i2s_out, 2+Iear+1);  //also send to the earpiece shield (earpieces and its headphone jack) (2=left, 3=right)
-    }
+  patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, i2s_out, OUTPUT_LEFT_EARPIECE); 
+  patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, i2s_out, OUTPUT_LEFT_TYMPAN); 
+  if (RUN_STEREO) {
+    patchCord[count++] = new AudioConnection_F32(compBroadband[RIGHT], 0, i2s_out, OUTPUT_RIGHT_EARPIECE); 
+    patchCord[count++] = new AudioConnection_F32(compBroadband[RIGHT], 0, i2s_out, OUTPUT_RIGHT_TYMPAN); 
   }
-
+  
   //make the last connections for the audio test measurements and SD writer
   patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, audioTestMeasurement, 0);
   patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, audioTestMeasurement, 1);
   patchCord[count++] = new AudioConnection_F32(leftRightMixer[LEFT], 0, audioSDWriter, 0);
-  patchCord[count++] = new AudioConnection_F32(i2s_out, 0, audioSDWriter, 1);
+  patchCord[count++] = new AudioConnection_F32(i2s_out, OUTPUT_LEFT_EARPIECE, audioSDWriter, 1);
   
 
   return count;
