@@ -97,7 +97,7 @@ AudioTestSignalMeasurement_F32  audioTestMeasurement(audio_settings);
 AudioTestSignalMeasurementMulti_F32  audioTestMeasurement_filterbank(audio_settings);
 AudioControlTestAmpSweep_F32    ampSweepTester(audio_settings, audioTestGenerator, audioTestMeasurement);
 AudioControlTestFreqSweep_F32    freqSweepTester(audio_settings, audioTestGenerator, audioTestMeasurement);
-AudioControlTestFreqSweep_F32    freqSweepTester_FIR(audio_settings, audioTestGenerator, audioTestMeasurement_filterbank);
+AudioControlTestFreqSweep_F32    freqSweepTester_perBand(audio_settings, audioTestGenerator, audioTestMeasurement_filterbank);
 
 //make the audio connections
 #define N_MAX_CONNECTIONS 150  //some large number greater than the number of connections that we'll make
@@ -214,9 +214,8 @@ void togglePrintAveSignalLevels(bool as_dBSPL) {
   enable_printAveSignalLevels = !enable_printAveSignalLevels;
   printAveSignalLevels_as_dBSPL = as_dBSPL;
 };
-SerialManager serialManager(N_CHAN_MAX,
-      expCompLim[LEFT], expCompLim[RIGHT], 
-      ampSweepTester, freqSweepTester, freqSweepTester_FIR,
+SerialManager serialManager(N_CHAN_MAX, 
+      ampSweepTester, freqSweepTester, freqSweepTester_perBand,
       feedbackCancel, feedbackCancelR);
 
 //Setup the hardware
@@ -546,7 +545,7 @@ void configurePerBandWDRCs(int nchan, float fs_Hz,
     // adjust BOLT
     //float cltk = (float)this_gha.tk;
     float cltk = gha_tk;
-    if (bolt > cltk) bolt = cltk;
+    //if (bolt > cltk) bolt = cltk;  //this is enabled in the original BTNRH code.  *Temporarily* disabled by WEA 7/31/2020
     if (tkgain < 0) bolt = bolt + tkgain;
 
     //set the compressor's parameters
@@ -990,7 +989,27 @@ void printData(Print *s, bool printLeadingChar, int counter) {
   #endif
 }
 
-
+void printCompressorSettings(void) {
+  for (int Iear = 0; Iear < N_EARPIECES; Iear++) { //loop over channels
+    Serial.print("Per-Band 0, Ear = "); Serial.println(Iear);
+    Serial.print("  Scale factor (max_dB): "); Serial.println(expCompLim[Iear][0].getMaxdB());
+    Serial.print("  Expansion Knee (dB): "); Serial.println(expCompLim[Iear][0].getKneeExpansion_dBSPL());
+    Serial.print("  Expansion Ratio: "); Serial.println(expCompLim[Iear][0].getExpansionCompRatio());
+    Serial.print("  Linear Gain (dB): "); Serial.println(expCompLim[Iear][0].getGain_dB());
+    Serial.print("  Comp Knee (dB): "); Serial.println(expCompLim[Iear][0].getKneeCompressor_dBSPL());
+    Serial.print("  Comp Ratio: "); Serial.println(expCompLim[Iear][0].getCompRatio());
+    Serial.print("  Limiter Knee (dB): "); Serial.println(expCompLim[Iear][0].getKneeLimiter_dBSPL());
+    
+    Serial.print("Broadband, Ear = "); Serial.println(Iear);
+    Serial.print("  Scale factor (max_dB): "); Serial.println(compBroadband[Iear].getMaxdB());
+    Serial.print("  Expansion Knee (dB): "); Serial.println(compBroadband[Iear].getKneeExpansion_dBSPL());
+    Serial.print("  Expansion Ratio: "); Serial.println(compBroadband[Iear].getExpansionCompRatio());
+    Serial.print("  Linear Gain (dB): "); Serial.println(compBroadband[Iear].getGain_dB());
+    Serial.print("  Comp Knee (dB): "); Serial.println(compBroadband[Iear].getKneeCompressor_dBSPL());
+    Serial.print("  Comp Ratio: "); Serial.println(compBroadband[Iear].getCompRatio());
+    Serial.print("  Limiter Knee (dB): "); Serial.println(compBroadband[Iear].getKneeLimiter_dBSPL());
+  }
+}
 
 // // I don't think that this is really needed to receive audio from the BT Module...WEA 2019-11-27
 //

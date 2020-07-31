@@ -42,23 +42,20 @@ extern void updateGHA(BTNRH_WDRC::CHA_WDRC &);
 extern void updateAFC(BTNRH_WDRC::CHA_AFC &);
 extern int configureLeftRightMixer(int);
 extern bool enableAFC(bool);
+extern void printCompressorSettings(void);
 
 
 //now, define the Serial Manager class
 class SerialManager {
   public:
     SerialManager(int n,
-          GainAlgorithm_t *gain_algsL, 
-          GainAlgorithm_t *gain_algsR,
           AudioControlTestAmpSweep_F32 &_ampSweepTester,
           AudioControlTestFreqSweep_F32 &_freqSweepTester,
           AudioControlTestFreqSweep_F32 &_freqSweepTester_filterbank,
           AudioEffectFeedbackCancel_Local_F32 &_feedbackCancel,
           AudioEffectFeedbackCancel_Local_F32 &_feedbackCancelR
           )
-      : gain_algorithmsL(gain_algsL), 
-        gain_algorithmsR(gain_algsR),
-        ampSweepTester(_ampSweepTester), 
+      : ampSweepTester(_ampSweepTester), 
         freqSweepTester(_freqSweepTester),
         freqSweepTester_filterbank(_freqSweepTester_filterbank),
         feedbackCanceler(_feedbackCancel),
@@ -107,8 +104,6 @@ class SerialManager {
     int stream_chars_received;
     //float FAKE_GAIN_LEVEL[8] = {0.,0.,0.,0.,0.,0.,0.,0.};
   private:
-    GainAlgorithm_t *gain_algorithmsL;  //point to first element in array of expanders
-    GainAlgorithm_t *gain_algorithmsR;  //point to first element in array of expanders
     AudioControlTestAmpSweep_F32 &ampSweepTester;
     AudioControlTestFreqSweep_F32 &freqSweepTester;
     AudioControlTestFreqSweep_F32 &freqSweepTester_filterbank;
@@ -157,6 +152,7 @@ void SerialManager::printHelp(void) {
   printChanUpMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
   printChanDownMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
   myTympan.print(" d,D,G: Switch to WDRC Preset A, Full-On, RTS");myTympan.println();
+  myTympan.print("  b: Print compressor settings.");
   myTympan.print(" p,P: Enable or Disable Adaptive Feedback Cancelation.");myTympan.println();
   myTympan.print(" m,M: Increase or Decrease AFC mu (currently "); myTympan.print(feedbackCanceler.getMu(),6) ; myTympan.println(").");
   myTympan.print(" r,R: Increase or Decrease AFC rho (currently "); myTympan.print(feedbackCanceler.getRho(),6) ; myTympan.println(").");
@@ -548,23 +544,24 @@ void SerialManager::processSingleCharacter(char c) {
 
       break;   
     case 'b':
-      {
-        myTympan.println("Received b; sending test dsl");
-        BTNRH_WDRC::CHA_DSL test_dsl = {5.f,  // attack (ms)
-          300.f,  // release (ms)
-          115.f,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
-          0,    // 0=left, 1=right...ignored
-          3,    //num channels used (must be less than MAX_CHAN constant set in the main program
-          {700.0, 2400.0,       1.e4, 1.e4, 1.e4, 1.e4, 1.e4},   // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
-          {0.57, 0.57, 0.57,     1.0, 1.0, 1.0, 1.0, 1.0},   // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
-          {73.0, 50.0, 50.0,    34., 34., 34., 34., 34.},   // expansion-end kneepoint
-          {0.f, 5.f, 10.f,       30.f, 30.f, 30.f, 30.f, 30.f},   // compression-start gain
-          {1.5f, 1.5f, 1.5f,     1.5f, 1.5f, 1.5f, 1.5f, 1.5f},   // compression ratio
-          {50.0, 50.0, 50.0,     50.0, 50.0, 50.0, 50.0, 50.0},   // compression-start kneepoint (input dB SPL)
-          {90.f, 90.f, 90.f,     90.f, 90.f, 91.f, 92.f, 93.f}    // output limiting threshold (comp ratio 10)
-        };
-        sendStreamDSL(test_dsl);
-      }
+      printCompressorSettings();
+//      {
+//        myTympan.println("Received b; sending test dsl");
+//        BTNRH_WDRC::CHA_DSL test_dsl = {5.f,  // attack (ms)
+//          300.f,  // release (ms)
+//          115.f,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
+//          0,    // 0=left, 1=right...ignored
+//          3,    //num channels used (must be less than MAX_CHAN constant set in the main program
+//          {700.0, 2400.0,       1.e4, 1.e4, 1.e4, 1.e4, 1.e4},   // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
+//          {0.57, 0.57, 0.57,     1.0, 1.0, 1.0, 1.0, 1.0},   // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
+//          {73.0, 50.0, 50.0,    34., 34., 34., 34., 34.},   // expansion-end kneepoint
+//          {0.f, 5.f, 10.f,       30.f, 30.f, 30.f, 30.f, 30.f},   // compression-start gain
+//          {1.5f, 1.5f, 1.5f,     1.5f, 1.5f, 1.5f, 1.5f, 1.5f},   // compression ratio
+//          {50.0, 50.0, 50.0,     50.0, 50.0, 50.0, 50.0, 50.0},   // compression-start kneepoint (input dB SPL)
+//          {90.f, 90.f, 90.f,     90.f, 90.f, 91.f, 92.f, 93.f}    // output limiting threshold (comp ratio 10)
+//        };
+//        sendStreamDSL(test_dsl);
+//      }
       break;
   }
 }
@@ -837,8 +834,6 @@ void SerialManager::sendStreamAFC(const BTNRH_WDRC::CHA_AFC &this_afc) {
 void SerialManager::incrementChannelGain(int chan, float change_dB) {
   //increments the linear gain
   if (chan < N_CHAN) {
-    //gain_algorithmsL[chan].incrementGain_dB(change_dB);
-    //gain_algorithmsR[chan].incrementGain_dB(change_dB);
     myState.wdrc_perBand.tkgain[chan] += change_dB;
     updateDSL(myState.wdrc_perBand);
     //add something here (?) to send updated prescription values to the remote device
