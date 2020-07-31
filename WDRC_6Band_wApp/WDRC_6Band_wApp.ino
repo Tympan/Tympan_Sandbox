@@ -52,6 +52,7 @@ const int LEFT = 0, RIGHT = (LEFT+1);
 const int FRONT = 0, REAR = 1;
 //const int PDM_LEFT_FRONT = 3, PDM_LEFT_REAR = 2, PDM_RIGHT_FRONT = 1, PDM_RIGHT_REAR = 0;  //notice the weird order
 const int PDM_RIGHT_FRONT = 3, PDM_RIGHT_REAR = 2, PDM_LEFT_FRONT = 1, PDM_LEFT_REAR = 0;  //Front/Rear is weird.  Left/Right matches the enclosure labeling.
+
 const int LEFT_ANALOG = 0, RIGHT_ANALOG = 1, LEFT_EARPIECE = 2, RIGHT_EARPIECE = 3;
 const int  OUTPUT_LEFT_EARPIECE = 3, OUTPUT_RIGHT_EARPIECE = 2;  //Left/Right matches the enclosure...but is backwards from ideal
 const int  OUTPUT_LEFT_TYMPAN = 0, OUTPUT_RIGHT_TYMPAN = 1;  //left/right for headphone jack on main tympan board
@@ -108,35 +109,38 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
   //connect input to earpiece mixer
   patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_LEFT_FRONT, earpieceMixer[LEFT], FRONT); 
   patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_LEFT_REAR, earpieceMixer[LEFT], REAR); 
-  if (RUN_STEREO) {
+  //if (RUN_STEREO) {
     patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_RIGHT_FRONT, earpieceMixer[RIGHT], FRONT); 
     patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_RIGHT_REAR, earpieceMixer[RIGHT], REAR); 
-  }
+  //}
 
   //analog versus earpiece switching
   patchCord[count++] = new AudioConnection_F32(i2s_in, LEFT, analogVsDigitalSwitch[LEFT], ANALOG_IN); 
   patchCord[count++] = new AudioConnection_F32(earpieceMixer[LEFT], 0, analogVsDigitalSwitch[LEFT], PDM_IN); 
-  if (RUN_STEREO) {
+  //if (RUN_STEREO) {
     patchCord[count++] = new AudioConnection_F32(i2s_in, RIGHT, analogVsDigitalSwitch[RIGHT], ANALOG_IN); 
     patchCord[count++] = new AudioConnection_F32(earpieceMixer[RIGHT], 0, analogVsDigitalSwitch[RIGHT], PDM_IN); 
-  }
+  //}
  
   //connect analog and digital inputs for left side and then for the right side
   patchCord[count++] = new AudioConnection_F32(analogVsDigitalSwitch[LEFT], 0, leftRightMixer[LEFT], LEFT);      //all possible connections intended for LEFT output
-  if (RUN_STEREO) {
+  //if (RUN_STEREO) {
     patchCord[count++] = new AudioConnection_F32(analogVsDigitalSwitch[RIGHT], 0, leftRightMixer[LEFT], RIGHT);    //all possible connections intended for LEFT output
+  if (RUN_STEREO) {
     patchCord[count++] = new AudioConnection_F32(analogVsDigitalSwitch[LEFT], 0, leftRightMixer[RIGHT], LEFT);     //all possible connections intended for RIGHT output
     patchCord[count++] = new AudioConnection_F32(analogVsDigitalSwitch[RIGHT], 0, leftRightMixer[RIGHT], RIGHT);   //all possible connections intended for RIGHT output
   }
 
   //add prefilters
   patchCord[count++] = new AudioConnection_F32(leftRightMixer[LEFT],0,preFilter,0);
-  patchCord[count++] = new AudioConnection_F32(leftRightMixer[RIGHT],0,preFilterR,0);
+  if (RUN_STEREO) {
+    patchCord[count++] = new AudioConnection_F32(leftRightMixer[RIGHT],0,preFilterR,0);
+  }
   
   
   //configure the mixer's default state until set later
   configureEarpieceMixer(State::MIC_FRONT);
-  configureLeftRightMixer(State::INPUTMIX_STEREO); //set left mixer to only listen to left, set right mixer to only listen to right
+  configureLeftRightMixer(State::INPUTMIX_MUTE); //set left mixer to only listen to left, set right mixer to only listen to right
 
 
   //make the connection for the audio test measurements...only relevant when the audio test functions are being invoked by the engineer/user
@@ -194,6 +198,10 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
   if (RUN_STEREO) {
     patchCord[count++] = new AudioConnection_F32(compBroadband[RIGHT], 0, i2s_out, OUTPUT_RIGHT_EARPIECE); 
     patchCord[count++] = new AudioConnection_F32(compBroadband[RIGHT], 0, i2s_out, OUTPUT_RIGHT_TYMPAN); 
+  } else {
+    //copy mono audio to other channel to present in both ears
+    patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, i2s_out, OUTPUT_RIGHT_EARPIECE); 
+    patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, i2s_out, OUTPUT_RIGHT_TYMPAN); 
   }
   
   //make the last connections for the audio test measurements and SD writer
@@ -422,6 +430,14 @@ void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_
   //save the state
   myState.wdrc_perBand = this_dsl;  //shallow copy the contents of this_dsl into wdrc_perBand
   //myState.printPerBandSettings();  //debugging!
+
+  //active the correct earpiece
+  if (this_dsl.ear == 1) {
+    configureLeftRightMixer(State::INPUTMIX_BOTHRIGHT); //listen to the right mic(s)
+  } else {
+    configureLeftRightMixer(State::INPUTMIX_BOTHLEFT); //listen to the left mic(s)
+  }
+
 }
 
 void setupFromDSLandGHAandAFC(BTNRH_WDRC::CHA_DSL &this_dsl, BTNRH_WDRC::CHA_WDRC &this_gha,
@@ -598,6 +614,16 @@ int configureLeftRightMixer(int val) {  //call this if you want to change left-r
       leftRightMixer[LEFT].gain(LEFT,0.0);leftRightMixer[LEFT].gain(RIGHT,0.0);     //set what is sent left
       leftRightMixer[RIGHT].gain(LEFT,0.0);leftRightMixer[RIGHT].gain(RIGHT,0.0);   //set what is sent right
       break;
+    case State::INPUTMIX_BOTHLEFT:
+      myState.input_mixer_config = val;
+      leftRightMixer[LEFT].gain(LEFT,1.0);leftRightMixer[LEFT].gain(RIGHT,0.0);     //set what is sent left
+      leftRightMixer[RIGHT].gain(LEFT,1.0);leftRightMixer[RIGHT].gain(RIGHT,0.0);   //set what is sent right
+      break;
+    case State::INPUTMIX_BOTHRIGHT:
+      myState.input_mixer_config = val;
+      leftRightMixer[LEFT].gain(LEFT,0.0);leftRightMixer[LEFT].gain(RIGHT,1.0);     //set what is sent left
+      leftRightMixer[RIGHT].gain(LEFT,0.0);leftRightMixer[RIGHT].gain(RIGHT,1.0);   //set what is sent right
+      break;   
   }
   return myState.input_mixer_config;
 }

@@ -28,7 +28,7 @@ class State {
     //float vol_knob_gain_dB = 0.0;  //will be overwritten once the potentiometer is read
 
     //set input streo/mono configuration
-    enum INPUTMIX {INPUTMIX_STEREO, INPUTMIX_MONO, INPUTMIX_MUTE};
+    enum INPUTMIX {INPUTMIX_STEREO, INPUTMIX_MONO, INPUTMIX_MUTE, INPUTMIX_BOTHLEFT, INPUTMIX_BOTHRIGHT};
     int input_mixer_config = INPUTMIX_STEREO;
     
     //algorithm settings

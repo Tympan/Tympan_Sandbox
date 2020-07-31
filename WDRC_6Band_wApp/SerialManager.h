@@ -151,15 +151,15 @@ void SerialManager::printHelp(void) {
   //myTympan.println(" s,S: Mono or Stereo Audio.");
   printChanUpMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
   printChanDownMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
-  myTympan.print(" d,D,G: Switch to WDRC Preset A, Full-On, RTS");myTympan.println();
-  myTympan.print("  b: Print compressor settings.");
-  myTympan.print(" p,P: Enable or Disable Adaptive Feedback Cancelation.");myTympan.println();
-  myTympan.print(" m,M: Increase or Decrease AFC mu (currently "); myTympan.print(feedbackCanceler.getMu(),6) ; myTympan.println(").");
-  myTympan.print(" r,R: Increase or Decrease AFC rho (currently "); myTympan.print(feedbackCanceler.getRho(),6) ; myTympan.println(").");
-  myTympan.print(" n,N: Increase or Decrease AFC eps (currently "); myTympan.print(feedbackCanceler.getEps(),6) ; myTympan.println(").");
+  myTympan.print(  " d,D,G: Switch to WDRC Preset A, Full-On, RTS");myTympan.println();
+  myTympan.println("   b: Print compressor settings.");
+  myTympan.print(  " p,P: Enable or Disable Adaptive Feedback Cancelation.");myTympan.println();
+  myTympan.print(  " m,M: Increase or Decrease AFC mu (currently "); myTympan.print(feedbackCanceler.getMu(),6) ; myTympan.println(").");
+  myTympan.print(  " r,R: Increase or Decrease AFC rho (currently "); myTympan.print(feedbackCanceler.getRho(),6) ; myTympan.println(").");
+  myTympan.print(  " n,N: Increase or Decrease AFC eps (currently "); myTympan.print(feedbackCanceler.getEps(),6) ; myTympan.println(").");
   //myTympan.print(" x,X: Increase or Decrease AFC filter length (currently "); myTympan.print(feedbackCanceler.getAfl()) ; myTympan.println(").");
   //myTympan.print(" u,U: Increase or Decrease Cutoff Frequency of HP Prefilter (currently "); myTympan.print(myTympan.getHPCutoff_Hz()); myTympan.println(" Hz).");
-  myTympan.print(" z,Z: Increase or Decrease AFC N_Coeff_To_Zero (currently "); myTympan.print(feedbackCanceler.getNCoeffToZero()) ; myTympan.println(").");  
+  myTympan.print(  " z,Z: Increase or Decrease AFC N_Coeff_To_Zero (currently "); myTympan.print(feedbackCanceler.getNCoeffToZero()) ; myTympan.println(").");  
   myTympan.println(" |: Print estimated feedback impulse response.");
   //myTympan.println(" J: Print the JSON config object, for the Tympan Remote app");
   myTympan.println(" ],}: Enable/Disable printing of data to plot.");
@@ -405,18 +405,18 @@ void SerialManager::processSingleCharacter(char c) {
       setButtonState_inputMixer();
       break;
     case 'Q':
-      configureLeftRightMixer(State::INPUTMIX_STEREO);
-      myTympan.println("Received: Stereo audio.");
+      configureLeftRightMixer(State::INPUTMIX_MONO);
+      myTympan.println("Received: Input: Mix L+R.");
       setButtonState_inputMixer();
       break;  
     case 's':
-      configureLeftRightMixer(State::INPUTMIX_MONO);
-      myTympan.println("Received: Mono audio.");
+      configureLeftRightMixer(State::INPUTMIX_BOTHLEFT);
+      myTympan.println("Received: Input: Both Left.");
       setButtonState_inputMixer();
       break;
     case 'S':
-      configureLeftRightMixer(State::INPUTMIX_STEREO);
-      myTympan.println("Received: Stereo audio.");
+      configureLeftRightMixer(State::INPUTMIX_BOTHRIGHT);
+      myTympan.println("Received: Input: Both Right.");
       setButtonState_inputMixer();
       break;   
     case 'J':
@@ -581,7 +581,8 @@ void SerialManager::printTympanRemoteLayout(void) {
     "'pages':["
       "{'title':'Presets','cards':["
           //"{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mono','cmd': 's','id':'inp_mono','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'12'}]},"
-          "{'name':'Overall Audio','buttons':[{'label': 'Active','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'6'}]},"
+          //"{'name':'Overall Audio','buttons':[{'label': 'Active','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'6'}]},"
+          "{'name':'Earpiece Mic','buttons':[{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'6'},{'label': 'Mix L+R','cmd': 'Q','id':'inp_mono','width':'6'},{'label': 'Left Mics','cmd': 's','id':'inp_micL','width':'6'},{'label': 'Right Mics','cmd': 'S','id':'inp_micR','width':'6'}]},"          
           "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'alg_preset0'},{'label': 'Full-On Gain', 'cmd': 'D', 'id': 'alg_preset1'},{'label': 'RTS Gain', 'cmd': 'G', 'id': 'alg_preset2'}]},"
           "{'name':'Feedback Cancellation','buttons':[{'label': 'On', 'cmd': 'p', 'id': 'afc_on'},{'label': 'Off', 'cmd': 'P', 'id': 'afc_off'}]}"
       "]},"   //include comma if NOT the last one
@@ -897,21 +898,28 @@ void SerialManager::setButtonState_algPresets(void) {
 }
 
 void SerialManager::setButtonState_inputMixer(void) {
+   setButtonState("inp_mute",false);
+   setButtonState("inp_mono",false); 
+   setButtonState("inp_micL",false);
+   setButtonState("inp_micR",false);
+   //setButtonState("inp_stereo",flae);  delay(3); 
+  
+        
   switch (myState.input_mixer_config) {
     case (State::INPUTMIX_STEREO):
-      setButtonState("inp_mute",false);delay(3);
-      setButtonState("inp_mono",false); delay(3);
       setButtonState("inp_stereo",true);  delay(3); 
       break;
     case (State::INPUTMIX_MONO):
-      setButtonState("inp_mute",false);delay(3);
       setButtonState("inp_mono",true); delay(3);
-      setButtonState("inp_stereo",false);  delay(3); 
       break;
     case (State::INPUTMIX_MUTE):
       setButtonState("inp_mute",true);  delay(3); 
-      setButtonState("inp_mono",false); delay(3); 
-      setButtonState("inp_stereo",false);  delay(3);
+      break;
+    case (State::INPUTMIX_BOTHLEFT):
+      setButtonState("inp_micL",true);  delay(3); 
+      break;
+    case (State::INPUTMIX_BOTHRIGHT):
+      setButtonState("inp_micR",true);  delay(3); 
       break;
   }
 }
