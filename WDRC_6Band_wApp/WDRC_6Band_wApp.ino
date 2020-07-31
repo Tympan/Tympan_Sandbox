@@ -544,7 +544,7 @@ void configurePerBandWDRCs(int nchan, float fs_Hz,
 
     // adjust BOLT
     //float cltk = (float)this_gha.tk;
-    float cltk = gha_tk;
+    //float cltk = gha_tk; //this is enabled in the original BTNRH code.  *Temporarily* disabled by WEA 7/31/2020
     //if (bolt > cltk) bolt = cltk;  //this is enabled in the original BTNRH code.  *Temporarily* disabled by WEA 7/31/2020
     if (tkgain < 0) bolt = bolt + tkgain;
 
