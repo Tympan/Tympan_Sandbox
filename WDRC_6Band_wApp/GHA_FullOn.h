@@ -12,7 +12,7 @@
 BTNRH_WDRC::CHA_DSL dsl_fullon = {
   5.0,  // attack (ms)
   300.0,  // release (ms)
-  120.0,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
+  130.0,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
   0,    // 0=left, 1=right...ignored
   6,    //num channels used (must be less than MAX_CHAN constant set in the main program
   {500.0, 840.0, 1420.0, 2500.0, 5000.0,             1.e4, 1.e4, 1.e4},// cross frequencies (Hz)
