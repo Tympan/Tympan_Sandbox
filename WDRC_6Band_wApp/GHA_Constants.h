@@ -6,8 +6,7 @@
 
 #include <AudioEffectCompWDRC_F32.h>  //links to "BTNRH_WDRC_Types.h", which sets the CHA_DSL and CHA_WDRC data types
 
-// Here is the per-band prescription that is the default behavior of the multi-band
-// processing.  This sounded decent to WEA's ears but YMMV.
+// Here is the per-band prescription that is the default behavior of the multi-band processing.
 BTNRH_WDRC::CHA_DSL dsl = {
   5.0,  // attack (ms)
   300.0,  // release (ms)
@@ -16,10 +15,10 @@ BTNRH_WDRC::CHA_DSL dsl = {
   6,    //num channels used (must be less than MAX_CHAN constant set in the main program
   {500.0, 840.0, 1420.0, 2500.0, 5000.0,            1.e4,  1.e4, 1.e4}, // cross frequencies (Hz)
   {  0.7,   0.7,    0.7,    0.7,    0.7,   0.7,      1.0,   1.0},       // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
-  { 67.0,  44.0,   45.0,   47.0,   51.0,  55.0,     10.0,  10.0},       // expansion-end kneepoint (Input dB SPL) (Note: Disabled by setting the ratio to 1.0)
-  {  7.0,  10.0,   20.0,   20.0,   25.0,  28.0,     10.0,  10.0},       // compression-start gain
-  {  1.0,   1.0,    1.0,    1.0,    1.0,   1.0,     1.00,  1.00},       // compression ratio (disabled by setting ratio to 1.)
-  { 50.0,  50.0,   50.0,   50.0,   50.0,  50.0,     50.0,  50.0},       // compression-start kneepoint (input dB SPL)
+  { 50.0,  45.0,   45.0,   45.0,   45.0,  45.0,     10.0,  10.0},       // expansion-end kneepoint (Input dB SPL) (Note: Disabled by setting the ratio to 1.0)
+  {  7.0,  10.0,   20.0,   20.0,   25.0,  25.0,     10.0,  10.0},       // compression-start gain
+  {  1.1,   1.2,    1.5,    1.5,    1.5,   1.5,     1.00,  1.00},       // compression ratio (disabled by setting ratio to 1.)
+  { 55.0,  55.0,   55.0,   55.0,   55.0,  55.0,     55.0,  55.0},       // compression-start kneepoint (input dB SPL)
   {200.0, 200.0,  200.0,  200.0,  200.0, 200.0,    200.0, 200.0}        // output limiting threshold (input dB SPL) (comp ratio 10) (Disabled by setting to high value)
 };
 
@@ -29,7 +28,7 @@ BTNRH_WDRC::CHA_DSL dsl = {
 BTNRH_WDRC::CHA_WDRC gha = {
   5.0,      // attack time (ms)
   300.0,    // release time (ms)
-  24000.0,  // sampling rate (Hz)...ignored.  Set globally in the main program.
+  22050.0,  // sampling rate (Hz)...ignored.  Set globally in the main program.
   130.0,    // maxdB.  calibration.  dB SPL for signal at 0dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
   1.0,      // compression ratio for lowest-SPL region (ie, the expansion region) (should be < 1.0.  set to 1.0 for linear)
   0.0,      // kneepoint of end of expansion region (set very low to defeat the expansion)

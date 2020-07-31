@@ -29,7 +29,7 @@ BTNRH_WDRC::CHA_DSL dsl_rts = {
 BTNRH_WDRC::CHA_WDRC gha_rts = {
   5.0,       // attack time (ms)
   300.0,    // release time (ms)
-  24000.0,  // sampling rate (Hz)...IGNORED.  (Set globally in the main program.)
+  22050.0,  // sampling rate (Hz)...IGNORED.  (Set globally in the main program.)
   130.0,    // maxdB.  calibration.  dB SPL for signal at 0dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
   1.0,      // compression ratio for lowest-SPL region (ie, the expansion region) (should be < 1.0.  set to 1.0 for linear)
   0.0,      // kneepoint of end of expansion region (set very low to defeat the expansion)
