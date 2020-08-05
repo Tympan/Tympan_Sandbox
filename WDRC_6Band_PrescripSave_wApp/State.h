@@ -103,9 +103,9 @@ class State {
     const char *var_names[N_PRESETS*3] = {"dsl", "gha", "afc", "dsl_fullon", "gha_fullon", "afc_fullon", "dsl_rts", "gha_rts", "afc_rts"}; //use for writing to SD          
     void defineAlgorithmPresets(bool loadFromSD = false){
       //Define the hard-wired settings
-      #include "GHA_Constants.h"  //this sets dsl and gha settings, which will be the defaults
-      #include "GHA_FullOn.h"     //this sets alternate dsl and gha, which can be switched in via commands
-      #include "GHA_RTS.h"        //this sets a third dsl and gha, which can be switched in via commands
+      #include "GHA_Constants.h"  //this sets dsl and gha settings, which will be the defaults...includes regular settings, full-on gain, and RTS
+      //include "GHA_FullOn.h"     //this sets alternate dsl and gha, which can be switched in via commands
+      //include "GHA_RTS.h"        //this sets a third dsl and gha, which can be switched in via commands
       
       //now loop over each preset
       bool is_SD_success;
@@ -179,9 +179,9 @@ class State {
     }
     void revertCurrentAlgPresetToDefault(bool writeToSD = false) { //saves the current preset to the presets[] array and (maybe) writes to SD
       //Define the hard-wired settings
-      #include "GHA_Constants.h"  //this sets dsl and gha settings, which will be the defaults
-      #include "GHA_FullOn.h"     //this sets alternate dsl and gha, which can be switched in via commands
-      #include "GHA_RTS.h"        //this sets a third dsl and gha, which can be switched in via commands 
+      #include "GHA_Constants.h"  //this sets dsl and gha settings, which will be the defaults...includes regular settings, full-on gain, and RTS
+      //#include "GHA_FullOn.h"     //this sets alternate dsl and gha, which can be switched in via commands
+      //#include "GHA_RTS.h"        //this sets a third dsl and gha, which can be switched in via commands 
 
       //load the factor defaults into the preset
       int i = current_alg_config;
