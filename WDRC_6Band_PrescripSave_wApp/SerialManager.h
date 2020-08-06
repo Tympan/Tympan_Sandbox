@@ -557,23 +557,6 @@ void SerialManager::processSingleCharacter(char c) {
       break;   
     case 'b':
       printCompressorSettings();
-//      {
-//        myTympan.println("Received b; sending test dsl");
-//        BTNRH_WDRC::CHA_DSL test_dsl = {5.f,  // attack (ms)
-//          300.f,  // release (ms)
-//          115.f,  //maxdB.  calibration.  dB SPL for input signal at 0 dBFS.  Needs to be tailored to mic, spkrs, and mic gain.
-//          0,    // 0=left, 1=right...ignored
-//          3,    //num channels used (must be less than MAX_CHAN constant set in the main program
-//          {700.0, 2400.0,       1.e4, 1.e4, 1.e4, 1.e4, 1.e4},   // cross frequencies (Hz)...FOR IIR FILTERING, THESE VALUES ARE IGNORED!!!
-//          {0.57, 0.57, 0.57,     1.0, 1.0, 1.0, 1.0, 1.0},   // compression ratio for low-SPL region (ie, the expander..values should be < 1.0)
-//          {73.0, 50.0, 50.0,    34., 34., 34., 34., 34.},   // expansion-end kneepoint
-//          {0.f, 5.f, 10.f,       30.f, 30.f, 30.f, 30.f, 30.f},   // compression-start gain
-//          {1.5f, 1.5f, 1.5f,     1.5f, 1.5f, 1.5f, 1.5f, 1.5f},   // compression ratio
-//          {50.0, 50.0, 50.0,     50.0, 50.0, 50.0, 50.0, 50.0},   // compression-start kneepoint (input dB SPL)
-//          {90.f, 90.f, 90.f,     90.f, 90.f, 91.f, 92.f, 93.f}    // output limiting threshold (comp ratio 10)
-//        };
-//        sendStreamDSL(test_dsl);
-//      }
       break;
   }
 }
