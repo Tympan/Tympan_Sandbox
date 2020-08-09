@@ -1,11 +1,12 @@
 
 AudioInputI2SQuad_F32         i2s_in(audio_settings);   //Digital audio input from the ADC
-AudioMixer4_F32               earpieceMixer[2];         //mixes front-back earpiece mics
+AudioMixer4_F32               frontRearMixer[2];         //mixes front-back earpiece mics
 AudioSummer4_F32              analogVsDigitalSwitch[2];  //switches between analog and PDM (a summer is cpu cheaper than a mixer, and we don't need to mix here)
 AudioMixer4_F32               leftRightMixer[2];        //mixers to control mono versus stereo
 AudioTestSignalGenerator_F32  audioTestGenerator(audio_settings); //keep this to be *after* the creation of the i2s_in object
 
 //create audio objects for the algorithm
+AudioEffectDelay_F32       rearMicDelay(audio_settings), rearMicDelayR(audio_settings);
 AudioFilterBiquad_F32      preFilter(audio_settings), preFilterR(audio_settings);  //remove low frequencies near DC
 AudioEffectAFC_BTNRH_F32   feedbackCancel(audio_settings), feedbackCancelR(audio_settings);  //original adaptive feedback cancelation from BTNRH
 AudioFilterBiquad_F32      bpFilt[2][N_CHAN_MAX];         //here are the filters to break up the audio into multiple bands
@@ -33,19 +34,21 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
   int count = 0;
 
   //connect input to earpiece mixer
-  patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_LEFT_FRONT, earpieceMixer[LEFT], FRONT); 
-  patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_LEFT_REAR, earpieceMixer[LEFT], REAR); 
+  patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_LEFT_FRONT, frontRearMixer[LEFT], FRONT); 
+  patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_LEFT_REAR, rearMicDelay, 0); 
+  patchCord[count++] = new AudioConnection_F32(rearMicDelay, 0, frontRearMixer[LEFT], REAR); 
   //if (RUN_STEREO) {
-    patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_RIGHT_FRONT, earpieceMixer[RIGHT], FRONT); 
-    patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_RIGHT_REAR, earpieceMixer[RIGHT], REAR); 
+    patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_RIGHT_FRONT, frontRearMixer[RIGHT], FRONT); 
+    patchCord[count++] = new AudioConnection_F32(i2s_in, PDM_RIGHT_REAR, rearMicDelayR, 0); 
+    patchCord[count++] = new AudioConnection_F32(rearMicDelayR, 0, frontRearMixer[RIGHT], REAR); 
   //}
 
   //analog versus earpiece switching
   patchCord[count++] = new AudioConnection_F32(i2s_in, LEFT, analogVsDigitalSwitch[LEFT], ANALOG_IN); 
-  patchCord[count++] = new AudioConnection_F32(earpieceMixer[LEFT], 0, analogVsDigitalSwitch[LEFT], PDM_IN); 
+  patchCord[count++] = new AudioConnection_F32(frontRearMixer[LEFT], 0, analogVsDigitalSwitch[LEFT], PDM_IN); 
   //if (RUN_STEREO) {
     patchCord[count++] = new AudioConnection_F32(i2s_in, RIGHT, analogVsDigitalSwitch[RIGHT], ANALOG_IN); 
-    patchCord[count++] = new AudioConnection_F32(earpieceMixer[RIGHT], 0, analogVsDigitalSwitch[RIGHT], PDM_IN); 
+    patchCord[count++] = new AudioConnection_F32(frontRearMixer[RIGHT], 0, analogVsDigitalSwitch[RIGHT], PDM_IN); 
   //}
  
   //connect analog and digital inputs for left side and then for the right side
@@ -65,8 +68,10 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
   
   
   //configure the mixer's default state until set later
-  //configureEarpieceMixer(State::MIC_FRONT);
+  //configureFrontRearMixer(State::MIC_FRONT);
   //configureLeftRightMixer(State::INPUTMIX_MUTE); //set left mixer to only listen to left, set right mixer to only listen to right
+  frontRearMixer[LEFT].gain(FRONT,1.0);frontRearMixer[LEFT].gain(REAR,0.0);
+  frontRearMixer[RIGHT].gain(FRONT,1.0);frontRearMixer[RIGHT].gain(REAR,0.0);
   leftRightMixer[LEFT].gain(LEFT,0.0);leftRightMixer[LEFT].gain(RIGHT,0.0);     //mute the left side
   leftRightMixer[RIGHT].gain(LEFT,0.0);leftRightMixer[RIGHT].gain(RIGHT,0.0);   //mute the right side
   

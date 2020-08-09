@@ -26,15 +26,20 @@ class State {
     enum ANALOG_VS_PDM {INPUT_ANALOG, INPUT_PDM};
     enum ANALOG_INPUTS {INPUT_PCBMICS, INPUT_MICJACK_MIC, INPUT_LINEIN_SE, INPUT_MICJACK_LINEIN};
     //enum GAIN_TYPE {INPUT_GAIN_ID, DSL_GAIN_ID, GHA_GAIN_ID, OUTPUT_GAIN_ID};
-    enum EARPIECE_CONFIG_TYPE {MIC_FRONT, MIC_REAR, MIC_BOTH_INPHASE, MIC_BOTH_INVERTED};
 
     int input_analogVsPDM = INPUT_PDM;
-    int input_earpiece_config = MIC_FRONT;
     int input_analog_config = INPUT_PCBMICS;
    
     //int input_source = NO_STATE;
     float inputGain_dB = 0.0;  //gain on the analog inputs (ie, the AIC ignores this when in PDM mode, right?)
     //float vol_knob_gain_dB = 0.0;  //will be overwritten once the potentiometer is read
+
+    //set the front-rear parameters
+    enum FRONTREAR_CONFIG_TYPE {MIC_FRONT, MIC_REAR, MIC_BOTH_INPHASE, MIC_BOTH_INVERTED, MIC_BOTH_INVERTED_DELAYED};
+    int input_frontrear_config = MIC_FRONT;
+    int targetRearDelay_samps = 1;  //in samples
+    int currentRearDelay_samps = 0; //in samples
+
 
     //set input streo/mono configuration
     enum INPUTMIX {INPUTMIX_STEREO, INPUTMIX_MONO, INPUTMIX_MUTE, INPUTMIX_BOTHLEFT, INPUTMIX_BOTHRIGHT};
@@ -122,6 +127,13 @@ class State {
               }
             }
           }
+
+//          if (i==0) {
+//            presets[i].wdrc_perBand.printAllValues(); 
+//            presets[i].wdrc_broadband.printAllValues(); 
+//            presets[i].afc.printAllValues();
+//          }
+          
           if (!is_SD_success) {
             //print error messages
             Serial.print("State: defineAlgorithmPresets: *** WARNING *** could not read all preset elements from "); Serial.print(fname);
@@ -183,29 +195,40 @@ class State {
       //#include "GHA_FullOn.h"     //this sets alternate dsl and gha, which can be switched in via commands
       //#include "GHA_RTS.h"        //this sets a third dsl and gha, which can be switched in via commands 
 
+      Serial.print("State: revertCurrentAlgPresetToDefault: current_alg_config = ");
+      Serial.println(current_alg_config);
+
       //load the factor defaults into the preset
       int i = current_alg_config;
       switch (i) {
         case ALG_PRESET_A:
+          Serial.println("State: revertCurrentAlgPresetToDefault: reseting Preset_A");
           presets[i].wdrc_perBand = dsl;  
           presets[i].wdrc_broadband = gha; 
           presets[i].afc = afc;
           break;
         case ALG_PRESET_B:
+          Serial.println("State: revertCurrentAlgPresetToDefault: reseting Preset_B (Full-on)");
           presets[i].wdrc_perBand = dsl_fullon;  
           presets[i].wdrc_broadband = gha_fullon; 
           presets[i].afc = afc_fullon;
           break;
         case ALG_PRESET_C:
+          Serial.println("State: revertCurrentAlgPresetToDefault: reseting Preset_C (RTS)");
           presets[i].wdrc_perBand = dsl_rts;  
           presets[i].wdrc_broadband = gha_rts; 
           presets[i].afc = afc_rts;
           break;          
       }
-    
+//      if (i==0) {
+//        presets[i].wdrc_perBand.printAllValues(); 
+//        presets[i].wdrc_broadband.printAllValues(); 
+//        presets[i].afc.printAllValues();
+//      }    
 
       //save to SD card
       if (writeToSD) {
+        Serial.println("State: revertCurrentAlgPresetToDefault: writing to SD.");
         const char *fname = preset_fnames[i];
         presets[i].wdrc_perBand.printToSD(fname,var_names[i*3+0], true);  //the "true" says to start from a fresh file
         presets[i].wdrc_broadband.printToSD(fname,var_names[i*3+1]);  //append to the file

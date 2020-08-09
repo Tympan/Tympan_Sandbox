@@ -38,8 +38,11 @@ extern void togglePrintAveSignalLevels(bool);
 //extern void incrementDSLConfiguration(Stream *);
 extern void setAlgorithmPreset(int);
 extern void updateDSL(BTNRH_WDRC::CHA_DSL &);
+float updateDSL_channelGain(int,float);
 extern void updateGHA(BTNRH_WDRC::CHA_WDRC &);
 extern void updateAFC(BTNRH_WDRC::CHA_AFC &);
+extern int configureFrontRearMixer(int);
+extern int setTargetRearDelay_samps(int);
 extern int configureLeftRightMixer(int);
 extern bool enableAFC(bool);
 extern void printCompressorSettings(void);
@@ -90,6 +93,7 @@ class SerialManager {
     void setInputConfigButtons(void);    
     void setButtonState_algPresets(void);
     void setButtonState_afc(void);
+    void setButtonState_frontRearMixer(void);
     void setButtonState_inputMixer(void);
     void setButtonState_gains(void);
     void setSDRecordingButtons(void);  
@@ -142,6 +146,8 @@ void SerialManager::printHelp(void) {
   myTympan.println(" g: Print the gain settings of the device.");
   myTympan.println(" c/C: Enable/disable printing of CPU and Memory");
   myTympan.println(" w/W/e/E: Inputs: Use PCB Mics, Mic on Jack, Line on Jack, PDM Earpieces");
+  myTympan.println(" t/T: Inputs: Use Front Mic or Inverted-Delayed Mix of Mics");
+  myTympan.print  (" y/Y: Rear Delay: incr/decrease target delay by one sample (currently "); myTympan.print(myState.targetRearDelay_samps); myTympan.println(")");
   myTympan.println(" l: Toggle printing of pre-gain per-channel signal levels (dBFS)");
   myTympan.println(" L: Toggle printing of pre-gain per-channel signal levels (dBSPL, per DSL 'maxdB')");
   myTympan.println(" A/a: Self-Generated Test: Amplitude sweep (1kHz/250Hz).  End-to-End Measurement.");
@@ -245,20 +251,11 @@ void SerialManager::processSingleCharacter(char c) {
       setButtonState_gains(); 
       break;
     case '1':
-      incrementChannelGain(1-1, channelGainIncrement_dB);
-      setButtonState_gains();
-      sendStreamDSL(myState.wdrc_perBand);  
-      break;
+      incrementChannelGain(1-1, channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand); break;
     case '2':
-      incrementChannelGain(2-1, channelGainIncrement_dB);
-      setButtonState_gains();
-      sendStreamDSL(myState.wdrc_perBand);  
-      break;
+      incrementChannelGain(2-1, channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand); break;
     case '3':
-      incrementChannelGain(3-1, channelGainIncrement_dB);
-      setButtonState_gains();
-      sendStreamDSL(myState.wdrc_perBand);  
-      break;
+      incrementChannelGain(3-1, channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand); break;
     case '4':
       incrementChannelGain(4-1, channelGainIncrement_dB); setButtonState_gains();sendStreamDSL(myState.wdrc_perBand);  break;
     case '5':
@@ -270,27 +267,21 @@ void SerialManager::processSingleCharacter(char c) {
     case '8':      
       incrementChannelGain(8-1, channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand);   break;    
     case '!':  //which is "shift 1"
-      incrementChannelGain(1-1, -channelGainIncrement_dB);
-      setButtonState_gains();
-      break;  
+      incrementChannelGain(1-1, -channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand); break;  
     case '@':  //which is "shift 2"
-      incrementChannelGain(2-1, -channelGainIncrement_dB);
-      setButtonState_gains();
-      break;  
+      incrementChannelGain(2-1, -channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand); break;  
     case '#':  //which is "shift 3"
-      incrementChannelGain(3-1, -channelGainIncrement_dB);
-      setButtonState_gains();
-      break;  
+      incrementChannelGain(3-1, -channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand); break;  
     case '$':  //which is "shift 4"
-      incrementChannelGain(4-1, -channelGainIncrement_dB);setButtonState_gains(); break;
+      incrementChannelGain(4-1, -channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand);  break;
     case '%':  //which is "shift 5"
-      incrementChannelGain(5-1, -channelGainIncrement_dB);setButtonState_gains(); break;
+      incrementChannelGain(5-1, -channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand);  break;
     case '^':  //which is "shift 6"
-      incrementChannelGain(6-1, -channelGainIncrement_dB);setButtonState_gains(); break;
+      incrementChannelGain(6-1, -channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand);  break;
     case '&':  //which is "shift 7"
-      incrementChannelGain(7-1, -channelGainIncrement_dB); setButtonState_gains();break;
+      incrementChannelGain(7-1, -channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand); break;
     case '*':  //which is "shift 8"
-      incrementChannelGain(8-1, -channelGainIncrement_dB);setButtonState_gains(); break;          
+      incrementChannelGain(8-1, -channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand); break;          
     case 'A':case 'a':
       //amplitude sweep test
       { //limit the scope of any variables that I create here
@@ -410,7 +401,30 @@ void SerialManager::processSingleCharacter(char c) {
       setInputAnalogVsPDM(State::INPUT_PDM);
       //setInputMixer(myState.digital_mic_config);
       setFullGUIState();
-      break;       
+      break;  
+    case 't':
+      myTympan.println("Received: Front Mics (if using earpieces)"); 
+      configureFrontRearMixer(State::MIC_FRONT);
+      setButtonState_frontRearMixer();
+      break;
+    case 'T':
+      myTympan.println("Received: Mix of Front Mics + Delayed Inverted Rear Mics"); 
+      configureFrontRearMixer(State::MIC_BOTH_INVERTED_DELAYED);
+      setButtonState_frontRearMixer();
+      break;
+    case 'y':
+      { 
+        int new_val = myState.targetRearDelay_samps+1;      
+        myTympan.print("Received: Increase rear-mic delay by one sample to ");myTympan.println(new_val);
+        setTargetRearDelay_samps(new_val);
+        setButtonState_frontRearMixer();
+      }
+      break;
+    case 'Y':
+      myTympan.println("Received: Reduce rear-mic delay by one sample");
+      setTargetRearDelay_samps(myState.targetRearDelay_samps-1);
+      setButtonState_frontRearMixer();
+      break;
     case 'q':
       configureLeftRightMixer(State::INPUTMIX_MUTE);
       myTympan.println("Received: Muting audio.");
@@ -598,6 +612,14 @@ void SerialManager::printTympanRemoteLayout(void) {
                       "{'label':'Band5','width':'3'},{'label': '-', 'cmd': '%','width':'3'},{'id':'gain5', 'label': '', 'width':'3'},{'label': '+', 'cmd': '5','width':'3'},"
                       "{'label':'HIGH','width':'3'},{'label': '-', 'cmd': '^','width':'3'},{'id':'gain6', 'label': '', 'width':'3'},{'label': '+', 'cmd': '6','width':'3'}"  // //no comma if the last one, which this one is in tis button group
                   "]}"        //no comma if the last one, which this one is for this card group
+      "]}," //include comma if NOT the last one  
+      "{'title':'Digital Earpieces','cards':["
+           "{'name':'Front or Rear Mics', 'buttons':["
+                     "{'label':'Front','id':'frontMic','cmd':'t','width':'6'},{'label':'Front-Rear','id':'frontRearMix','cmd':'T','width':'6'}" 
+           "]},"  //include trailing comma if NOT the last one
+           "{'name':'Rear Mic Delay (samples)', 'buttons':["
+                     "{'label':'-','cmd':'Y','width':'4'},{'label':'','id':'delaySamps','width':'4'},{'label':'+','cmd':'y','width':'4'}" 
+           "]}"  //exclude trailing comma if it IS the last one
       "]}," //include comma if NOT the last one      
 //      "{'title':'Input Select','cards':["
 //          "{'name':'Audio Source', 'buttons':["
@@ -830,15 +852,13 @@ void SerialManager::sendStreamAFC(const BTNRH_WDRC::CHA_AFC &this_afc) {
   myTympan.println(checkVal);
 };
 
-void SerialManager::incrementChannelGain(int chan, float change_dB) {
+void SerialManager::incrementChannelGain(int chan, float change_dB) { //chan counts from zero
   //increments the linear gain
   if (chan < N_CHAN) {
     myState.wdrc_perBand.tkgain[chan] += change_dB;
-    updateDSL(myState.wdrc_perBand);
-    //add something here (?) to send updated prescription values to the remote device
+    updateDSL_channelGain(chan,myState.wdrc_perBand.tkgain[chan]);
     
     printGainSettings();  //in main sketch file
-    //FAKE_GAIN_LEVEL[chan] += change_dB;
   }
 }
 
@@ -860,6 +880,7 @@ void SerialManager::printCPUtoGUI(unsigned long curTime_millis = 0, unsigned lon
 void SerialManager::setFullGUIState(void) {
   setButtonState_algPresets();
   setButtonState_afc();
+  setButtonState_frontRearMixer();
   setButtonState_inputMixer();
   setInputConfigButtons();
 
@@ -895,7 +916,21 @@ void SerialManager::setButtonState_algPresets(void) {
   }
   setButtonText("presetFname",myState.preset_fnames[myState.current_alg_config]);
 }
-
+void SerialManager::setButtonState_frontRearMixer(void) {
+  setButtonState("frontMic",false);
+  setButtonState("frontRearMix",false);
+  switch (myState.input_frontrear_config) {
+    case State::MIC_FRONT:
+      setButtonState("frontMic",true);
+      break;
+    case State::MIC_BOTH_INVERTED_DELAYED:
+      setButtonState("frontRearMix",true);
+      break;    
+  }
+  Serial.print("setButtonState_frontRearMixer: setting delaySamps field to ");
+  Serial.println(String(myState.currentRearDelay_samps));
+  setButtonText("delaySamps",String(myState.currentRearDelay_samps));
+}
 void SerialManager::setButtonState_inputMixer(void) {
    setButtonState("inp_mute",false);
    setButtonState("inp_mono",false); 

@@ -210,7 +210,7 @@ void setupAudioProcessing(void) {
   Serial.println("setupAudioProcessing: makeAudioConnections() is complete.");
 
   //configure the default audio flow through the mixers
-  configureEarpieceMixer(State::MIC_FRONT);
+  configureFrontRearMixer(myState.input_frontrear_config); //set using the default
   configureLeftRightMixer(State::INPUTMIX_MUTE); //set left mixer to only listen to left, set right mixer to only listen to right
 
   
@@ -344,6 +344,7 @@ void setAlgorithmPreset(int preset_ind) {
       is_ok_value = true;
       break;      
   }
+  Serial.print("setAlgorithmPreset: ind = "); Serial.print(preset_ind); Serial.print(", really? "); Serial.println(is_ok_value);
   if (is_ok_value) {
     myState.current_alg_config = preset_ind;
     setupFromDSLandGHAandAFC(myState.presets[preset_ind].wdrc_perBand, myState.presets[preset_ind].wdrc_broadband, myState.presets[preset_ind].afc, N_CHAN_MAX, audio_settings);
@@ -358,6 +359,16 @@ void updateDSL(BTNRH_WDRC::CHA_DSL &this_dsl) {
   setupFromDSL(this_dsl, myState.wdrc_broadband.tk, N_CHAN_MAX, audio_settings);
 }
 
+float updateDSL_channelGain(int Ichan, float given_tkgain) { //chan is counting from zero
+  //setupFromDSL(this_dsl, myState.wdrc_broadband.tk, N_CHAN_MAX, audio_settings);
+  myState.wdrc_perBand.tkgain[Ichan] = given_tkgain;
+  for (int Ileftright=0; Ileftright < 1; Ileftright++) {
+    configurePerBandWDRC(Ichan, sample_rate_Hz, myState.wdrc_perBand, myState.wdrc_broadband.tkgain,expCompLim[Ileftright][Ichan]);
+  }
+
+  return myState.wdrc_broadband.tkgain;
+}
+
 void updateGHA(BTNRH_WDRC::CHA_WDRC &this_gha) {
   setupFromDSLandGHAandAFC(myState.wdrc_perBand, this_gha, myState.afc, N_CHAN_MAX, audio_settings);
 }
@@ -365,6 +376,8 @@ void updateGHA(BTNRH_WDRC::CHA_WDRC &this_gha) {
 void updateAFC(BTNRH_WDRC::CHA_AFC &this_afc) {
   setupFromDSLandGHAandAFC(myState.wdrc_perBand, myState.wdrc_broadband, this_afc, N_CHAN_MAX, audio_settings);
 }
+
+
 
 void configureBroadbandWDRCs(float fs_Hz, const BTNRH_WDRC::CHA_WDRC &this_gha,
                              float vol_knob_gain_dB, AudioEffectCompWDRC_F32 &WDRC)
@@ -388,6 +401,36 @@ void configureBroadbandWDRCs(float fs_Hz, const BTNRH_WDRC::CHA_WDRC &this_gha,
 
 }
 
+void configurePerBandWDRC(int Ichan, float fs_Hz,
+                           const BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk,
+                           AudioEffectCompWDRC_F32 &WDRC) {
+
+  int i = Ichan;
+  
+  //logic and values are extracted from from CHAPRO repo agc_prepare.c
+  float atk = (float)this_dsl.attack;   //milliseconds!
+  float rel = (float)this_dsl.release;  //milliseconds!
+  //float fs = gha->fs;
+  float fs = (float)fs_Hz; // WEA override
+  float maxdB = (float) this_dsl.maxdB;
+  float exp_cr = (float)this_dsl.exp_cr[i];
+  float exp_end_knee = (float)this_dsl.exp_end_knee[i];
+  float tk = (float) this_dsl.tk[i];
+  float comp_ratio = (float) this_dsl.cr[i];
+  float tkgain = (float) this_dsl.tkgain[i];
+  float bolt = (float) this_dsl.bolt[i];
+  
+  // adjust BOLT
+  //float cltk = (float)this_gha.tk;
+  //float cltk = gha_tk; //this is enabled in the original BTNRH code.  *Temporarily* disabled by WEA 7/31/2020
+  //if (bolt > cltk) bolt = cltk;  //this is enabled in the original BTNRH code.  *Temporarily* disabled by WEA 7/31/2020
+  if (tkgain < 0) bolt = bolt + tkgain;
+  
+  //set the compressor's parameters
+  WDRC.setSampleRate_Hz(fs);
+  WDRC.setParams(atk, rel, maxdB, exp_cr, exp_end_knee, tkgain, comp_ratio, tk, bolt);                            
+}
+
 void configurePerBandWDRCs(int nchan, float fs_Hz,
                            const BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk,
                            AudioEffectCompWDRC_F32 *WDRCs)
@@ -399,57 +442,67 @@ void configurePerBandWDRCs(int nchan, float fs_Hz,
   }
 
   //now, loop over each channel
-  for (int i = 0; i < nchan; i++) {
-
-    //logic and values are extracted from from CHAPRO repo agc_prepare.c
-    float atk = (float)this_dsl.attack;   //milliseconds!
-    float rel = (float)this_dsl.release;  //milliseconds!
-    //float fs = gha->fs;
-    float fs = (float)fs_Hz; // WEA override
-    float maxdB = (float) this_dsl.maxdB;
-    float exp_cr = (float)this_dsl.exp_cr[i];
-    float exp_end_knee = (float)this_dsl.exp_end_knee[i];
-    float tk = (float) this_dsl.tk[i];
-    float comp_ratio = (float) this_dsl.cr[i];
-    float tkgain = (float) this_dsl.tkgain[i];
-    float bolt = (float) this_dsl.bolt[i];
-
-    // adjust BOLT
-    //float cltk = (float)this_gha.tk;
-    //float cltk = gha_tk; //this is enabled in the original BTNRH code.  *Temporarily* disabled by WEA 7/31/2020
-    //if (bolt > cltk) bolt = cltk;  //this is enabled in the original BTNRH code.  *Temporarily* disabled by WEA 7/31/2020
-    if (tkgain < 0) bolt = bolt + tkgain;
-
-    //set the compressor's parameters
-    WDRCs[i].setSampleRate_Hz(fs);
-    WDRCs[i].setParams(atk, rel, maxdB, exp_cr, exp_end_knee, tkgain, comp_ratio, tk, bolt);
-  }
+  for (int Ichan = 0; Ichan < nchan; Ichan++) configurePerBandWDRC(Ichan,fs_Hz,this_dsl,gha_tk,WDRCs[Ichan]);
 }
 
-int configureEarpieceMixer(int val) {
+int setTargetRearDelay_samps(int samples) {
+  //Serial.print("setTargetRearDelay_samps: setting to "); Serial.print(samples);
+  if (samples >= 0) {
+    myState.targetRearDelay_samps = samples;
+  }
+  if (myState.input_frontrear_config == State::MIC_BOTH_INVERTED_DELAYED) {
+    //Serial.print("setTargetRearDelay_samps: and updating current value to  "); Serial.print(myState.targetRearDelay_samps);
+    setRearMicDelay_samps(myState.targetRearDelay_samps);
+  }
+  return myState.targetRearDelay_samps;
+}
+
+int setRearMicDelay_samps(int samples) {
+  //Serial.print("setRearMicDelay_samps: setting to "); Serial.print(samples);
+  if (samples >= 0) {
+    float delay_msec = ((float)samples) / audio_settings.sample_rate_Hz * 1000.0f;
+    rearMicDelay.delay(0,delay_msec);
+    rearMicDelayR.delay(0,delay_msec);
+    myState.currentRearDelay_samps = samples;
+  }
+  return myState.currentRearDelay_samps;
+}
+
+int configureFrontRearMixer(int val) {
   switch (val) {
+
     case State::MIC_FRONT:
-      earpieceMixer[LEFT].gain(FRONT, 1.0);earpieceMixer[LEFT].gain(REAR, 0.0);
-      earpieceMixer[RIGHT].gain(FRONT, 1.0);earpieceMixer[RIGHT].gain(REAR, 0.0);
-      myState.input_earpiece_config = val;
+      frontRearMixer[LEFT].gain(FRONT, 1.0);frontRearMixer[LEFT].gain(REAR, 0.0);
+      frontRearMixer[RIGHT].gain(FRONT, 1.0);frontRearMixer[RIGHT].gain(REAR, 0.0);
+      myState.input_frontrear_config = val;
+      setRearMicDelay_samps(0);
       break;
     case State::MIC_REAR:
-      earpieceMixer[LEFT].gain(FRONT, 0.0);earpieceMixer[LEFT].gain(REAR, 1.0);
-      earpieceMixer[RIGHT].gain(FRONT, 0.0);earpieceMixer[RIGHT].gain(REAR, 1.0);
-      myState.input_earpiece_config = val;
+      frontRearMixer[LEFT].gain(FRONT, 0.0);frontRearMixer[LEFT].gain(REAR, 1.0);
+      frontRearMixer[RIGHT].gain(FRONT, 0.0);frontRearMixer[RIGHT].gain(REAR, 1.0);
+      myState.input_frontrear_config = val;
+      setRearMicDelay_samps(0);
       break;
     case State::MIC_BOTH_INPHASE:
-      earpieceMixer[LEFT].gain(FRONT, 0.5);earpieceMixer[LEFT].gain(REAR, 0.5);
-      earpieceMixer[RIGHT].gain(FRONT, 0.5);earpieceMixer[RIGHT].gain(REAR, 0.5);
-      myState.input_earpiece_config = val;
+      frontRearMixer[LEFT].gain(FRONT, 0.5);frontRearMixer[LEFT].gain(REAR, 0.5);
+      frontRearMixer[RIGHT].gain(FRONT, 0.5);frontRearMixer[RIGHT].gain(REAR, 0.5);
+      myState.input_frontrear_config = val;
+      setRearMicDelay_samps(0);
       break;  
     case State::MIC_BOTH_INVERTED:
-      earpieceMixer[LEFT].gain(FRONT, 1.0);earpieceMixer[LEFT].gain(REAR, -1.0);
-      earpieceMixer[RIGHT].gain(FRONT, 1.0);earpieceMixer[RIGHT].gain(REAR, -1.0);
-      myState.input_earpiece_config = val;
-      break;           
+      frontRearMixer[LEFT].gain(FRONT, 0.75);frontRearMixer[LEFT].gain(REAR, -0.75);
+      frontRearMixer[RIGHT].gain(FRONT, 0.75);frontRearMixer[RIGHT].gain(REAR, -0.75);
+      myState.input_frontrear_config = val;
+      setRearMicDelay_samps(0);
+      break;  
+    case State::MIC_BOTH_INVERTED_DELAYED:
+      frontRearMixer[LEFT].gain(FRONT, 0.75);frontRearMixer[LEFT].gain(REAR, -0.75);
+      frontRearMixer[RIGHT].gain(FRONT, 0.75);frontRearMixer[RIGHT].gain(REAR, -0.75);
+      myState.input_frontrear_config = val; 
+      setRearMicDelay_samps(myState.targetRearDelay_samps);
+      break;              
   }
-  return myState.input_earpiece_config;
+  return myState.input_frontrear_config;
 }
 
 //int configureLeftRightMixer(void) { return configureLeftRightMixer(myState.input_mixer_config); } 
