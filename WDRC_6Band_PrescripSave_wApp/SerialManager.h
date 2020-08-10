@@ -46,6 +46,7 @@ extern int setTargetRearDelay_samps(int);
 extern int configureLeftRightMixer(int);
 extern bool enableAFC(bool);
 extern void printCompressorSettings(void);
+extern void reloadCurrentAlgPresetFromSD(void);
 extern void revertCurrentAlgPresetToDefault(void);
 
 
@@ -159,7 +160,7 @@ void SerialManager::printHelp(void) {
   printChanUpMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
   printChanDownMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
   myTympan.println(" d,D,G: Switch to WDRC Preset A, Full-On, RTS");
-  myTympan.println("   {,[: Save to SD Preset / Revert to Factory Default");
+  myTympan.println(" {,>,[: Preset: Save to SD / Reload from SD / Revert to Factory Default");
   //myTympan.println("   b: Print compressor settings.");
   myTympan.print(  " p,P: Enable or Disable Adaptive Feedback Cancelation.");myTympan.println();
   myTympan.print(  " m,M: Increase or Decrease AFC mu (currently "); myTympan.print(feedbackCanceler.getMu(),6) ; myTympan.println(").");
@@ -347,8 +348,14 @@ void SerialManager::processSingleCharacter(char c) {
       myTympan.println("Received: revert preset to factory default");
       revertCurrentAlgPresetToDefault();
       setFullGUIState(); //this resets algorithm parameters, so do a complete refresh
+      sendStreamDSL(myState.wdrc_perBand);      sendStreamGHA(myState.wdrc_broadband);      sendStreamAFC(myState.afc); 
       break;
-    
+    case '>':
+      myTympan.println("Received: reload preset from SD");
+      reloadCurrentAlgPresetFromSD();
+      setFullGUIState(); //this resets algorithm parameters, so do a complete refresh
+      sendStreamDSL(myState.wdrc_perBand);      sendStreamGHA(myState.wdrc_broadband);      sendStreamAFC(myState.afc); 
+      break;
     case 'F':
       //frequency sweep test...end-to-end
       { //limit the scope of any variables that I create here
@@ -640,7 +647,7 @@ void SerialManager::printTympanRemoteLayout(void) {
           "{'name':'CPU Usage (%)', 'buttons':[{'label': 'Start', 'cmd' :'c','id':'cpuStart','width':'4'},{'id':'cpuValue', 'label': '', 'width':'4'},{'label': 'Stop', 'cmd': 'C','width':'4'}]},"  //add comma if you add any lines below before this line's closing quote
           "{'name':'Record Mics to SD Card','buttons':[{'label': 'Start', 'cmd': '`', 'id':'recordStart','width':'6'},{'label': 'Stop', 'cmd': '~','width':'6'},"
                                                     "{'label': '', 'id':'sdFname','width':'12'}]},"
-          "{'name':'Overwrite Current Algorithm Preset on SD','buttons':[{'label': 'Save', 'cmd': '[', 'id': 'savePreset'},{'label': 'Restore', 'cmd': '{', 'id': 'restorePreset'},"
+          "{'name':'Overwrite Current Algorithm Preset on SD','buttons':[{'label': 'Save', 'cmd': '[', 'id': 'savePreset'},{'label': 'Reload', 'cmd': '>', 'id': 'reloadPreset'},{'label': 'Restore', 'cmd': '{', 'id': 'restorePreset'},"
                                                     "{'label': '', 'id':'presetFname','width':'12'}]}"
           //"{'name':'Record Mics to SD Card','buttons':[{'label': 'Start', 'cmd': 'r', 'id':'recordStart'},{'label': 'Stop', 'cmd': 's'}]},"
           //"{'name':'Send Data to Plot', 'buttons':[{'label': 'Start', 'cmd' :']','id':'plotStart'},{'label': 'Stop', 'cmd': '}'}]}"

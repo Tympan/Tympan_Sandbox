@@ -106,83 +106,75 @@ class State {
 
     const char *preset_fnames[N_PRESETS] = {"GHA_Constants.txt", "GHA_FullOn.txt", "GHA_RTS.txt"};  //filenames for reading off SD
     const char *var_names[N_PRESETS*3] = {"dsl", "gha", "afc", "dsl_fullon", "gha_fullon", "afc_fullon", "dsl_rts", "gha_rts", "afc_rts"}; //use for writing to SD          
-    void defineAlgorithmPresets(bool loadFromSD = false){
+    void setPresetToDefault(int Ipreset) {
       //Define the hard-wired settings
       #include "GHA_Constants.h"  //this sets dsl and gha settings, which will be the defaults...includes regular settings, full-on gain, and RTS
-      //include "GHA_FullOn.h"     //this sets alternate dsl and gha, which can be switched in via commands
-      //include "GHA_RTS.h"        //this sets a third dsl and gha, which can be switched in via commands
-      
-      //now loop over each preset
-      bool is_SD_success;
-      for (int i=0; i<N_PRESETS; i++) { //loop
 
-        //if we want to read from the SD card, try to read from the SD card
-        is_SD_success = false;
-        const char *fname = preset_fnames[i];
-        if (loadFromSD) {
-          if (presets[i].wdrc_perBand.readFromSD(fname) == 0) { //zero is success
-            if (presets[i].wdrc_broadband.readFromSD(fname) == 0) { //zero is success
-              if (presets[i].afc.readFromSD(fname) == 0) { //zero is success
-                is_SD_success = true;
-              }
+      //choose the one for the given preset
+      int i = Ipreset;
+      switch (i) {
+        case ALG_PRESET_A:
+          presets[i].wdrc_perBand = dsl;  
+          presets[i].wdrc_broadband = gha; 
+          presets[i].afc = afc;
+          break;
+        case ALG_PRESET_B:
+          presets[i].wdrc_perBand = dsl_fullon;  
+          presets[i].wdrc_broadband = gha_fullon; 
+          presets[i].afc = afc_fullon;
+          break;
+        case ALG_PRESET_C:
+          presets[i].wdrc_perBand = dsl_rts;  
+          presets[i].wdrc_broadband = gha_rts; 
+          presets[i].afc = afc_rts;
+          break;          
+      }
+    }
+    void defineAlgorithmPresets(bool loadFromSD = false){ for (int i=0; i<N_PRESETS;i++) defineAlgorithmPreset(i,loadFromSD); }
+    void defineAlgorithmPreset(int Ipreset, bool loadFromSD = false) {
+
+      int i = Ipreset;
+      setPresetToDefault(i);
+      
+      //if we want to read from the SD card, try to read from the SD card
+      bool is_SD_success = false;
+      const char *fname = preset_fnames[i];
+      if (loadFromSD) {
+        if ((presets[i].wdrc_perBand.readFromSD(fname)) == 0) { //zero is success
+          if ((presets[i].wdrc_broadband.readFromSD(fname)) == 0) { //zero is success
+            if ((presets[i].afc.readFromSD(fname)) == 0) { //zero is success
+              is_SD_success = true;
             }
           }
+        }
 
 //          if (i==0) {
 //            presets[i].wdrc_perBand.printAllValues(); 
 //            presets[i].wdrc_broadband.printAllValues(); 
 //            presets[i].afc.printAllValues();
 //          }
-          
-          if (!is_SD_success) {
-            //print error messages
-            Serial.print("State: defineAlgorithmPresets: *** WARNING *** could not read all preset elements from "); Serial.print(fname);
-            Serial.println("    : Using built-in algorithm presets instead.");
-          }
+        
+        if (!is_SD_success) {
+          //print error messages
+          Serial.print("State: defineAlgorithmPresets: *** WARNING *** could not read all preset elements from "); Serial.print(fname);
+          Serial.println("    : Using built-in algorithm presets instead.");
         }
-    
-        //did all three get successfully read?
-        if (is_SD_success) {
-          //the values are already stored in the presets so there's nothing more to do
-        } else {
-          //it failed, so let's use the hardwired presets
-          switch (i) {
-            case ALG_PRESET_A:
-              presets[i].wdrc_perBand = dsl;  
-              presets[i].wdrc_broadband = gha; 
-              presets[i].afc = afc;
-              break;
-            case ALG_PRESET_B:
-              presets[i].wdrc_perBand = dsl_fullon;  
-              presets[i].wdrc_broadband = gha_fullon; 
-              presets[i].afc = afc_fullon;
-              break;
-            case ALG_PRESET_C:
-              presets[i].wdrc_perBand = dsl_rts;  
-              presets[i].wdrc_broadband = gha_rts; 
-              presets[i].afc = afc_rts;
-              break;          
-          }
-      
-          //because the reading failed, try writing to file on SD so that reading will work next time
-          //const char *var_names[N_PRESETS*3] = {"dsl", "gha", "afc", "dsl_fullon", "gha_fullon", "afc_fullon", "dsl_rts", "gha_rts", "afc_rts"}; //use for writing to SD
-          //Serial.print("State: defineAlgorithmPresets: writing preset to "); Serial.println(fname);
-          //presets[i].wdrc_perBand.printToSD(fname,var_names[i*3+0], true);  //the "true" says to start from a fresh file
-          //presets[i].wdrc_broadband.printToSD(fname,var_names[i*3+1]);  //append to the file
-          //presets[i].afc.printToSD(fname,var_names[i*3+2]);  //append to the file
-        } 
       }
+  
+      //did all three get successfully read?
+      if (!loadFromSD || !is_SD_success) setPresetToDefault(i);
     }    
 
     void saveCurrentAlgPresetToSD(bool writeToSD = false) { //saves the current preset to the presets[] array and (maybe) writes to SD
+      int i = current_alg_config;
+         
       //save current settings to the preset
-      presets[current_alg_config].wdrc_perBand = wdrc_perBand;
-      presets[current_alg_config].wdrc_broadband = wdrc_broadband;
-      presets[current_alg_config].afc = afc;
+      presets[i].wdrc_perBand = wdrc_perBand;
+      presets[i].wdrc_broadband = wdrc_broadband;
+      presets[i].afc = afc;
 
       //write preset to the SD card
       if (writeToSD) {
-        int i = current_alg_config;
         const char *fname = preset_fnames[i];
         presets[i].wdrc_perBand.printToSD(fname,var_names[i*3+0], true);  //the "true" says to start from a fresh file
         presets[i].wdrc_broadband.printToSD(fname,var_names[i*3+1]);  //append to the file
@@ -190,36 +182,13 @@ class State {
       }
     }
     void revertCurrentAlgPresetToDefault(bool writeToSD = false) { //saves the current preset to the presets[] array and (maybe) writes to SD
-      //Define the hard-wired settings
-      #include "GHA_Constants.h"  //this sets dsl and gha settings, which will be the defaults...includes regular settings, full-on gain, and RTS
-      //#include "GHA_FullOn.h"     //this sets alternate dsl and gha, which can be switched in via commands
-      //#include "GHA_RTS.h"        //this sets a third dsl and gha, which can be switched in via commands 
-
       Serial.print("State: revertCurrentAlgPresetToDefault: current_alg_config = ");
       Serial.println(current_alg_config);
 
       //load the factor defaults into the preset
       int i = current_alg_config;
-      switch (i) {
-        case ALG_PRESET_A:
-          Serial.println("State: revertCurrentAlgPresetToDefault: reseting Preset_A");
-          presets[i].wdrc_perBand = dsl;  
-          presets[i].wdrc_broadband = gha; 
-          presets[i].afc = afc;
-          break;
-        case ALG_PRESET_B:
-          Serial.println("State: revertCurrentAlgPresetToDefault: reseting Preset_B (Full-on)");
-          presets[i].wdrc_perBand = dsl_fullon;  
-          presets[i].wdrc_broadband = gha_fullon; 
-          presets[i].afc = afc_fullon;
-          break;
-        case ALG_PRESET_C:
-          Serial.println("State: revertCurrentAlgPresetToDefault: reseting Preset_C (RTS)");
-          presets[i].wdrc_perBand = dsl_rts;  
-          presets[i].wdrc_broadband = gha_rts; 
-          presets[i].afc = afc_rts;
-          break;          
-      }
+      defineAlgorithmPreset(current_alg_config, false);  //false => do NOT read from SD card.  Use the built-in settings.
+
 //      if (i==0) {
 //        presets[i].wdrc_perBand.printAllValues(); 
 //        presets[i].wdrc_broadband.printAllValues(); 

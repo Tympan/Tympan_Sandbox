@@ -351,7 +351,6 @@ void setAlgorithmPreset(int preset_ind) {
   }
   
   //configureLeftRightMixer(State::INPUTMIX_STEREO);
-  
 }
 
 void updateDSL(BTNRH_WDRC::CHA_DSL &this_dsl) {
@@ -363,9 +362,8 @@ float updateDSL_channelGain(int Ichan, float given_tkgain) { //chan is counting 
   //setupFromDSL(this_dsl, myState.wdrc_broadband.tk, N_CHAN_MAX, audio_settings);
   myState.wdrc_perBand.tkgain[Ichan] = given_tkgain;
   for (int Ileftright=0; Ileftright < 1; Ileftright++) {
-    configurePerBandWDRC(Ichan, sample_rate_Hz, myState.wdrc_perBand, myState.wdrc_broadband.tkgain,expCompLim[Ileftright][Ichan]);
+    configurePerBandWDRC(Ichan, sample_rate_Hz, myState.wdrc_perBand, myState.wdrc_broadband.tkgain, expCompLim[Ileftright][Ichan]);
   }
-
   return myState.wdrc_broadband.tkgain;
 }
 
@@ -376,8 +374,6 @@ void updateGHA(BTNRH_WDRC::CHA_WDRC &this_gha) {
 void updateAFC(BTNRH_WDRC::CHA_AFC &this_afc) {
   setupFromDSLandGHAandAFC(myState.wdrc_perBand, myState.wdrc_broadband, this_afc, N_CHAN_MAX, audio_settings);
 }
-
-
 
 void configureBroadbandWDRCs(float fs_Hz, const BTNRH_WDRC::CHA_WDRC &this_gha,
                              float vol_knob_gain_dB, AudioEffectCompWDRC_F32 &WDRC)
@@ -953,5 +949,18 @@ void revertCurrentAlgPresetToDefault(void){
 
   //implement the settings into the actual processing blocks
   setAlgorithmPreset(myState.current_alg_config); //sets the Per Band, the Broad Band, and the AFC parameters using a preset
+  
+  //myState.printPerBandSettings("revertCurrentAlgPresetToDefault: DSL =",myState.wdrc_perBand);
+  //myState.printBroadbandSettings("revertCurrentAlgPresetToDefault: GHA =",myState.wdrc_broadband);
+
 }
-;
+void reloadCurrentAlgPresetFromSD(void) {
+  myState.defineAlgorithmPreset(myState.current_alg_config,true); //yes, try to load from SD
+  
+  //implement the settings into the actual processing blocks
+  setAlgorithmPreset(myState.current_alg_config); //sets the Per Band, the Broad Band, and the AFC parameters using a preset
+
+  //myState.printPerBandSettings("reloadCurrentAlgPresetFromSD: DSL =",myState.wdrc_perBand);
+  //myState.printBroadbandSettings("revertCurrentAlgPresetToDefault: GHA =",myState.wdrc_broadband);
+
+}
