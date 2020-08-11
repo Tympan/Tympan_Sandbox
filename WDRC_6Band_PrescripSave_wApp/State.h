@@ -40,10 +40,10 @@ class State {
     int targetRearDelay_samps = 1;  //in samples
     int currentRearDelay_samps = 0; //in samples
 
-
     //set input streo/mono configuration
     enum INPUTMIX {INPUTMIX_STEREO, INPUTMIX_MONO, INPUTMIX_MUTE, INPUTMIX_BOTHLEFT, INPUTMIX_BOTHRIGHT};
-    int input_mixer_config = INPUTMIX_STEREO;
+    int input_mixer_config = INPUTMIX_BOTHLEFT;
+    int input_mixer_nonmute_config = INPUTMIX_BOTHLEFT;
     
     //algorithm settings
     enum ALG_CONFIG {ALG_PRESET_A=0, ALG_PRESET_B, ALG_PRESET_C};
@@ -52,6 +52,8 @@ class State {
     BTNRH_WDRC::CHA_WDRC wdrc_broadband;
     BTNRH_WDRC::CHA_AFC afc;
     Alg_Preset presets[N_PRESETS];
+
+    char GUI_tuner_persistent_mode = 'g';
 
     void printPerBandSettings(void) {   printPerBandSettings("myState: printing per-band settings:",wdrc_perBand);  }
     static void printPerBandSettings(String s, BTNRH_WDRC::CHA_DSL &this_dsl) {  Serial.print(s);  this_dsl.printAllValues(); } 

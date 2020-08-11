@@ -9,14 +9,19 @@
 #include "AudioEffectCompWDRC_F32.h"    //change this if you change the name of the algorithm's source code filename
 typedef AudioEffectCompWDRC_F32 GainAlgorithm_t; //change this if you change the algorithm's class name
 
-#define MAX_DATASTREAM_LENGTH 1024
-#define DATASTREAM_START_CHAR (char)0x02
-#define DATASTREAM_SEPARATOR (char)0x03
-#define DATASTREAM_END_CHAR (char)0x04
+#define MAX_DATASTREAM_LENGTH   1024
+#define DATASTREAM_START_CHAR   (char)0x02
+#define DATASTREAM_SEPARATOR    (char)0x03
+#define DATASTREAM_END_CHAR     (char)0x04
+#define QUADCHAR_START_CHAR     ((char)'_')   //this is an underscore
+#define QUADCHAR_CHAR__USE_PERSISTENT_MODE ((char)'_')  //this is an underscore
 enum read_state_options {
   SINGLE_CHAR,
   STREAM_LENGTH,
-  STREAM_DATA
+  STREAM_DATA,
+  QUAD_CHAR_1,
+  QUAD_CHAR_2,
+  QUAD_CHAR_3,
 };
 
 
@@ -38,7 +43,10 @@ extern void togglePrintAveSignalLevels(bool);
 //extern void incrementDSLConfiguration(Stream *);
 extern void setAlgorithmPreset(int);
 extern void updateDSL(BTNRH_WDRC::CHA_DSL &);
-float updateDSL_channelGain(int,float);
+float updateDSL_linearGain(int,float);
+float updateDSL_compressionRatio(int,float);
+float updateDSL_compressionKnee(int,float);
+float updateDSL_limitter(int,float);
 extern void updateGHA(BTNRH_WDRC::CHA_WDRC &);
 extern void updateAFC(BTNRH_WDRC::CHA_AFC &);
 extern int configureFrontRearMixer(int);
@@ -73,8 +81,13 @@ class SerialManager {
     void respondToByte(char c);
     void processSingleCharacter(char c);
     void processStream(void);
+    void interpretQuadChar(char mode_char, char chan_char, char data_char);
     void printHelp(void);
     void incrementChannelGain(int chan, float change_dB);
+    void incrementCompressionRatio(int chan, float change);
+    void incrementCompressionKnee(int chan, float change_dB);
+    void incrementLimitter(int chan, float change_dB);
+    
     void decreaseChannelGain(int chan);
     void set_N_CHAN(int _n_chan) { N_CHAN = _n_chan; };
     void printChanUpMsg(int N_CHAN);
@@ -97,18 +110,23 @@ class SerialManager {
     void setButtonState_frontRearMixer(void);
     void setButtonState_inputMixer(void);
     void setButtonState_gains(void);
+    void setButtonState_tunerGUI(void);
     void setSDRecordingButtons(void);  
     void setButtonState(String btnId, bool newState);
     void setButtonText(String btnId, String text);
     String channelGainAsString(int chan);
 
     float channelGainIncrement_dB = 2.5f;  
+    float compKneeIncrement_dB = 2.5f;
+    float compressionRatioIncrement = 0.1f;
+    float limitterIncrement_dB = 1.0f;
     int N_CHAN;
     int serial_read_state; // Are we reading one character at a time, or a stream?
     char stream_data[MAX_DATASTREAM_LENGTH];
     int stream_length;
     int stream_chars_received;
     //float FAKE_GAIN_LEVEL[8] = {0.,0.,0.,0.,0.,0.,0.,0.};
+
   private:
     AudioControlTestAmpSweep_F32 &ampSweepTester;
     AudioControlTestFreqSweep_F32 &freqSweepTester;
@@ -156,7 +174,7 @@ void SerialManager::printHelp(void) {
   myTympan.println(" f: Self-Generated Test: Frequency sweep.  Measure filterbank.");
   myTympan.print(" k/K: Increase/Decrease gain of all channels (ie, knob gain) by "); myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
   myTympan.println(" q,Q: Mute or Unmute the audio.");
-  //myTympan.println(" s,S: Mono or Stereo Audio.");
+  myTympan.println(" s,S,B: Left, Right, or Mono-mix the audio");
   printChanUpMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
   printChanDownMsg(N_CHAN);  myTympan.print(channelGainIncrement_dB); myTympan.println(" dB");
   myTympan.println(" d,D,G: Switch to WDRC Preset A, Full-On, RTS");
@@ -177,8 +195,68 @@ void SerialManager::printHelp(void) {
 }
 
 
+void SerialManager::interpretQuadChar(char mode_char, char chan_char, char data_char) {
+  int chan=0;
+  float float_val;
+  bool is_ok = false;
+
+  //are we in persistent mode?
+  if (mode_char == QUADCHAR_CHAR__USE_PERSISTENT_MODE) mode_char = myState.GUI_tuner_persistent_mode;
+  
+  switch (mode_char) {
+    case '|': //change the persistent mode
+      Serial.print("SerialManager: interpretQuadChar: changing persistent mode to: "); Serial.println(data_char);
+      myState.GUI_tuner_persistent_mode = data_char;
+      setButtonState_tunerGUI();
+      break;
+    case 'g': // linear gain
+      chan = chan_char - '0'; //Interpret character as an integer.  For some reason, I couldn't get atoi() to work
+      if (chan >= 1) { //assumes counts from zero
+        if (data_char == '+') { float_val = 1.0; is_ok = true; } else if (data_char == '-') { float_val = -1.0; is_ok = true; }
+      }
+      if (is_ok) {
+          incrementChannelGain(chan-1, float_val*channelGainIncrement_dB);
+          setButtonState_tunerGUI();
+          sendStreamDSL(myState.wdrc_perBand);
+      }
+      break;
+    case 'c': //compression ratio
+      chan = chan_char - '0'; //Interpret character as an integer.  For some reason, I couldn't get atoi() to work
+      if (chan >= 1) { //assumes counts from zero
+        if (data_char == '+') { float_val = 1.0; is_ok = true; } else if (data_char == '-') { float_val = -1.0; is_ok = true; }
+      }
+      if (is_ok) {
+          incrementCompressionRatio(chan-1, float_val*compressionRatioIncrement);
+          setButtonState_tunerGUI();
+          sendStreamDSL(myState.wdrc_perBand); break;
+      }
+      break;
+    case 'k': //compression knee
+      chan = chan_char - '0'; //Interpret character as an integer.  For some reason, I couldn't get atoi() to work
+      if (chan >= 1) { //assumes counts from zero
+        if (data_char == '+') { float_val = 1.0; is_ok = true; } else if (data_char == '-') { float_val = -1.0; is_ok = true; }
+      }
+      if (is_ok) {
+          incrementCompressionKnee(chan-1, float_val*compKneeIncrement_dB);
+          setButtonState_tunerGUI();
+          sendStreamDSL(myState.wdrc_perBand); break;
+      }      
+    case 'b': //bolt limiter
+      chan = chan_char - '0'; //Interpret character as an integer.  For some reason, I couldn't get atoi() to work
+      if (chan >= 1) { //assumes counts from zero
+        if (data_char == '+') { float_val = 1.0; is_ok = true; } else if (data_char == '-') { float_val = -1.0; is_ok = true; }
+      }
+      if (is_ok) {
+          incrementLimitter(chan-1, float_val*limitterIncrement_dB);
+          setButtonState_tunerGUI();
+          sendStreamDSL(myState.wdrc_perBand); break;
+      }
+      break;           
+  }
+}
 
 //switch yard to determine the desired action
+char mode_char, chan_char, data_char;
 void SerialManager::respondToByte(char c) {
   switch (serial_read_state) {
     case SINGLE_CHAR:
@@ -187,6 +265,8 @@ void SerialManager::respondToByte(char c) {
         // Start a data stream:
         serial_read_state = STREAM_LENGTH;
         stream_chars_received = 0;
+      } else if (c == QUADCHAR_START_CHAR) {
+        serial_read_state = QUAD_CHAR_1;
       } else {
         if ((c != '\n') && (c != '\r')) {
           Serial.print("Processing character ");
@@ -233,6 +313,26 @@ void SerialManager::respondToByte(char c) {
         stream_chars_received = 0;
       }
       break;
+    case QUAD_CHAR_1:
+      if ((c == '\n') || (c == '\r')) { serial_read_state = SINGLE_CHAR; return; } // abort
+      if (c == DATASTREAM_START_CHAR) { Serial.println("Start data stream."); serial_read_state = STREAM_LENGTH; stream_chars_received = 0; return; }//abort into stream mode
+      mode_char = c; chan_char = (char)NULL; data_char = (char)NULL;
+      serial_read_state = QUAD_CHAR_2;
+      break;
+    case QUAD_CHAR_2:
+      if ((c == '\n') || (c == '\r')) { serial_read_state = SINGLE_CHAR; return; } // abort
+      if (c == DATASTREAM_START_CHAR) { Serial.println("Start data stream."); serial_read_state = STREAM_LENGTH; stream_chars_received = 0; return;} //abort into stream mode
+      chan_char = c;
+      serial_read_state = QUAD_CHAR_3;
+      break;
+    case QUAD_CHAR_3:
+      if ((c == '\n') || (c == '\r')) { serial_read_state = SINGLE_CHAR; return; } // abort
+      if (c == DATASTREAM_START_CHAR) { Serial.println("Start data stream."); serial_read_state = STREAM_LENGTH; stream_chars_received = 0; return; }//abort into stream mode
+      data_char = c;
+      //Serial.print("Serial_Manager: respondToByte: Quad Char "); Serial.print(mode_char); Serial.print(", "); Serial.print(chan_char); Serial.print(", ");Serial.println(data_char);
+      interpretQuadChar(mode_char, chan_char, data_char);
+      serial_read_state = SINGLE_CHAR;
+      break;      
   }
 }
 
@@ -246,10 +346,12 @@ void SerialManager::processSingleCharacter(char c) {
     case 'k':
       incrementKnobGain(channelGainIncrement_dB); 
       setButtonState_gains();
+      setButtonState("inp_mute",false);
       break;
     case 'K':   //which is "shift k"
       incrementKnobGain(-channelGainIncrement_dB); 
       setButtonState_gains(); 
+      setButtonState("inp_mute",false);
       break;
     case '1':
       incrementChannelGain(1-1, channelGainIncrement_dB);setButtonState_gains();sendStreamDSL(myState.wdrc_perBand); break;
@@ -438,8 +540,12 @@ void SerialManager::processSingleCharacter(char c) {
       setButtonState_inputMixer();
       break;
     case 'Q':
-      configureLeftRightMixer(State::INPUTMIX_MONO);
+      configureLeftRightMixer(myState.input_mixer_nonmute_config);
+      setButtonState_inputMixer();
+      break;  
+    case 'B':
       myTympan.println("Received: Input: Mix L+R.");
+      configureLeftRightMixer(State::INPUTMIX_MONO);
       setButtonState_inputMixer();
       break;  
     case 's':
@@ -576,9 +682,6 @@ void SerialManager::processSingleCharacter(char c) {
       myTympan.println("Delete all SD recordings complete.");
 
       break;   
-    case 'b':
-      printCompressorSettings();
-      break;
   }
 }
 
@@ -598,7 +701,8 @@ void SerialManager::printTympanRemoteLayout(void) {
       "{'title':'Main Controls','cards':["
           //"{'name':'Overall Audio','buttons':[{'label': 'Stereo','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mono','cmd': 's','id':'inp_mono','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'12'}]},"
           //"{'name':'Overall Audio','buttons':[{'label': 'Active','cmd': 'Q','id':'inp_stereo','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'6'}]},"
-          "{'name':'Earpiece Source','buttons':[{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'6'},{'label': 'Mix L+R','cmd': 'Q','id':'inp_mono','width':'6'},{'label': 'Left','cmd': 's','id':'inp_micL','width':'6'},{'label': 'Right','cmd': 'S','id':'inp_micR','width':'6'}]},"          
+          //"{'name':'Select Earpiece','buttons':[{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'6'},{'label': 'Mix L+R','cmd': 'Q','id':'inp_mono','width':'6'},{'label': 'Left','cmd': 's','id':'inp_micL','width':'6'},{'label': 'Right','cmd': 'S','id':'inp_micR','width':'6'}]},"          
+          "{'name':'Overall Volume', 'buttons':[{'label': 'Less', 'cmd' :'QK'},{'label': 'More', 'cmd': 'Qk'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'12'}]},"
           "{'name':'Algorithm Presets','buttons':[{'label': 'Compression (WDRC)', 'cmd': 'd', 'id': 'alg_preset0'},{'label': 'Full-On Gain', 'cmd': 'D', 'id': 'alg_preset1'},{'label': 'RTS Gain', 'cmd': 'G', 'id': 'alg_preset2'}]},"
           "{'name':'Feedback Cancellation','buttons':[{'label': 'On', 'cmd': 'p', 'id': 'afc_on'},{'label': 'Off', 'cmd': 'P', 'id': 'afc_off'}]}"
           //"{'name':'Overwrite Current Preset','buttons':[{'label': 'Save', 'cmd': '[', 'id': 'savePreset'},{'label': 'Restore', 'cmd': '{', 'id': 'restorePreset'}]}"
@@ -609,19 +713,40 @@ void SerialManager::printTympanRemoteLayout(void) {
 //          "{'name':'Mid Gain (dB)', 'buttons':[{'label': '-', 'cmd': '@','width':'4'},{'id':'midGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '2','width':'4'}]},"
 //          "{'name':'Low Gain (dB)', 'buttons':[{'label': '-', 'cmd': '!','width':'4'},{'id':'lowGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '1','width':'4'}]}"                          
 //      "]}," //include comma if NOT the last one
-      "{'title':'Tuner','cards':["
-          "{'name':'Overall Volume', 'buttons':[{'label': 'Less', 'cmd' :'K'},{'label': 'More', 'cmd': 'k'}]},"
-          "{'name':'Linear Gain Per Band (dB)', 'buttons':["
-                      "{'label':'LOW','width':'3'},{'label': '-', 'cmd': '!','width':'3'},{'id':'gain1', 'label': '', 'width':'3'},{'label': '+', 'cmd': '1','width':'3'},"
-                      "{'label':'Band2','width':'3'},{'label': '-', 'cmd': '@','width':'3'},{'id':'gain2', 'label': '', 'width':'3'},{'label': '+', 'cmd': '2','width':'3'},"
-                      "{'label':'Band3','width':'3'},{'label': '-', 'cmd': '#','width':'3'},{'id':'gain3', 'label': '', 'width':'3'},{'label': '+', 'cmd': '3','width':'3'},"
-                      "{'label':'Band4','width':'3'},{'label': '-', 'cmd': '$','width':'3'},{'id':'gain4', 'label': '', 'width':'3'},{'label': '+', 'cmd': '4','width':'3'},"
-                      "{'label':'Band5','width':'3'},{'label': '-', 'cmd': '%','width':'3'},{'id':'gain5', 'label': '', 'width':'3'},{'label': '+', 'cmd': '5','width':'3'},"
-                      "{'label':'HIGH','width':'3'},{'label': '-', 'cmd': '^','width':'3'},{'id':'gain6', 'label': '', 'width':'3'},{'label': '+', 'cmd': '6','width':'3'}"  // //no comma if the last one, which this one is in tis button group
-                  "]}"        //no comma if the last one, which this one is for this card group
+//      "{'title':'Tuner','cards':["
+//          "{'name':'Overall Volume', 'buttons':[{'label': 'Less', 'cmd' :'K'},{'label': 'More', 'cmd': 'k'}]},"
+//          "{'name':'Linear Gain Per Band (dB)', 'buttons':["
+//                      "{'label':'LOW','width':'3'},{'label': '-', 'cmd': '!','width':'3'},{'id':'gain1', 'label': '', 'width':'3'},{'label': '+', 'cmd': '1','width':'3'},"
+//                      "{'label':'Band2','width':'3'},{'label': '-', 'cmd': '@','width':'3'},{'id':'gain2', 'label': '', 'width':'3'},{'label': '+', 'cmd': '2','width':'3'},"
+//                      "{'label':'Band3','width':'3'},{'label': '-', 'cmd': '#','width':'3'},{'id':'gain3', 'label': '', 'width':'3'},{'label': '+', 'cmd': '3','width':'3'},"
+//                      "{'label':'Band4','width':'3'},{'label': '-', 'cmd': '$','width':'3'},{'id':'gain4', 'label': '', 'width':'3'},{'label': '+', 'cmd': '4','width':'3'},"
+//                      "{'label':'Band5','width':'3'},{'label': '-', 'cmd': '%','width':'3'},{'id':'gain5', 'label': '', 'width':'3'},{'label': '+', 'cmd': '5','width':'3'},"
+//                      "{'label':'HIGH','width':'3'},{'label': '-', 'cmd': '^','width':'3'},{'id':'gain6', 'label': '', 'width':'3'},{'label': '+', 'cmd': '6','width':'3'}"  // //no comma if the last one, which this one is in tis button group
+//                  "]}"        //no comma if the last one, which this one is for this card group
+//      "]}," //include comma if NOT the last one  
+      "{'title':'WDRC Tuner','cards':["
+          //"{'name':'Overall Volume',   'buttons':[{'label': 'Less',     'cmd' :'K'},{'label': 'More', 'cmd': 'k'}]},"
+          "{'name':'Parameter to Change','buttons':[{'id':'modeGain','label':'Linear Gain (dB)','cmd':'_|0g','width':'12'},"
+                                                   "{'id':'modeKnee','label':'Comp Knee (dB SPL)','cmd':'_|0k','width':'12'},"
+                                                   "{'id':'modeCR','label':'Comp Ratio','cmd':'_|0c','width':'12'},"
+                                                   "{'id':'modeLim','label':'Limitter (dB SPL)','cmd':'_|0b','width':'12'}"
+                                                   "]},"
+          "{'name':'', 'buttons':["
+                      //"{'id':'tunerMode','label':'-','width':'12'},"
+                      "{'label':'LOW','width':'3'},{'label': '-', 'cmd': '__1-','width':'3'},{'id':'tune1', 'label': '', 'width':'3'},{'label': '+', 'cmd': '__1+','width':'3'},"
+                      "{'label':'Band2','width':'3'},{'label': '-', 'cmd': '__2-','width':'3'},{'id':'tune2', 'label': '', 'width':'3'},{'label': '+', 'cmd': '__2+','width':'3'},"
+                      "{'label':'Band3','width':'3'},{'label': '-', 'cmd': '__3-','width':'3'},{'id':'tune3', 'label': '', 'width':'3'},{'label': '+', 'cmd': '__3+','width':'3'},"
+                      "{'label':'Band4','width':'3'},{'label': '-', 'cmd': '__4-','width':'3'},{'id':'tune4', 'label': '', 'width':'3'},{'label': '+', 'cmd': '__4+','width':'3'},"
+                      "{'label':'Band5','width':'3'},{'label': '-', 'cmd': '__5-','width':'3'},{'id':'tune5', 'label': '', 'width':'3'},{'label': '+', 'cmd': '__5+','width':'3'},"
+                      "{'label':'HIGH','width':'3'},{'label': '-', 'cmd': '__6-','width':'3'},{'id':'tune6', 'label': '', 'width':'3'},{'label': '+', 'cmd': '__6+','width':'3'}"  // //no comma if the last one, which this one is in tis button group
+                  "]},"        //no comma if the last one or, yes, comma if not the last one
+          "{'name':'','buttons':[{'label': 'Save As Preset', 'cmd': '[', 'id': 'savePreset','width':'12'},{'label': 'Reload', 'cmd': '>', 'id': 'reloadPreset','width':'6'},{'label': 'Factory', 'cmd': '{', 'id': 'restorePreset','width':'6'},"
+                                                    "{'label': '', 'id':'presetFname','width':'12'}]}"                  
       "]}," //include comma if NOT the last one  
+
       "{'title':'Digital Earpieces','cards':["
-           "{'name':'Front or Rear Mics', 'buttons':["
+          "{'name':'Select Earpiece','buttons':[{'label': 'Left','cmd': 's','id':'inp_micL','width':'6'},{'label': 'Right','cmd': 'S','id':'inp_micR','width':'6'},{'label': 'Mix L+R','cmd': 'B','id':'inp_mono','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'6'}]},"          
+          "{'name':'Front or Rear Mics', 'buttons':["
                      "{'label':'Front','id':'frontMic','cmd':'t','width':'6'},{'label':'Front-Rear','id':'frontRearMix','cmd':'T','width':'6'}" 
            "]},"  //include trailing comma if NOT the last one
            "{'name':'Rear Mic Delay (samples)', 'buttons':["
@@ -646,9 +771,9 @@ void SerialManager::printTympanRemoteLayout(void) {
 //                                             "]}," //include trailing comma because there are more button groups below
           "{'name':'CPU Usage (%)', 'buttons':[{'label': 'Start', 'cmd' :'c','id':'cpuStart','width':'4'},{'id':'cpuValue', 'label': '', 'width':'4'},{'label': 'Stop', 'cmd': 'C','width':'4'}]},"  //add comma if you add any lines below before this line's closing quote
           "{'name':'Record Mics to SD Card','buttons':[{'label': 'Start', 'cmd': '`', 'id':'recordStart','width':'6'},{'label': 'Stop', 'cmd': '~','width':'6'},"
-                                                    "{'label': '', 'id':'sdFname','width':'12'}]},"
-          "{'name':'Overwrite Current Algorithm Preset on SD','buttons':[{'label': 'Save', 'cmd': '[', 'id': 'savePreset'},{'label': 'Reload', 'cmd': '>', 'id': 'reloadPreset'},{'label': 'Restore', 'cmd': '{', 'id': 'restorePreset'},"
-                                                    "{'label': '', 'id':'presetFname','width':'12'}]}"
+                                                    "{'label': '', 'id':'sdFname','width':'12'}]}"
+          //"{'name':'Overwrite Current Algorithm Preset on SD','buttons':[{'label': 'Save', 'cmd': '[', 'id': 'savePreset'},{'label': 'Reload', 'cmd': '>', 'id': 'reloadPreset'},{'label': 'Factory', 'cmd': '{', 'id': 'restorePreset'},"
+          //                                          "{'label': '', 'id':'presetFname','width':'12'}]}"
           //"{'name':'Record Mics to SD Card','buttons':[{'label': 'Start', 'cmd': 'r', 'id':'recordStart'},{'label': 'Stop', 'cmd': 's'}]},"
           //"{'name':'Send Data to Plot', 'buttons':[{'label': 'Start', 'cmd' :']','id':'plotStart'},{'label': 'Stop', 'cmd': '}'}]}"
          "]}" //no comma if last one
@@ -860,14 +985,31 @@ void SerialManager::sendStreamAFC(const BTNRH_WDRC::CHA_AFC &this_afc) {
 };
 
 void SerialManager::incrementChannelGain(int chan, float change_dB) { //chan counts from zero
-  //increments the linear gain
-  if (chan < N_CHAN) {
+  if ((chan >= 0) && (chan < N_CHAN)) {
     myState.wdrc_perBand.tkgain[chan] += change_dB;
-    updateDSL_channelGain(chan,myState.wdrc_perBand.tkgain[chan]);
-    
-    printGainSettings();  //in main sketch file
+    updateDSL_linearGain(chan,myState.wdrc_perBand.tkgain[chan]);
+    //printGainSettings();  //in main sketch file
   }
 }
+void SerialManager::incrementCompressionRatio(int chan, float change) { //chan counts from zero
+  if ((chan >= 0) && (chan < N_CHAN)) {
+    myState.wdrc_perBand.cr[chan] += change;
+    updateDSL_compressionRatio(chan,myState.wdrc_perBand.cr[chan]);
+  }
+}
+void SerialManager::incrementCompressionKnee(int chan, float change_dB) { //chan counts from zero
+  if ((chan >= 0) && (chan < N_CHAN)) {
+    myState.wdrc_perBand.tk[chan] += change_dB;
+    updateDSL_compressionKnee(chan,myState.wdrc_perBand.tk[chan]);
+  }
+}
+void SerialManager::incrementLimitter(int chan, float change_dB) { //chan counts from zero
+  if ((chan >= 0) && (chan < N_CHAN)) {
+    myState.wdrc_perBand.bolt[chan] += change_dB;
+    updateDSL_limitter(chan,myState.wdrc_perBand.bolt[chan]);
+  }
+}
+
 
 String SerialManager::channelGainAsString(int chan) {  //channels start from zero
   //return String(FAKE_GAIN_LEVEL[chan],1);
@@ -892,7 +1034,9 @@ void SerialManager::setFullGUIState(void) {
   setInputConfigButtons();
 
   setButtonState_gains();
+  setButtonState_tunerGUI();
   setSDRecordingButtons();  
+  
     
   //add something here to send prescription values to the remote device
 
@@ -907,6 +1051,7 @@ void SerialManager::setFullGUIState(void) {
   } else {
     setButtonState("plotStart",false);
   }
+
 }
 
 void SerialManager::setButtonState_algPresets(void) {
@@ -1005,13 +1150,54 @@ void SerialManager::setButtonState_afc(void) {
 }
 
 void SerialManager::setButtonState_gains(void) {
-  setButtonText("gain1",channelGainAsString(1-1));
-  setButtonText("gain2",channelGainAsString(2-1));
-  setButtonText("gain3",channelGainAsString(3-1));
-  setButtonText("gain4",channelGainAsString(4-1));
-  setButtonText("gain5",channelGainAsString(5-1));
-  setButtonText("gain6",channelGainAsString(6-1));
- 
+  
+//  setButtonText("gain1",channelGainAsString(1-1));
+//  setButtonText("gain2",channelGainAsString(2-1));
+//  setButtonText("gain3",channelGainAsString(3-1));
+//  setButtonText("gain4",channelGainAsString(4-1));
+//  setButtonText("gain5",channelGainAsString(5-1));
+//  setButtonText("gain6",channelGainAsString(6-1));
+}
+
+void SerialManager::setButtonState_tunerGUI(void) {
+  float *vals = NULL;
+
+  setButtonState("modeGain",false);
+  setButtonState("modeKnee",false);
+  setButtonState("modeCR",false);
+  setButtonState("modeLim",false);
+  
+  switch (myState.GUI_tuner_persistent_mode) {
+    case 'g':
+      //setButtonText("tunerMode","Linear Gain (dB)");
+      vals = myState.wdrc_perBand.tkgain;
+      setButtonState("modeGain",true);
+      break;
+    case 'c':
+      //setButtonText("tunerMode","Comp Ratio");
+      vals = myState.wdrc_perBand.cr;
+      setButtonState("modeCR",true);
+      break;
+    case 'k':
+      //setButtonText("tunerMode","Comp Knee (dB SPL)");
+      vals = myState.wdrc_perBand.tk;
+      setButtonState("modeKnee",true);
+      break;
+    case 'b':
+      //setButtonText("tunerMode","Limitter Knee (dB SPL)");
+      vals = myState.wdrc_perBand.bolt;
+      setButtonState("modeLim",true);
+      break;
+  }
+
+  if (vals != NULL) {
+    setButtonText("tune1",String(vals[1-1],1));
+    setButtonText("tune2",String(vals[2-1],1));
+    setButtonText("tune3",String(vals[3-1],1));
+    setButtonText("tune4",String(vals[4-1],1));
+    setButtonText("tune5",String(vals[5-1],1));
+    setButtonText("tune6",String(vals[6-1],1));    
+  }
 }
 
 void SerialManager::setSDRecordingButtons(void) {

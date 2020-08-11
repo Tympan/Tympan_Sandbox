@@ -358,13 +358,33 @@ void updateDSL(BTNRH_WDRC::CHA_DSL &this_dsl) {
   setupFromDSL(this_dsl, myState.wdrc_broadband.tk, N_CHAN_MAX, audio_settings);
 }
 
-float updateDSL_channelGain(int Ichan, float given_tkgain) { //chan is counting from zero
-  //setupFromDSL(this_dsl, myState.wdrc_broadband.tk, N_CHAN_MAX, audio_settings);
-  myState.wdrc_perBand.tkgain[Ichan] = given_tkgain;
+float updateDSL_linearGain(int Ichan, float new_val) { //chan is counting from zero
+  myState.wdrc_perBand.tkgain[Ichan] = new_val;
   for (int Ileftright=0; Ileftright < 1; Ileftright++) {
     configurePerBandWDRC(Ichan, sample_rate_Hz, myState.wdrc_perBand, myState.wdrc_broadband.tkgain, expCompLim[Ileftright][Ichan]);
   }
   return myState.wdrc_broadband.tkgain;
+}
+float updateDSL_compressionRatio(int Ichan, float new_val) { //chan is counting from zero
+  myState.wdrc_perBand.cr[Ichan] = new_val;
+  for (int Ileftright=0; Ileftright < 1; Ileftright++) {
+    configurePerBandWDRC(Ichan, sample_rate_Hz, myState.wdrc_perBand, myState.wdrc_broadband.tkgain, expCompLim[Ileftright][Ichan]);
+  }
+  return myState.wdrc_broadband.cr;
+}
+float updateDSL_compressionKnee(int Ichan, float new_val) { //chan is counting from zero
+  myState.wdrc_perBand.tk[Ichan] = new_val;
+  for (int Ileftright=0; Ileftright < 1; Ileftright++) {
+    configurePerBandWDRC(Ichan, sample_rate_Hz, myState.wdrc_perBand, myState.wdrc_broadband.tkgain, expCompLim[Ileftright][Ichan]);
+  }
+  return myState.wdrc_broadband.cr;
+}
+float updateDSL_limitter(int Ichan, float new_val) { //chan is counting from zero
+  myState.wdrc_perBand.bolt[Ichan] = new_val;
+  for (int Ileftright=0; Ileftright < 1; Ileftright++) {
+    configurePerBandWDRC(Ichan, sample_rate_Hz, myState.wdrc_perBand, myState.wdrc_broadband.tkgain, expCompLim[Ileftright][Ichan]);
+  }
+  return myState.wdrc_broadband.bolt;
 }
 
 void updateGHA(BTNRH_WDRC::CHA_WDRC &this_gha) {
@@ -505,12 +525,12 @@ int configureFrontRearMixer(int val) {
 int configureLeftRightMixer(int val) {  //call this if you want to change left-right mixing (or if the input source was changed)
   switch (val) {  // now configure that mix for the analog inputs  
     case State::INPUTMIX_STEREO:
-      myState.input_mixer_config = val;
+      myState.input_mixer_config = val;  myState.input_mixer_nonmute_config = myState.input_mixer_config;
       leftRightMixer[LEFT].gain(LEFT,1.0);leftRightMixer[LEFT].gain(RIGHT,0.0);   //set what is sent left
       leftRightMixer[RIGHT].gain(LEFT,0.0);leftRightMixer[RIGHT].gain(RIGHT,1.0); //set what is sent right
       break;
     case State::INPUTMIX_MONO:
-      myState.input_mixer_config = val;
+      myState.input_mixer_config = val; myState.input_mixer_nonmute_config = myState.input_mixer_config;
       leftRightMixer[LEFT].gain(LEFT,0.5);leftRightMixer[LEFT].gain(RIGHT,0.5);   //set what is sent left
       leftRightMixer[RIGHT].gain(LEFT,0.5);leftRightMixer[RIGHT].gain(RIGHT,0.5); //set what is sent right
       break;
@@ -520,12 +540,12 @@ int configureLeftRightMixer(int val) {  //call this if you want to change left-r
       leftRightMixer[RIGHT].gain(LEFT,0.0);leftRightMixer[RIGHT].gain(RIGHT,0.0);   //set what is sent right
       break;
     case State::INPUTMIX_BOTHLEFT:
-      myState.input_mixer_config = val;
+      myState.input_mixer_config = val; myState.input_mixer_nonmute_config = myState.input_mixer_config;
       leftRightMixer[LEFT].gain(LEFT,1.0);leftRightMixer[LEFT].gain(RIGHT,0.0);     //set what is sent left
       leftRightMixer[RIGHT].gain(LEFT,1.0);leftRightMixer[RIGHT].gain(RIGHT,0.0);   //set what is sent right
       break;
     case State::INPUTMIX_BOTHRIGHT:
-      myState.input_mixer_config = val;
+      myState.input_mixer_config = val; myState.input_mixer_nonmute_config = myState.input_mixer_config;
       leftRightMixer[LEFT].gain(LEFT,0.0);leftRightMixer[LEFT].gain(RIGHT,1.0);     //set what is sent left
       leftRightMixer[RIGHT].gain(LEFT,0.0);leftRightMixer[RIGHT].gain(RIGHT,1.0);   //set what is sent right
       break;   
