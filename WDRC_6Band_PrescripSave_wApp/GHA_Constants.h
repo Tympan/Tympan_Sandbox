@@ -19,7 +19,7 @@ BTNRH_WDRC::CHA_DSL dsl = {
   {  7.0,  10.0,   20.0,   20.0,   25.0,  25.0,     10.0,  10.0},       // compression-start gain
   {  1.1,   1.2,    1.5,    1.5,    1.5,   1.5,     1.00,  1.00},       // compression ratio (disabled by setting ratio to 1.)
   { 55.0,  55.0,   55.0,   55.0,   55.0,  55.0,     55.0,  55.0},       // compression-start kneepoint (input dB SPL)
-  {200.0, 200.0,  200.0,  200.0,  200.0, 200.0,    200.0, 200.0}        // output limiting threshold (input dB SPL) (comp ratio 10) (Disabled by setting to high value)
+  {140.0, 140.0,  140.0,  140.0,  140.0, 140.0,    140.0, 140.0}        // output limiting threshold (input dB SPL) (comp ratio 10) (Disabled by setting to high value)
 };
 
 // Here are the settings for the broadband limiter at the end.
@@ -72,7 +72,7 @@ BTNRH_WDRC::CHA_DSL dsl_fullon = {
   { 27.0,  30.0,   40.0,   40.0,   45.0,   48.0,     10.f, 10.f},      // compression-start gain
   {  1.0,   1.0,    1.0,    1.0,    1.0,    1.0,     1.0f, 1.0f},      // compression ratio(Note: Disable by setting the ratio to 1.0)
   { 80.0,  80.0,   80.0,   80.0,   80.0,   80.0,     80.0, 80.0},      // compression-start kneepoint (input dB SPL) 
-  {200.0, 200.0,  200.0,  200.0,  200.0,  200.0,    200.0, 200.0}      // output limiting threshold (input dB SPL) (comp ratio 10) (Disabled by setting to high value)
+  {140.0, 140.0,  140.0,  140.0,  140.0, 140.0,    140.0, 140.0}        // output limiting threshold (input dB SPL) (comp ratio 10) (Disabled by setting to high value)
 };
 
 
@@ -123,7 +123,7 @@ BTNRH_WDRC::CHA_DSL dsl_rts = {
   { 22.0,  25.0,   35.0,   35.0,   40.0,   43.0,    10.f, 10.f},      // compression-start gain
   {  1.0,   1.0,    1.0,    1.0,    1.0,    1.0,    1.0f, 1.0f},      // compression ratio(Note: Disabled by setting the ratio to 1.0)
   { 80.0,  80.0,   80.0,   80.0,   80.0,   80.0,    80.0, 80.0},      // compression-start kneepoint (input dB SPL) 
-  {200.0, 200.0,  200.0,  200.0,  200.0,  200.0,   200.0, 200.0}      // output limiting threshold (input dB SPL) (comp ratio 10) (Disabled by setting to high value)
+  {140.0, 140.0,  140.0,  140.0,  140.0, 140.0,    140.0, 140.0}        // output limiting threshold (input dB SPL) (comp ratio 10) (Disabled by setting to high value)
 };
 
 
