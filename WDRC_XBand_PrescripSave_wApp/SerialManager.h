@@ -898,11 +898,6 @@ void SerialManager::interpretStreamDSL(int idx) {
   const int maxChan = DSL_MXCH; //"DSL_MXCH" is in BTNRH_WDRC_Types.h via AudioEffectCompWDRC_F32.h
  
   BTNRH_WDRC::CHA_DSL this_dsl = myState.wdrc_perBand; //default to what we already have?
-  //{ //start limitting of scope to avoid problems with what might get brought in from the included file below
-  //  #include "GHA_Constants.h"  //this sets dsl and gha settings, which will be the defaults...includes regular settings, full-on gain, and RTS
-  //  this_dsl = dsl;  //use the preset from the file above
-  //} //end of scope limiting
-
 
   this_dsl.attack        = *((float*)(stream_data+idx)); idx=idx+4;
   this_dsl.release       = *((float*)(stream_data+idx)); idx=idx+4;
@@ -927,7 +922,6 @@ void SerialManager::interpretStreamDSL(int idx) {
   idx = readStreamFloatArray(idx, this_dsl.cr, nchan);  //from the App, for DSL, tk comes before cr
   idx = readStreamFloatArray(idx, this_dsl.bolt, nchan);    
   
-
   //print to serial for debugging
   State::printPerBandSettings("interpretStreamDSL: printing new dsl:",this_dsl); //for debugging
 
