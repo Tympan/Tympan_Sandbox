@@ -35,7 +35,7 @@
 
 // Define parameters relating to the overall setup
 String overall_name = String("Tympan: 6-Band IIR WDRC (Left only), with App Control");
-const int N_CHAN_MAX = 8;  //number of frequency bands (channels)
+const int N_CHAN_MAX = 6;  //number of frequency bands (channels)
 //int N_CHAN = N_CHAN_MAX;  //will be changed to user-selected number of channels later
 const float input_gain_dB = 15.0f; //gain on the analog microphones...does not affect the PDM microphone
 float vol_knob_gain_dB = 0.0; //will be overridden by volume knob
@@ -344,7 +344,7 @@ void setAlgorithmPreset(int preset_ind) {
       is_ok_value = true;
       break;      
   }
-  Serial.print("setAlgorithmPreset: ind = "); Serial.print(preset_ind); Serial.print(", really? "); Serial.println(is_ok_value);
+  //Serial.print("setAlgorithmPreset: ind = "); Serial.print(preset_ind); Serial.print(", really? "); Serial.println(is_ok_value);
   if (is_ok_value) {
     myState.current_alg_config = preset_ind;
     setupFromDSLandGHAandAFC(myState.presets[preset_ind].wdrc_perBand, myState.presets[preset_ind].wdrc_broadband, myState.presets[preset_ind].afc, N_CHAN_MAX, audio_settings);
