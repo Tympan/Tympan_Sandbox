@@ -215,7 +215,7 @@ void setupAudioProcessing(void) {
 
   
   //set the DC-blocking higpass filter cutoff...this is the filter done here in software, not the one done in the AIC DSP hardware
-  preFilter.setHighpass(0, 60.0);  preFilterR.setHighpass(0, 60.0); 
+  preFilter.setHighpass(0, 80.0);  preFilterR.setHighpass(0, 80.0); 
 
   //setup default processing simply to avoid audio processing errors while we read from the SD card in the next step
   setAlgorithmPreset(myState.current_alg_config); //sets the Per Band, the Broad Band, and the AFC parameters using a preset
@@ -270,7 +270,7 @@ void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_
     //give the pre-computed coefficients to the IIR filters
     for (int Iband = 0; Iband < n_chan_max; Iband++) {
       if (Iband < N_CHAN) {
-        bpFilt[Iear][Iband].setFilterCoeff_Matlab_sos(&(filter_sos[Iband][0]), N_BIQUAD_PER_FILT);  //from filter_coeff_sos.h.  Also calls begin().
+        bpFilt[Iear][Iband].setFilterCoeff_Matlab_sos(&(filter_sos[Iband][0]), N_BIQUAD_PER_FILT);  //sets multiple biquads.  Also calls begin().
       } else {
         bpFilt[Iear][Iband].end();
       }
