@@ -848,27 +848,30 @@ void SerialManager::interpretStreamGHA(int idx) {
 void SerialManager::interpretStreamDSL(int idx) {
   const int maxChan = DSL_MXCH; //this #define is in BTNRH_WDRC_Types.h via AudioEffectCompWDRC_F32.h
  
-  BTNRH_WDRC::CHA_DSL dsl;
-  dsl.attack        = *((float*)(stream_data+idx)); idx=idx+4;
-  dsl.release       = *((float*)(stream_data+idx)); idx=idx+4;
-  dsl.nchannel      = *((int*)(stream_data+idx)); idx=idx+4;
-  dsl.maxdB         = *((float*)(stream_data+idx)); idx=idx+4;
+ BTNRH_WDRC::CHA_DSL this_dsl = myState.wdrc_perBand; //default to what we already have?
 
-  if (dsl.nchannel > maxChan) {
+  this_dsl.attack        = *((float*)(stream_data+idx)); idx=idx+4;
+  this_dsl.release       = *((float*)(stream_data+idx)); idx=idx+4;
+  this_dsl.nchannel      = *((int*)(stream_data+idx)); idx=idx+4;
+  this_dsl.maxdB         = *((float*)(stream_data+idx)); idx=idx+4;
+  this_dsl.ear = 0; //hardwired for now
+
+  if (this_dsl.nchannel > maxChan) {
     Serial.println("SerialManager::interpretStreamDSL: *** ERROR ***");
-    Serial.print  ("  : App says numChannels = "); Serial.print(dsl.nchannel); Serial.print(", which is larger than "); Serial.println(maxChan);
+    Serial.print  ("  : App says numChannels = "); Serial.print(this_dsl.nchannel); Serial.print(", which is larger than "); Serial.println(maxChan);
     Serial.println("  : Ignoring DSL given by the App.  Returning.");
     return;
   }
 
-  //interpret the rest of the values
-  idx = readStreamFloatArray(idx, dsl.cross_freq, dsl.nchannel );
-  idx = readStreamFloatArray(idx, dsl.exp_cr, dsl.nchannel );
-  idx = readStreamFloatArray(idx, dsl.exp_end_knee, dsl.nchannel );
-  idx = readStreamFloatArray(idx, dsl.tkgain, dsl.nchannel );
-  idx = readStreamFloatArray(idx, dsl.cr, dsl.nchannel );
-  idx = readStreamFloatArray(idx, dsl.tk, dsl.nchannel );
-  idx = readStreamFloatArray(idx, dsl.bolt, dsl.nchannel );    
+  //interpret the rest of the values in the stream
+  int nchan = this_dsl.nchannel;
+  idx = readStreamFloatArray(idx, this_dsl.cross_freq, nchan); 
+  idx = readStreamFloatArray(idx, this_dsl.exp_cr, nchan);
+  idx = readStreamFloatArray(idx, this_dsl.exp_end_knee, nchan);
+  idx = readStreamFloatArray(idx, this_dsl.tkgain, nchan);
+  idx = readStreamFloatArray(idx, this_dsl.tk, nchan); //from the App, for DSL, tk comes before cr
+  idx = readStreamFloatArray(idx, this_dsl.cr, nchan);  //from the App, for DSL, tk comes before cr
+  idx = readStreamFloatArray(idx, this_dsl.bolt, nchan);      
   
   //print to serial for debugging
   State::printPerBandSettings("interpretStreamDSL: printing new dsl:",dsl); //for debugging
