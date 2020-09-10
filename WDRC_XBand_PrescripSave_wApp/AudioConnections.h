@@ -1,13 +1,12 @@
-
+//create audio objects for the algorithm
 AudioInputI2SQuad_F32         i2s_in(audio_settings);   //Digital audio input from the ADC
+AudioEffectDelay_F32          rearMicDelay(audio_settings), rearMicDelayR(audio_settings);
 AudioMixer4_F32               frontRearMixer[2];         //mixes front-back earpiece mics
 AudioSummer4_F32              analogVsDigitalSwitch[2];  //switches between analog and PDM (a summer is cpu cheaper than a mixer, and we don't need to mix here)
 AudioMixer4_F32               leftRightMixer[2];        //mixers to control mono versus stereo
+AudioFilterBiquad_F32         preFilter(audio_settings), preFilterR(audio_settings);  //remove low frequencies near DC
 AudioTestSignalGenerator_F32  audioTestGenerator(audio_settings); //keep this to be *after* the creation of the i2s_in object
 
-//create audio objects for the algorithm
-AudioEffectDelay_F32       rearMicDelay(audio_settings), rearMicDelayR(audio_settings);
-AudioFilterBiquad_F32      preFilter(audio_settings), preFilterR(audio_settings);  //remove low frequencies near DC
 AudioEffectAFC_BTNRH_F32   feedbackCancel(audio_settings), feedbackCancelR(audio_settings);  //original adaptive feedback cancelation from BTNRH
 AudioFilterBiquad_F32      bpFilt[2][N_CHAN_MAX];         //here are the filters to break up the audio into multiple bands
 AudioConfigIIRFilterBank_F32 filterBankCalculator(audio_settings);  //this computes the filter coefficients
