@@ -108,6 +108,7 @@ class SerialManager {
     void setInputConfigButtons(void);    
     void setButtonState_algPresets(void);
     void setButtonState_afc(void);
+    void setButtonState_rearMic(void);
     void setButtonState_frontRearMixer(void);
     void setButtonState_inputMixer(void);
     void setButtonState_gains(void);
@@ -576,10 +577,12 @@ void SerialManager::processSingleCharacter(char c) {
     case 'i':
       new_val = incrementRearMicGain(rearMicGainIncrement_dB);
       myTympan.print("Adjusting rear mic gain to "); myTympan.print(new_val); myTympan.println(" dB");
+      setButtonState_rearMic();
       break;
     case 'I':
       new_val = incrementRearMicGain(-rearMicGainIncrement_dB);
       myTympan.print("Adjusting rear mic gain to "); myTympan.print(new_val); myTympan.println(" dB");
+      setButtonState_rearMic();
       break;
     case 'y':
       { 
@@ -1075,7 +1078,7 @@ void SerialManager::printCPUtoGUI(unsigned long curTime_millis = 0, unsigned lon
 void SerialManager::setFullGUIState(void) {
   setButtonState_algPresets();
   setButtonState_afc();
-  setButtonText("rearGain",String(myState.rearMicGain_dB,1));
+  setButtonState_rearMic();
   setButtonState_frontRearMixer();
   setButtonState_inputMixer();
   setInputConfigButtons();
@@ -1114,6 +1117,10 @@ void SerialManager::setButtonState_algPresets(void) {
       setButtonState("alg_preset2",true); delay(3); break;      
   }
   setButtonText("presetFname",myState.preset_fnames[myState.current_alg_config]);
+}
+
+void SerialManager::setButtonState_rearMic(void) {
+  setButtonText("rearGain",String(myState.rearMicGain_dB,1));
 }
 void SerialManager::setButtonState_frontRearMixer(void) {
   setButtonState("frontMic",false);
