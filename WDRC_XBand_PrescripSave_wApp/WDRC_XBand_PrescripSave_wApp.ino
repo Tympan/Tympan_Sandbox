@@ -483,8 +483,8 @@ int setRearMicDelay_samps(int samples) {
 }
 
 int configureFrontRearMixer(int val) {
+  float rearMicScaleFac = sqrtf(powf(10.0,0.1*myState.rearMicGain_dB));
   switch (val) {
-
     case State::MIC_FRONT:
       frontRearMixer[LEFT].gain(FRONT, 1.0);frontRearMixer[LEFT].gain(REAR, 0.0);
       frontRearMixer[RIGHT].gain(FRONT, 1.0);frontRearMixer[RIGHT].gain(REAR, 0.0);
@@ -492,26 +492,26 @@ int configureFrontRearMixer(int val) {
       setRearMicDelay_samps(0);
       break;
     case State::MIC_REAR:
-      frontRearMixer[LEFT].gain(FRONT, 0.0);frontRearMixer[LEFT].gain(REAR, 1.0);
-      frontRearMixer[RIGHT].gain(FRONT, 0.0);frontRearMixer[RIGHT].gain(REAR, 1.0);
+      frontRearMixer[LEFT].gain(FRONT, 0.0);frontRearMixer[LEFT].gain(REAR,rearMicScaleFac);
+      frontRearMixer[RIGHT].gain(FRONT, 0.0);frontRearMixer[RIGHT].gain(REAR,rearMicScaleFac);
       myState.input_frontrear_config = val;
       setRearMicDelay_samps(0);
       break;
     case State::MIC_BOTH_INPHASE:
-      frontRearMixer[LEFT].gain(FRONT, 0.5);frontRearMixer[LEFT].gain(REAR, 0.5);
-      frontRearMixer[RIGHT].gain(FRONT, 0.5);frontRearMixer[RIGHT].gain(REAR, 0.5);
+      frontRearMixer[LEFT].gain(FRONT, 0.5);frontRearMixer[LEFT].gain(REAR, 0.5*rearMicScaleFac);
+      frontRearMixer[RIGHT].gain(FRONT, 0.5);frontRearMixer[RIGHT].gain(REAR, 0.5*rearMicScaleFac);
       myState.input_frontrear_config = val;
       setRearMicDelay_samps(0);
       break;  
     case State::MIC_BOTH_INVERTED:
-      frontRearMixer[LEFT].gain(FRONT, 0.75);frontRearMixer[LEFT].gain(REAR, -0.75);
-      frontRearMixer[RIGHT].gain(FRONT, 0.75);frontRearMixer[RIGHT].gain(REAR, -0.75);
+      frontRearMixer[LEFT].gain(FRONT, 0.75);frontRearMixer[LEFT].gain(REAR, -0.75*rearMicScaleFac);
+      frontRearMixer[RIGHT].gain(FRONT, 0.75);frontRearMixer[RIGHT].gain(REAR, -0.75*rearMicScaleFac);
       myState.input_frontrear_config = val;
       setRearMicDelay_samps(0);
       break;  
     case State::MIC_BOTH_INVERTED_DELAYED:
-      frontRearMixer[LEFT].gain(FRONT, 0.75);frontRearMixer[LEFT].gain(REAR, -0.75);
-      frontRearMixer[RIGHT].gain(FRONT, 0.75);frontRearMixer[RIGHT].gain(REAR, -0.75);
+      frontRearMixer[LEFT].gain(FRONT, 0.75);frontRearMixer[LEFT].gain(REAR, -0.75*rearMicScaleFac);
+      frontRearMixer[RIGHT].gain(FRONT, 0.75);frontRearMixer[RIGHT].gain(REAR, -0.75*rearMicScaleFac);
       myState.input_frontrear_config = val; 
       setRearMicDelay_samps(myState.targetRearDelay_samps);
       break;              
@@ -815,9 +815,17 @@ float setInputGain_dB(float gain_dB) {
   earpieceShield.setInputGain_dB(gain_dB);  //set the AIC on the Earpiece Sheild
   return myState.inputGain_dB;
 }
-
-extern void incrementKnobGain(float increment_dB) { //"extern" to make it available to other files, such as SerialManager.h
+void incrementKnobGain(float increment_dB) { //"extern" to make it available to other files, such as SerialManager.h
   setVolKnobGain_dB(vol_knob_gain_dB + increment_dB);
+}
+
+float setRearMicGain_dB(float gain_dB) {
+  myState.rearMicGain_dB = gain_dB;
+  configureFrontRearMixer(myState.input_frontrear_config);
+  return gain_dB;
+}
+float incrementRearMicGain(float increment_dB) {
+  return setRearMicGain_dB(myState.rearMicGain_dB + increment_dB);
 }
 
 void setVolKnobGain_dB(float gain_dB) {

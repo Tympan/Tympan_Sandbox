@@ -52,6 +52,7 @@ extern void updateAFC(BTNRH_WDRC::CHA_AFC &);
 extern int configureFrontRearMixer(int);
 extern int setTargetRearDelay_samps(int);
 extern int configureLeftRightMixer(int);
+extern float incrementRearMicGain(float);
 extern bool enableAFC(bool);
 extern void printCompressorSettings(void);
 extern void reloadCurrentAlgPresetFromSD(void);
@@ -120,6 +121,7 @@ class SerialManager {
     float compKneeIncrement_dB = 2.5f;
     float compressionRatioIncrement = 0.1f;
     float limitterIncrement_dB = 1.0f;
+    float rearMicGainIncrement_dB = 0.5f;
     int N_CHAN;
     int serial_read_state; // Are we reading one character at a time, or a stream?
     char stream_data[MAX_DATASTREAM_LENGTH];
@@ -166,7 +168,8 @@ void SerialManager::printHelp(void) {
   myTympan.println(" c/C: Enable/disable printing of CPU and Memory");
   myTympan.println(" w/W/e/E: Inputs: Use PCB Mics, Mic on Jack, Line on Jack, PDM Earpieces");
   myTympan.println(" t/T: Inputs: Use Front Mic or Inverted-Delayed Mix of Mics");
-  myTympan.print  (" y/Y: Rear Delay: incr/decrease target delay by one sample (currently "); myTympan.print(myState.targetRearDelay_samps); myTympan.println(")");
+  myTympan.print  (" i/I: Rear Mic: incr/decr rear gain by "); myTympan.print(rearMicGainIncrement_dB); myTympan.println(" dB");
+  myTympan.print  (" y/Y: Rear Mic: incr/decr rear delay by one sample (currently "); myTympan.print(myState.targetRearDelay_samps); myTympan.println(")");
   myTympan.println(" l: Toggle printing of pre-gain per-channel signal levels (dBFS)");
   myTympan.println(" L: Toggle printing of pre-gain per-channel signal levels (dBSPL, per DSL 'maxdB')");
   myTympan.println(" A/a: Self-Generated Test: Amplitude sweep (1kHz/250Hz).  End-to-End Measurement.");
@@ -570,6 +573,14 @@ void SerialManager::processSingleCharacter(char c) {
       configureFrontRearMixer(State::MIC_BOTH_INVERTED_DELAYED);
       setButtonState_frontRearMixer();
       break;
+    case 'i':
+      new_val = incrementRearMicGain(rearMicGainIncrement_dB);
+      myTympan.print("Adjusting rear mic gain to "); myTympan.print(new_val); myTympan.println(" dB");
+      break;
+    case 'I':
+      new_val = incrementRearMicGain(-rearMicGainIncrement_dB);
+      myTympan.print("Adjusting rear mic gain to "); myTympan.print(new_val); myTympan.println(" dB");
+      break;
     case 'y':
       { 
         int new_val = myState.targetRearDelay_samps+1;      
@@ -756,23 +767,7 @@ void SerialManager::printTympanRemoteLayout(void) {
           "{'name':'Feedback Cancellation','buttons':[{'label': 'On', 'cmd': 'p', 'id': 'afc_on'},{'label': 'Off', 'cmd': 'P', 'id': 'afc_off'}]}"
           //"{'name':'Overwrite Current Preset','buttons':[{'label': 'Save', 'cmd': '[', 'id': 'savePreset'},{'label': 'Restore', 'cmd': '{', 'id': 'restorePreset'}]}"
       "]},"   //include comma if NOT the last one
-//      "{'title':'Tuner','cards':["
-//          "{'name':'Overall Volume', 'buttons':[{'label': '-', 'cmd' :'K'},{'label': '+', 'cmd': 'k'}]},"
-//          "{'name':'High Gain (dB)', 'buttons':[{'label': '-', 'cmd': '#','width':'4'},{'id':'highGain', 'label': '', 'width':'4'},{'label': '+', 'cmd': '3','width':'4'}]},"
-//          "{'name':'Mid Gain (dB)', 'buttons':[{'label': '-', 'cmd': '@','width':'4'},{'id':'midGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '2','width':'4'}]},"
-//          "{'name':'Low Gain (dB)', 'buttons':[{'label': '-', 'cmd': '!','width':'4'},{'id':'lowGain', 'label':'', 'width':'4'},{'label': '+', 'cmd': '1','width':'4'}]}"                          
-//      "]}," //include comma if NOT the last one
-//      "{'title':'Tuner','cards':["
-//          "{'name':'Overall Volume', 'buttons':[{'label': 'Less', 'cmd' :'K'},{'label': 'More', 'cmd': 'k'}]},"
-//          "{'name':'Linear Gain Per Band (dB)', 'buttons':["
-//                      "{'label':'LOW','width':'3'},{'label': '-', 'cmd': '!','width':'3'},{'id':'gain1', 'label': '', 'width':'3'},{'label': '+', 'cmd': '1','width':'3'},"
-//                      "{'label':'Band2','width':'3'},{'label': '-', 'cmd': '@','width':'3'},{'id':'gain2', 'label': '', 'width':'3'},{'label': '+', 'cmd': '2','width':'3'},"
-//                      "{'label':'Band3','width':'3'},{'label': '-', 'cmd': '#','width':'3'},{'id':'gain3', 'label': '', 'width':'3'},{'label': '+', 'cmd': '3','width':'3'},"
-//                      "{'label':'Band4','width':'3'},{'label': '-', 'cmd': '$','width':'3'},{'id':'gain4', 'label': '', 'width':'3'},{'label': '+', 'cmd': '4','width':'3'},"
-//                      "{'label':'Band5','width':'3'},{'label': '-', 'cmd': '%','width':'3'},{'id':'gain5', 'label': '', 'width':'3'},{'label': '+', 'cmd': '5','width':'3'},"
-//                      "{'label':'HIGH','width':'3'},{'label': '-', 'cmd': '^','width':'3'},{'id':'gain6', 'label': '', 'width':'3'},{'label': '+', 'cmd': '6','width':'3'}"  // //no comma if the last one, which this one is in tis button group
-//                  "]}"        //no comma if the last one, which this one is for this card group
-//      "]}," //include comma if NOT the last one  
+
       "{'title':'WDRC Tuner','cards':["
           //"{'name':'Overall Volume',   'buttons':[{'label': 'Less',     'cmd' :'K'},{'label': 'More', 'cmd': 'k'}]},"
           "{'name':'Parameter to Change','buttons':[{'id':'modeGain','label':'Linear Gain (dB)','cmd':'_|0g','width':'12'},"
@@ -781,7 +776,6 @@ void SerialManager::printTympanRemoteLayout(void) {
                                                    "{'id':'modeLim','label':'Limitter (dB SPL)','cmd':'_|0b','width':'12'}"
                                                    "]},"
           "{'name':'', 'buttons':["
-                      //"{'id':'tunerMode','label':'-','width':'12'},"
                       "{'label':'LOW','width':'3'},{'label': '-', 'cmd': '__1-','width':'3'},{'id':'tune1', 'label': '', 'width':'3'},{'label': '+', 'cmd': '__1+','width':'3'},"
                       "{'label':'Band2','width':'3'},{'label': '-', 'cmd': '__2-','width':'3'},{'id':'tune2', 'label': '', 'width':'3'},{'label': '+', 'cmd': '__2+','width':'3'},"
                       "{'label':'Band3','width':'3'},{'label': '-', 'cmd': '__3-','width':'3'},{'id':'tune3', 'label': '', 'width':'3'},{'label': '+', 'cmd': '__3+','width':'3'},"
@@ -798,6 +792,9 @@ void SerialManager::printTympanRemoteLayout(void) {
           "{'name':'Front or Rear Mics', 'buttons':["
                      "{'label':'Front','id':'frontMic','cmd':'t','width':'6'},{'label':'Front-Rear','id':'frontRearMix','cmd':'T','width':'6'}" 
            "]},"  //include trailing comma if NOT the last one
+           "{'name':'Rear Mic Gain (dB)', 'buttons':["
+                    "{'label':'-','cmd':'I','width':'4'},{'label':'','id':'rearGain','width':'4'},{'label':'+','cmd':'I','width':'4'}" 
+           "]},"
            "{'name':'Rear Mic Delay (samples)', 'buttons':["
                      "{'label':'-','cmd':'Y','width':'4'},{'label':'','id':'delaySamps','width':'4'},{'label':'+','cmd':'y','width':'4'}" 
            "]}"  //exclude trailing comma if it IS the last one
@@ -812,19 +809,9 @@ void SerialManager::printTympanRemoteLayout(void) {
 //                                            "]}" //don't have a trailing comma on this last one
 //     "]}," //include comma if NOT the last one
       "{'title':'Globals','cards':["
-//          "{'name':'Input Source', 'buttons':["
-//                                               "{'label':'Digital: Earpieces', 'cmd': 'E', 'id':'configPDMMic', 'width':'12'},"
-//                                               "{'label':'Analog: PCB Mics',  'cmd': 'w', 'id':'configPCBMic',  'width':'12'},"
-//                                               "{'label':'Analog: Mic Jack (Mic)',  'cmd': 'W', 'id':'configMicJack', 'width':'12'},"
-//                                               "{'label':'Analog: Mic Jack (Line)',  'cmd': 'e', 'id':'configLineJack', 'width':'12'}" //add a comma if you also add the line below
-//                                             "]}," //include trailing comma because there are more button groups below
           "{'name':'CPU Usage (%)', 'buttons':[{'label': 'Start', 'cmd' :'c','id':'cpuStart','width':'4'},{'id':'cpuValue', 'label': '', 'width':'4'},{'label': 'Stop', 'cmd': 'C','width':'4'}]},"  //add comma if you add any lines below before this line's closing quote
           "{'name':'Record Mics to SD Card','buttons':[{'label': 'Start', 'cmd': '`', 'id':'recordStart','width':'6'},{'label': 'Stop', 'cmd': '~','width':'6'},"
                                                     "{'label': '', 'id':'sdFname','width':'12'}]}"
-          //"{'name':'Overwrite Current Algorithm Preset on SD','buttons':[{'label': 'Save', 'cmd': '[', 'id': 'savePreset'},{'label': 'Reload', 'cmd': '>', 'id': 'reloadPreset'},{'label': 'Factory', 'cmd': '{', 'id': 'restorePreset'},"
-          //                                          "{'label': '', 'id':'presetFname','width':'12'}]}"
-          //"{'name':'Record Mics to SD Card','buttons':[{'label': 'Start', 'cmd': 'r', 'id':'recordStart'},{'label': 'Stop', 'cmd': 's'}]},"
-          //"{'name':'Send Data to Plot', 'buttons':[{'label': 'Start', 'cmd' :']','id':'plotStart'},{'label': 'Stop', 'cmd': '}'}]}"
          "]}" //no comma if last one
     "],"
     "'prescription':{'type':'BoysTown','pages':['serialMonitor','multiband','broadband','afc','plot']}"
@@ -1088,6 +1075,7 @@ void SerialManager::printCPUtoGUI(unsigned long curTime_millis = 0, unsigned lon
 void SerialManager::setFullGUIState(void) {
   setButtonState_algPresets();
   setButtonState_afc();
+  setButtonText("rearGain",String(myState.rearMicGain_dB,1));
   setButtonState_frontRearMixer();
   setButtonState_inputMixer();
   setInputConfigButtons();
