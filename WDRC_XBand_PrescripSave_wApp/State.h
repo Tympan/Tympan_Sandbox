@@ -39,7 +39,7 @@ class State {
     int input_frontrear_config = MIC_FRONT;
     int targetRearDelay_samps = 1;  //in samples
     int currentRearDelay_samps = 0; //in samples
-    int rearMicGain_dB = 0.0;
+    float rearMicGain_dB = 0.0;
 
     //set input streo/mono configuration
     enum INPUTMIX {INPUTMIX_STEREO, INPUTMIX_MONO, INPUTMIX_MUTE, INPUTMIX_BOTHLEFT, INPUTMIX_BOTHRIGHT};
