@@ -168,7 +168,7 @@ void SerialManager::printHelp(void) {
   myTympan.println(" g: Print the gain settings of the device.");
   myTympan.println(" c/C: Enable/disable printing of CPU and Memory");
   myTympan.println(" w/W/e/E: Inputs: Use PCB Mics, Mic on Jack, Line on Jack, PDM Earpieces");
-  myTympan.println(" t/T: Inputs: Use Front Mic or Inverted-Delayed Mix of Mics");
+  myTympan.println(" t/T/H: Inputs: Use Front Mic, Inverted-Delayed Mix of Mics, or Rear Mic");
   myTympan.print  (" i/I: Rear Mic: incr/decr rear gain by "); myTympan.print(rearMicGainIncrement_dB); myTympan.println(" dB");
   myTympan.print  (" y/Y: Rear Mic: incr/decr rear delay by one sample (currently "); myTympan.print(myState.targetRearDelay_samps); myTympan.println(")");
   myTympan.println(" l: Toggle printing of pre-gain per-channel signal levels (dBFS)");
@@ -574,6 +574,11 @@ void SerialManager::processSingleCharacter(char c) {
       configureFrontRearMixer(State::MIC_BOTH_INVERTED_DELAYED);
       setButtonState_frontRearMixer();
       break;
+     case 'H':
+      myTympan.println("Received: Rear Mics (if using earpieces)"); 
+      configureFrontRearMixer(State::MIC_REAR);
+      setButtonState_frontRearMixer();
+      break;
     case 'i':
       new_val = incrementRearMicGain(rearMicGainIncrement_dB);
       myTympan.print("Adjusting rear mic gain to "); myTympan.print(new_val); myTympan.println(" dB");
@@ -793,10 +798,10 @@ void SerialManager::printTympanRemoteLayout(void) {
       "{'title':'Digital Earpieces','cards':["
           "{'name':'Select Earpiece','buttons':[{'label': 'Left','cmd': 's','id':'inp_micL','width':'6'},{'label': 'Right','cmd': 'S','id':'inp_micR','width':'6'},{'label': 'Mix L+R','cmd': 'B','id':'inp_mono','width':'6'},{'label': 'Mute','cmd': 'q','id':'inp_mute','width':'6'}]},"          
           "{'name':'Front or Rear Mics', 'buttons':["
-                     "{'label':'Front','id':'frontMic','cmd':'t','width':'6'},{'label':'Front-Rear','id':'frontRearMix','cmd':'T','width':'6'}" 
+                     "{'label':'Front','id':'frontMic','cmd':'t','width':'4'},{'label':'Mix(F-R)','id':'frontRearMix','cmd':'T','width':'4'},{'label':'Rear','id':'rearMic','cmd':'H','width':'4'}" 
            "]},"  //include trailing comma if NOT the last one
            "{'name':'Rear Mic Gain (dB)', 'buttons':["
-                    "{'label':'-','cmd':'I','width':'4'},{'label':'','id':'rearGain','width':'4'},{'label':'+','cmd':'I','width':'4'}" 
+                    "{'label':'-','cmd':'I','width':'4'},{'label':'','id':'rearGain','width':'4'},{'label':'+','cmd':'i','width':'4'}" 
            "]},"
            "{'name':'Rear Mic Delay (samples)', 'buttons':["
                      "{'label':'-','cmd':'Y','width':'4'},{'label':'','id':'delaySamps','width':'4'},{'label':'+','cmd':'y','width':'4'}" 
@@ -1125,12 +1130,17 @@ void SerialManager::setButtonState_rearMic(void) {
 void SerialManager::setButtonState_frontRearMixer(void) {
   setButtonState("frontMic",false);
   setButtonState("frontRearMix",false);
+  setButtonState("rearMic",false);
+
   switch (myState.input_frontrear_config) {
     case State::MIC_FRONT:
       setButtonState("frontMic",true);
       break;
     case State::MIC_BOTH_INVERTED_DELAYED:
       setButtonState("frontRearMix",true);
+      break;
+    case State::MIC_REAR:
+      setButtonState("rearMic",true);
       break;    
   }
   Serial.print("setButtonState_frontRearMixer: setting delaySamps field to ");

@@ -1,5 +1,5 @@
 /*
-  WDRC_6Band_wApp
+  WDRC_XBand_PrescripSave_wApp
 
   Created: Chip Audette (OpenAudio), 2020
     Primarly built upon CHAPRO "Generic Hearing Aid" from
