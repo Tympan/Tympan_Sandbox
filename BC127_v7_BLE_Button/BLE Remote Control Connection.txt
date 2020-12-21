@@ -1,0 +1,254 @@
+
+%Melody V5...ALWAYS use carriage returns, not newlines!
+
+%turn on advertising?
+%ADVERTISING ON
+
+% put into central mode
+SET BLE_ROLE=2
+
+% scan for BLE connections for 20 seconds
+%SCAN 20
+
+% Inquire about connections
+INQUIRY 15
+
+% Hold down the pairing button on the remote.  A reply looks like 
+% >INQUIRY {BT ADDRESS} {DEVICE CLASS} {RSSI}
+INQUIRY DC2C26C4D757 002540 -46db
+
+% open a connection
+% >OPEN {BD ADDRESS} {PROFILE}
+% Establishes a connection with a given Bluetooth address 
+% (formatted as 12 Hexadecimal digits with no separators. 
+% e.g.: 3859F9CCB893) and a certain profile. profile can
+% be: SPP, A2DP, AVRCP, MAP6, HFP, PBAP7
+%If profile is left blank, SPP will be assumed
+OPEN DC2C26C4D757 AVRCP
+
+% RESPONSE
+
+PAIR_PENDING
+PAIR_OK DC2C26C4D757
+OPEN_ERROR AVRCP
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>> Melody 7
+
+>>Send
+ADVERTISING ON
+>>Receive
+OK
+
+>>Send
+BT_STATE ON ON
+>>Receive
+OK
+
+>>Send
+STATUS
+>>Recieve
+STATE CONNECTED[0] CONNECTABLE[ON] DISCOVERABLE[ON] BLE[ADVERTISING]
+ 
+
+>> Send
+INQUIRY
+>> Receive: 
+PENDING                                                              
+INQU_OK
+ 
+>> Send
+SCAN
+>> recieve
+SCAN C19A69CBABA7 1 <Tunai Button> 06 -75dBm                               
+SCAN C19A69CBABA7 1 <UNKNOWN> 00 -75dBm                                    
+SCAN_OK
+ 
+
+>> Send
+OPEN C19B69CBABA7 BLE 1
+>> Response
+PENDING                                             
+OPEN_OK 14 BLE C19A69CBABA7                                        
+PAIR_PENDING                                                                
+BLE_PAIR_OK C19A69CBABA7
+
+>> Send
+STATUS
+>> Receive
+STATE CONNECTED[0] CONNECTABLE[ON] DISCOVERABLE[ON] BLE[CONNECTED]          
+LINK 14 CONNECTED BLE C19A69CBABA7 23                                       
+OK
+
+>> Send
+BLE_GET_SERV 14
+>> Receive
+PENDING                                                                       
+BLE_SERV 14 U16 1800 0001 0009                                          
+BLE_SERV 14 U16 1801 000A 000A
+BLE_SERV 14 U16 180A 000B 0017
+BLE_SERV 14 U16 1812 0018 002B
+BLE_SERV 14 U128 7ADC8267-3650-4314-B830-C471763E0613 002C 0034
+BLE_SERV 14 U16 FE59 0035 FFFF
+OK
+
+>> Send (get all the characteristics)
+BLE_GET_CHAR 14
+>> Receive
+PENDING
+BLE_CHAR 14 U16 2A00 0003 0A
+BLE_CHAR 14 U16 2A01 0005 02
+BLE_CHAR 14 U16 2A04 0007 02
+BLE_CHAR 14 U16 2AA6 0009 02
+BLE_CHAR 14 U16 2A29 000D 02
+BLE_CHAR 14 U16 2A24 000F 02
+BLE_CHAR 14 U16 2A25 0011 02
+BLE_CHAR 14 U16 2A27 0013 02
+BLE_CHAR 14 U16 2A26 0015 02
+BLE_CHAR 14 U16 2A50 0017 02
+BLE_CHAR 14 U16 2A4E 001A 06
+BLE_CHAR 14 U16 2A4D 001C 1A
+BLE_CHAR 14 U16 2A4D 0020 1A
+BLE_CHAR 14 U16 2A4D 0024 0E
+BLE_CHAR 14 U16 2A4B 0027 02
+BLE_CHAR 14 U16 2A4A 0029 02
+BLE_CHAR 14 U16 2A4C 002B 04
+BLE_CHAR 14 U128 2B61E753-4F91-4361-B098-7AD607554822 002E 12
+BLE_CHAR 14 U128 2B61E754-4F91-4361-B098-7AD607554822 0031 2A
+BLE_CHAR 14 U128 2B61E755-4F91-4361-B098-7AD607554822 0034 02
+BLE_CHAR 14 U128 8EC90003-F315-4F60-9FB8-838830DAEA50 0037 28                
+OK
+   
+>> Send
+GET BLE_CONFIG
+>> Receive
+STATE CONNECTED[0] CONNECTABLE[ON] DISCOVERABLE[ON] BLE[ADVERTISING]        
+LINK 14 CONNECTED BLE C19B69CBABA7 23
+OK
+   
+>>>>>>>>>>>>>>>>>>>>.
+From here: https://devzone.nordicsemi.com/nordic/short-range-guides/b/bluetooth-low-energy/posts/ble-services-a-beginners-tutorial
+The Generic Access service. Service UUID 0x1800.  "generic_access"
+
+ Three mandatory characteristics:
+
+Characteristic: Device name. UUID 0x2A00.
+Characteristic: Appearance. UUID 0x2A01.
+Characteristic: Peripheral Preferred Connection Parameters. UUID 0x2A04.
+
+The Generic Attribute service. UUID 0x1801. One optional characteristic:
+
+Characteristic: Service Changed. UUID 0x2A05.
+
+
+From here: https://inductive-kickback.com/projects/bluetooth-low-energy/bluetooth-smartble-crash-course/
+The Generic Attribute service.  Service UUID 0x180A.  "Device Information"
+
+
+Tons of service codes here: https://developer.nordicsemi.com/nRF51_SDK/nRF51_SDK_v4.x.x/doc/html/group___u_u_i_d___s_e_r_v_i_c_e_s.html#gab8eac87431b53cdfaeccd6d3a15ed5ac
+
+Tons of service codes here: https://developer.nordicsemi.com/nRF51_SDK/nRF51_SDK_v4.x.x/doc/html/group___u_u_i_d___c_h_a_r_a_c_t_e_r_i_s_t_i_c_s.html
+
+Full UUID here: https://btprodspecificationrefs.blob.core.windows.net/assigned-values/16-bit%20UUID%20Numbers%20Document.pdf
+
+>>>>>>>>>>
+Hey our first service is 0x1800 and we indeed do have characteristic 0x2A00, 2A01, and 2A04.
+And, we do have a 0x1801 but we do not have 2A05
+>>>
+
+>> Send
+OPEN C19B69CBABA7 BLE 1
+>> Response
+PENDING                                             
+OPEN_OK 14 BLE C19A69CBABA7                                        
+
+
+>> Send (to get characteristic handle 0x0003)
+BLE_READ 14 0003
+>> Receive
+PENDING                                                                      
+BLE_READ_RES 14 0003 C 54756E616920427574746F6E   (says "Tunai Button")
+OK
+
+
+>> Send (to get characteristic handle 0x0005)
+BLE_READ 14 0005
+>> Receive
+BLE_READ_RES 14 0005 2 C103
+
+>> Send(to get characteristic handle 0x0007)
+BLE READ 14 0007
+>> Receive
+BLE_READ_RES 14 0007 8 180050000100C800  (says nothing)
+
+>>>>> Read a bunch more
+
+BLE_READ_RES 14 0009 1 01
+
+BLE_READ_RES 14 000D E 54756E6169204372656174697665  (Says "Tunai Creative")
+
+BLE_READ_RES 14 000F B 4E6F726D616C204D6F6465   (Says "Normal Mode")
+ 
+BLE_READ_RES 14 0011 C 633139613639636261626137  (Says "c19a69cbaba7")
+                                                                     
+BLE_READ_RES 14 0013 3 312E32  (Says "1.2")
+                                                                       
+BLE_READ_RES 14 0015 3 312E39   (Says "1.9")
+                                                                                                                          
+BLE_READ_RES 14 0017 7 021519EEEE0100  (Says nothing)
+                                          
+BLE_READ_RES 14 001A 1 01
+
+BLE_READ_RES 14 001C 0 
+                                                                      
+BLE_READ_RES 14 0020 0 
+                                                                                                                              
+BLE_READ_RES 14 0024 0 
+                                                                     
+BLE_READ_RES 14 0027 16 050C0901A1018502150025017501950109CD81020A83  (Says nothing)
+                                                                        
+BLE_READ_RES 14 0029 4 01010003  (Says nothing)
+                                                                        
+BLE_READ_RES 14 002E 14 0000000000000000000000000000000000000000
+                                                                        
+BLE_READ_RES 14 0031 14 0000000000000000000000000000000000000000
+                                                                        
+BLE_READ_RES 14 0034 14 75F9E6AD0BDC0000000000000000000000000000  (Says nothing)
+                                                                        
+BLE_READ_RES 14 0037 0 
+
+
+>>>>>>>>>>>>>>>
+
+Subscribe to notifications
+
+>> Send (set handle 001D with two bytes.  Set to be 0101)
+BLE_WRITE 14 001D 2  (sent as ascii + CR)
+1 1  (sent as numbers)
+
+>> reply OK
+
+
+>> Send (set handle 0x0021 with two bytes.  Set to be 0101)
+BLE_WRITE 14 0021 2  (sent as ascii + CR)
+1 1  (sent as numbers)
+
+>> reply OK
+
+>>>>> Then pressing buttons, I get:
+
+BLE_NOTIFICATION 14 0020 2 1000		//top pressed
+BLE_NOTIFICATION 14 0020 2 0000		//nothing pressed
+BLE_NOTIFICATION 14 0020 2 0400		//right pressued
+BLE_NOTIFICATION 14 0020 2 0000		//nothing pressed
+BLE_NOTIFICATION 14 0020 2 2000		//bottom pressed
+BLE_NOTIFICATION 14 0020 2 0000		//nothing pressed
+BLE_NOTIFICATION 14 0020 2 0800		//left pressed
+BLE_NOTIFICATION 14 0020 2 0000		//nothing pressed
+
+BLE_NOTIFICATION 14 0020 2 0004		//Call button pressed
+BLE_NOTIFICATION 14 0020 2 0000		//nothing pressed
+BLE_NOTIFICATION 14 0020 2 0100    // play/pause pressed
+BLE_NOTIFICATION 14 0020 2 0000    //nothing pressed
+
+
+
