@@ -90,7 +90,7 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
   for (int Iear = 0; Iear < N_EARPIECES; Iear++) { //loop over channels
     for (int Iband = 0; Iband < N_CHAN_MAX; Iband++) {
       if (Iear == LEFT) {
-        #if 1  //set to zero to discable the adaptive feedback cancelation
+        #if 1  //set to zero to disable the adaptive feedback cancelation
           patchCord[count++] = new AudioConnection_F32(feedbackCancel, 0, bpFilt[Iear][Iband], 0); //connect to Feedback canceler //perhaps 
         #else
           patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, bpFilt[Iear][Iband], 0); //input is coming from the audio test generator
@@ -126,13 +126,14 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
   #endif
 
   //send the audio out
-  patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, i2s_out, OUTPUT_LEFT_EARPIECE); 
-  patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, i2s_out, OUTPUT_LEFT_TYMPAN); 
+  patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, i2s_out, OUTPUT_LEFT_EARPIECE); //send to left earpiece
+  patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, i2s_out, OUTPUT_LEFT_TYMPAN);   //send same audio to left of Tympan's headphone jack
+  
   if (RUN_STEREO) {
-    patchCord[count++] = new AudioConnection_F32(compBroadband[RIGHT], 0, i2s_out, OUTPUT_RIGHT_EARPIECE); 
-    patchCord[count++] = new AudioConnection_F32(compBroadband[RIGHT], 0, i2s_out, OUTPUT_RIGHT_TYMPAN); 
+    patchCord[count++] = new AudioConnection_F32(compBroadband[RIGHT], 0, i2s_out, OUTPUT_RIGHT_EARPIECE); //send to right earpiece
+    patchCord[count++] = new AudioConnection_F32(compBroadband[RIGHT], 0, i2s_out, OUTPUT_RIGHT_TYMPAN);   //send same audio to right of Tympan's headphone jack
   } else {
-    //copy mono audio to other channel to present in both ears
+    //copy mono audio to other channel to present in both ears   
     patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, i2s_out, OUTPUT_RIGHT_EARPIECE); 
     patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, i2s_out, OUTPUT_RIGHT_TYMPAN); 
   }
@@ -140,9 +141,9 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
   //make the last connections for the audio test measurements and SD writer
   patchCord[count++] = new AudioConnection_F32(audioTestGenerator, 0, audioTestMeasurement, 0);
   patchCord[count++] = new AudioConnection_F32(compBroadband[LEFT], 0, audioTestMeasurement, 1);
-  patchCord[count++] = new AudioConnection_F32(leftRightMixer[LEFT], 0, audioSDWriter, 0);
+  patchCord[count++] = new AudioConnection_F32(leftRightMixer[LEFT], 0, audioSDWriter, 0); 
   patchCord[count++] = new AudioConnection_F32(i2s_out, OUTPUT_LEFT_EARPIECE, audioSDWriter, 1);
-  
+    
 
   return count;
 }

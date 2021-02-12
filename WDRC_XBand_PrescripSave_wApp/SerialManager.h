@@ -807,15 +807,15 @@ void SerialManager::printTympanRemoteLayout(void) {
                      "{'label':'-','cmd':'Y','width':'4'},{'label':'','id':'delaySamps','width':'4'},{'label':'+','cmd':'y','width':'4'}" 
            "]}"  //exclude trailing comma if it IS the last one
       "]}," //include comma if NOT the last one      
-//      "{'title':'Input Select','cards':["
-//          "{'name':'Audio Source', 'buttons':["
-//                                             "{'label':'Digital: Earpieces', 'cmd': 'E', 'id':'configPDMMic', 'width':'12'},"
-//                                             "{'label':'Analog: PCB Mics',  'cmd': 'w', 'id':'configPCBMic',  'width':'12'},"
-//                                             "{'label':'Analog: Mic Jack (Mic)',  'cmd': 'W', 'id':'configMicJack', 'width':'12'},"
-//                                             "{'label':'Analog: Mic Jack (Line)',  'cmd': 'e', 'id':'configLineJack', 'width':'12'}" //add a comma if you also add the line below
-//                                             //"{'label':'Analog: BT Audio', 'cmd': 'E', 'id':'configLineSE',  'width':'12'}" //don't have a trailing comma on this last one
-//                                            "]}" //don't have a trailing comma on this last one
-//     "]}," //include comma if NOT the last one
+      "{'title':'Input Select','cards':["
+          "{'name':'Audio Source', 'buttons':["
+                                             "{'label':'Digital: Earpieces', 'cmd': 'E', 'id':'configPDMMic', 'width':'12'},"
+                                             "{'label':'Analog: PCB Mics',  'cmd': 'w', 'id':'configPCBMic',  'width':'12'},"
+                                             "{'label':'Analog: Mic Jack (Mic)',  'cmd': 'W', 'id':'configMicJack', 'width':'12'},"
+                                             "{'label':'Analog: Mic Jack (Line)',  'cmd': 'e', 'id':'configLineJack', 'width':'12'}" //add a comma if you also add the line below
+                                             //"{'label':'Analog: BT Audio', 'cmd': 'E', 'id':'configLineSE',  'width':'12'}" //don't have a trailing comma on this last one
+                                            "]}" //don't have a trailing comma on this last one
+     "]}," //include comma if NOT the last one
       "{'title':'Globals','cards':["
           "{'name':'CPU Usage (%)', 'buttons':[{'label': 'Start', 'cmd' :'c','id':'cpuStart','width':'4'},{'id':'cpuValue', 'label': '', 'width':'4'},{'label': 'Stop', 'cmd': 'C','width':'4'}]},"  //add comma if you add any lines below before this line's closing quote
           "{'name':'Record Mics to SD Card','buttons':[{'label': 'Start', 'cmd': '`', 'id':'recordStart','width':'6'},{'label': 'Stop', 'cmd': '~','width':'6'},"
@@ -1143,8 +1143,8 @@ void SerialManager::setButtonState_frontRearMixer(void) {
       setButtonState("rearMic",true);
       break;    
   }
-  Serial.print("setButtonState_frontRearMixer: setting delaySamps field to ");
-  Serial.println(String(myState.currentRearDelay_samps));
+  //Serial.print("setButtonState_frontRearMixer: setting delaySamps field to ");
+  //Serial.println(String(myState.currentRearDelay_samps));
   setButtonText("delaySamps",String(myState.currentRearDelay_samps));
 }
 void SerialManager::setButtonState_inputMixer(void) {

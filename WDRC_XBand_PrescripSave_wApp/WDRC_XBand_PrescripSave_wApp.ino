@@ -92,7 +92,7 @@ void setupTympanHardware(void) {
   earpieceShield.enable();
 
   //enable the Tympman to detect whether something was plugged inot the pink mic jack
-  myTympan.enableMicDetect(true);
+  //myTympan.enableMicDetect(true);
 
   //setup DC-blocking highpass filter running in the ADC hardware itself
   float cutoff_Hz = 40.0;  //set the default cutoff frequency for the highpass filter
@@ -100,13 +100,13 @@ void setupTympanHardware(void) {
   earpieceShield.setHPFonADC(true, cutoff_Hz, audio_settings.sample_rate_Hz); //set to false to disable
 
   //Choose the default input
-  if (1) {
+  if (1) { //this should be the default
     setAnalogInputSource(State::INPUT_PCBMICS);  //Choose the desired audio analog input on the Typman...this will be overridden by the serviceMicDetect() in loop()
     setInputAnalogVsPDM(State::INPUT_PDM); // ****but*** then activate the PDM mics
     Serial.println("setupTympanHardware: PDM Earpiece is the active input.");
   } else {
-    //setAnalogInputSource(State::INPUT_PCBMICS);  //Choose the desired audio analog input on the Typman...this will be overridden by the serviceMicDetect() in loop()
-    setAnalogInputSource(State::INPUT_MICJACK_MIC);  //Choose the desired audio analog input on the Typman...this will be overridden by the serviceMicDetect() in loop()
+    setAnalogInputSource(State::INPUT_PCBMICS);  //Choose the desired audio analog input on the Typman...this will be overridden by the serviceMicDetect() in loop()
+    //setAnalogInputSource(State::INPUT_MICJACK_MIC);  //Choose the desired audio analog input on the Typman...this will be overridden by the serviceMicDetect() in loop()
     Serial.println("setupTympanHardware: analog input is the active input.");
   }
   
@@ -213,15 +213,19 @@ void setupAudioProcessing(void) {
   configureFrontRearMixer(myState.input_frontrear_config); //set using the default
   configureLeftRightMixer(State::INPUTMIX_MUTE); //set left mixer to only listen to left, set right mixer to only listen to right
 
-  
   //set the DC-blocking higpass filter cutoff...this is the filter done here in software, not the one done in the AIC DSP hardware
   preFilter.setHighpass(0, 80.0);  preFilterR.setHighpass(0, 80.0); 
 
   //setup default processing simply to avoid audio processing errors while we read from the SD card in the next step
   setAlgorithmPreset(myState.current_alg_config); //sets the Per Band, the Broad Band, and the AFC parameters using a preset
 
+#if 0 //set to zero for debugging purposes only ...NEED TO FIX SD STUFF TO ENABLE THIS CALL TO WORK!!!!!!!!
+  
   //load various algorithm settings
   myState.defineAlgorithmPresets(true); //"true" loads from SD and back-fills with hardwired values if SD doesn't work.
+
+#endif
+  
   setAlgorithmPreset(myState.current_alg_config); //sets the Per Band, the Broad Band, and the AFC parameters using a preset
   
 }
@@ -266,9 +270,10 @@ void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_
   
   // Loop over each ear
   Serial.println("setupFromDSL: deploying SOS filter coefficients to the filter objects...");
-  for (int Iear = 0; Iear <= N_EARPIECES; Iear++) {
+  for (int Iear = 0; Iear < N_EARPIECES; Iear++) {
     //give the pre-computed coefficients to the IIR filters
     for (int Iband = 0; Iband < n_chan_max; Iband++) {
+      //Serial.print("    : SOS ear, band: "); Serial.print(Iear); Serial.print(", "); Serial.println(Iband);
       if (Iband < n_chan) {
         bpFilt[Iear][Iband].setFilterCoeff_Matlab_sos(&(filter_sos[Iband][0]), N_BIQUAD_PER_FILT);  //sets multiple biquads.  Also calls begin().
       } else {
@@ -297,7 +302,7 @@ void setupFromDSL(BTNRH_WDRC::CHA_DSL &this_dsl, float gha_tk, const int n_chan_
   myState.wdrc_perBand = this_dsl;  //shallow copy the contents of this_dsl into wdrc_perBand
   //myState.printPerBandSettings();  //debugging!
 
-  //active the correct earpiece
+  //activate the correct earpiece
   if (this_dsl.ear == 1) {
     configureLeftRightMixer(State::INPUTMIX_BOTHRIGHT); //listen to the right mic(s)
   } else {
@@ -630,18 +635,19 @@ void loop() {
 
   //service the potentiometer...if enough time has passed
   if (USE_VOLUME_KNOB) servicePotentiometer(millis(),100); //service the pot every 100 msec
-
+  
   //service the SD recording
   serviceSD();
-
-  //service the LEDs
-  serviceLEDs();   //Remember that the LEDs on the Tympan board are not visible with CCP shield in-place.
 
   //check the mic_detect signal
   serviceMicDetect(millis(), 500);  //service the MicDetect every 500 msec
 
+  //service the LEDs
+  serviceLEDs();   //Remember that the LEDs on the Tympan board are not visible with CCP shield in-place.
+
   //update the memory and CPU usage...if enough time has passed
-  if (myState.flag_printCPUandMemory) myState.printCPUandMemory(millis(),3000); //print CPU and mem every 3000 msec
+  //if (myState.flag_printCPUandMemory) myState.printCPUandMemory(millis(),3000); //print CPU and mem every 3000 msec
+  if (myState.flag_printCPUandMemory) printCPUandMemory(millis(),3000);
   if (myState.flag_printCPUtoGUI) serialManager.printCPUtoGUI(millis(),3000);
 
   //print info about the signal processing
@@ -651,7 +657,6 @@ void loop() {
   //print plottable data
   //if (myState.flag_printPlottableData) printPlottableData(millis(), 250);  //print values every 250msec
   if (myState.flag_printPlottableData) printPlottableData(millis(), 1000);  //print values every 250msec
-
 
 } //end loop()
 
@@ -754,6 +759,47 @@ void serviceSD(void) {
     i2s_in.clear_isOutOfMemory();
   }
 }
+
+void printCPUandMemory(unsigned long curTime_millis,unsigned long updatePeriod_millis) {
+
+  //static unsigned long updatePeriod_millis = 100; //how many milliseconds between updating the potentiometer reading?
+  static unsigned long lastUpdate_millis = 0;
+
+  //has enough time passed to update everything?
+  if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0; //handle wrap-around of the clock
+  if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
+    myState.printCPUandMemory(millis(),3000); //print CPU and mem every 3000 msec
+
+
+//    int n = AudioStream::cpu_cycles_total;
+//    Serial.print("Cycles, Block = "); Serial.print(audio_settings.audio_block_samples); Serial.print(", fs (Hz) = "); Serial.println(audio_settings.sample_rate_Hz);
+//    Serial.print("  : total = "); n=AudioStream::cpu_cycles_total;Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//    Serial.print("  : i2s_in_quad = "); n=i2s_in.cpu_cycles; Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//    Serial.print("  : rearMicDelay = "); n=rearMicDelay.cpu_cycles;Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//    Serial.print("  : frontRearMixer[0] = "); n=frontRearMixer[0].cpu_cycles;Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//    Serial.print("  : analogVsDigitalSwitch[0] = "); n=analogVsDigitalSwitch[0].cpu_cycles;Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//    Serial.print("  : leftRightMixer[0] = "); n=leftRightMixer[0].cpu_cycles; Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//   
+//    Serial.print("  : preFilter = "); n=preFilter.cpu_cycles; Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//    Serial.print("  : audioTestGenerator = "); n=audioTestGenerator.cpu_cycles;Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//    Serial.print("  : feedbackCancel = "); n=feedbackCancel.cpu_cycles;Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//    for (int i=0; i<4; i++) {
+//      Serial.print("  : bpFilt[0]["); Serial.print(i);Serial.print("] ="); n=bpFilt[0][i].cpu_cycles;Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//      Serial.print("  : postFiltDelay[0]["); Serial.print(i);Serial.print("] ="); n=postFiltDelay[0][i].cpu_cycles;Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//      Serial.print("  : expCompLim[0]["); Serial.print(i);Serial.print("] ="); n=expCompLim[0][i].cpu_cycles;Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//    }
+//    Serial.print("  : mixerFilterBank[0] = "); n=mixerFilterBank[0].cpu_cycles;Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//    Serial.print("  : compBroadband[0] = "); n=compBroadband[0].cpu_cycles; Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//    Serial.print("  : feedbackLoopBack = "); n=feedbackLoopBack.cpu_cycles;Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//    Serial.print("  : audioSDWriter = "); n=audioSDWriter.cpu_cycles; Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//    Serial.print("  : i2s_out_quad = ");n=i2s_out.cpu_cycles;Serial.print(n);Serial.print(", "); Serial.print(audio_settings.cpu_load_percent(n));Serial.println("%");
+//    
+
+
+    lastUpdate_millis = curTime_millis;
+  } // end if
+} //end servicePotentiometer();
+
 
 
 //servicePotentiometer: listens to the blue potentiometer and sends the new pot value
