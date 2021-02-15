@@ -62,8 +62,8 @@ const int ANALOG_IN = 0, PDM_IN = 1;
 #include "SerialManager.h"
 
 //define the sample rate and audio block size
-const float sample_rate_Hz = 22050.0f ; //16000, 24000 or 44117.64706f (or other frequencies in the table in AudioOutputI2S_F32
-const int audio_block_samples = 16;  //do not make bigger than AUDIO_BLOCK_SAMPLES from AudioStream.h (which is 128)
+const float sample_rate_Hz = 24000.0f ; //16000, 24000 or 44117.64706f (or other frequencies in the table in AudioOutputI2S_F32
+const int audio_block_samples = 24;  //do not make bigger than AUDIO_BLOCK_SAMPLES from AudioStream.h (which is 128)
 AudioSettings_F32   audio_settings(sample_rate_Hz, audio_block_samples);
 
 
@@ -218,14 +218,9 @@ void setupAudioProcessing(void) {
 
   //setup default processing simply to avoid audio processing errors while we read from the SD card in the next step
   setAlgorithmPreset(myState.current_alg_config); //sets the Per Band, the Broad Band, and the AFC parameters using a preset
-
-#if 0 //set to zero for debugging purposes only ...NEED TO FIX SD STUFF TO ENABLE THIS CALL TO WORK!!!!!!!!
   
   //load various algorithm settings
   myState.defineAlgorithmPresets(true); //"true" loads from SD and back-fills with hardwired values if SD doesn't work.
-
-#endif
-  
   setAlgorithmPreset(myState.current_alg_config); //sets the Per Band, the Broad Band, and the AFC parameters using a preset
   
 }
@@ -640,7 +635,7 @@ void loop() {
   serviceSD();
 
   //check the mic_detect signal
-  serviceMicDetect(millis(), 500);  //service the MicDetect every 500 msec
+  //serviceMicDetect(millis(), 500);  //service the MicDetect every 500 msec
 
   //service the LEDs
   serviceLEDs();   //Remember that the LEDs on the Tympan board are not visible with CCP shield in-place.

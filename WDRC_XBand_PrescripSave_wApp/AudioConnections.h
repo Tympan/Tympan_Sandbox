@@ -13,7 +13,7 @@ AudioConfigIIRFilterBank_F32 filterBankCalculator(audio_settings);  //this compu
 //AudioFilterIIR_F32         bpFilt[2][N_CHAN_MAX];           //here are the filters to break up the audio into multiple bands
 AudioEffectDelay_F32       postFiltDelay[2][N_CHAN_MAX];  //Here are the delay modules that we'll use to time-align the output of the filters
 AudioEffectCompWDRC_F32    expCompLim[2][N_CHAN_MAX];     //here are the per-band compressors
-AudioMixer8_F32            mixerFilterBank[2];                     //mixer to reconstruct the broadband audio
+AudioSummer8_F32            mixerFilterBank[2];                     //mixer to reconstruct the broadband audio
 AudioEffectCompWDRC_F32    compBroadband[2];              //broad band compressor
 AudioEffectFeedbackCancel_LoopBack_Local_F32 feedbackLoopBack(audio_settings), feedbackLoopBackR(audio_settings);
 AudioSDWriter_F32             audioSDWriter(audio_settings); //this is stereo by default
@@ -102,8 +102,14 @@ int makeAudioConnections(void) { //call this in setup() or somewhere like that
           patchCord[count++] = new AudioConnection_F32(preFilterR, 0, bpFilt[Iear][Iband], 0); //input is coming directly from i2s_in
         #endif
       }
-      patchCord[count++] = new AudioConnection_F32(bpFilt[Iear][Iband], 0, postFiltDelay[Iear][Iband], 0);  //connect to delay
-      patchCord[count++] = new AudioConnection_F32(postFiltDelay[Iear][Iband], 0, expCompLim[Iear][Iband], 0); //connect to compressor
+      #if 0
+        //use the post-filter delays
+        patchCord[count++] = new AudioConnection_F32(bpFilt[Iear][Iband], 0, postFiltDelay[Iear][Iband], 0);  //connect to delay
+        patchCord[count++] = new AudioConnection_F32(postFiltDelay[Iear][Iband], 0, expCompLim[Iear][Iband], 0); //connect to per-band compressor
+      #else
+        //do not use the post-filter delays
+        patchCord[count++] = new AudioConnection_F32(bpFilt[Iear][Iband], 0, expCompLim[Iear][Iband], 0); //connect to per-band compressor
+      #endif
       patchCord[count++] = new AudioConnection_F32(expCompLim[Iear][Iband], 0, mixerFilterBank[Iear], Iband); //connect to mixer
 
       //make the connection for the audio test measurements

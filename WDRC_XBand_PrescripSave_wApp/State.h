@@ -111,6 +111,8 @@ class State {
     const char *preset_fnames[N_PRESETS] = {"GHA_Constants.txt", "GHA_FullOn.txt", "GHA_RTS.txt"};  //filenames for reading off SD
     const char *var_names[N_PRESETS*3] = {"dsl", "gha", "afc", "dsl_fullon", "gha_fullon", "afc_fullon", "dsl_rts", "gha_rts", "afc_rts"}; //use for writing to SD          
     void setPresetToDefault(int Ipreset) {
+      //Serial.print("State: setPresetToDefault: setting preset "); Serial.println(Ipreset);
+      
       //Define the hard-wired settings
       #include "GHA_Constants.h"  //this sets dsl and gha settings, which will be the defaults...includes regular settings, full-on gain, and RTS
 
@@ -137,8 +139,12 @@ class State {
     void defineAlgorithmPresets(bool loadFromSD = false){ for (int i=0; i<N_PRESETS;i++) defineAlgorithmPreset(i,loadFromSD); }
     void defineAlgorithmPreset(int Ipreset, bool loadFromSD = false) {
 
+      //if (loadFromSD) { Serial.print("State: defineAlgorithmPresets: Ipreset = "); Serial.println(Ipreset);}
+
       int i = Ipreset;
       setPresetToDefault(i);
+
+      //if (loadFromSD) { Serial.println("State: defineAlgorithmPresets: completed setPresetToDefault.");}
       
       //if we want to read from the SD card, try to read from the SD card
       bool is_SD_success = false;
@@ -160,7 +166,7 @@ class State {
         
         if (!is_SD_success) {
           //print error messages
-          Serial.print("State: defineAlgorithmPresets: *** WARNING *** could not read all preset elements from "); Serial.print(fname);
+          Serial.print("State: defineAlgorithmPresets: *** WARNING *** could not read all preset elements from "); Serial.println(fname);
           Serial.println("    : Using built-in algorithm presets instead.");
         }
       }
