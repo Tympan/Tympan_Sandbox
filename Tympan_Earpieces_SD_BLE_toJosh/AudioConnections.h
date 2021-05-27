@@ -1,12 +1,11 @@
 
-#include "EarpieceMixer_F32.h"
 
 // Define audio objects
 AudioInputI2SQuad_F32         i2s_in(audio_settings);        //Digital audio *from* the Tympan AIC.
-EarpieceMixer_F32             earpieceMixer(audio_settings);  //mixes earpiece mics, allows switching to analog inputs, mixes left+right, etc
+EarpieceMixer_F32_UI          earpieceMixer(audio_settings);  //mixes earpiece mics, allows switching to analog inputs, mixes left+right, etc
 AudioEffectGain_F32           gain[2];   
 AudioOutputI2SQuad_F32        i2s_out(audio_settings);       //Digital audio *to* the Tympan AIC.  Always list last to minimize latency
-AudioSDWriter_F32             audioSDWriter(audio_settings); //this is stereo by default
+AudioSDWriter_F32_UI          audioSDWriter(&(sdx.sdfs), audio_settings); //this is stereo by default
 
 // ////////////////////////////  setup the audio connections
 

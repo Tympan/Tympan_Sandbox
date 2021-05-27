@@ -29,6 +29,23 @@
 #include <Tympan_Library.h>
 #include "State.h"
 #include "SerialManager.h"
+#include <SD.h>  
+
+
+#define USE_MTP true  //set to true to enable "MTP", which is USB access to the SD card when plugged into a computer
+#if (USE_MTP)
+  // Get the MTP library from: https://github.com/WMXZ-EU/MTP_t4
+  // You do not need the USB2 stuff.
+  // But, yes, you should do the installation instructions on that page for USB_MTP_SERIAL, such as:
+  //     * For Teensy3.6 (aka Tympan RevD), change C:\Program Files (x86)\Arduino\hardware\teensy\avr\cores\teensy3\usb_desc.h
+  //     * For Teensy4.x (aka Tympan RevE), change C:\Program Files (x86)\Arduino\hardware\teensy\avr\cores\teensy4\usb_desc.h
+  //     * For either Teensy, change C:\Program Files (x86)\Arduino\hardware\teensy\avr
+  // Finally, after installing all that you need to tell the Arduino IDE that you'll be
+  // using the USB for MTP.  Do this via the Arduino IDE menu: Tools -> USB Type -> MTP Disk SERIAL (Experimental)
+  #include <TimeLib.h>   //Used by MTP
+  #include <MTP.h>
+  #include "MTP_funcs.h" //local to this sketch
+#endif
 
 //set the sample rate and block size
 const float sample_rate_Hz    = 44100.0f ;  //Allowed values: 8000, 11025, 16000, 22050, 24000, 32000, 44100, 44118, or 48000 Hz
@@ -36,11 +53,12 @@ const int audio_block_samples = 128;     //do not make bigger than AUDIO_BLOCK_S
 AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 
 //setup the  Tympan using the default settings
-Tympan      myTympan(TympanRev::E);    //note: Rev C is not compatible with the AIC shield
-EarpieceShield   earpieceShield(TympanRev::E, AICShieldRev::A);
+Tympan          myTympan(TympanRev::E);    //note: Rev C is not compatible with the AIC shield
+EarpieceShield  earpieceShield(TympanRev::E, AICShieldRev::A);
+SDClass sdx; // define SD card parameters (will get passed to AudioSDWriter and to MTP stuff
 
 // Create the audio objects and audio connections
-const int LEFT = 0, RIGHT = (LEFT+1), FRONT = 0, REAR = (FRONT+1);
+const int LEFT = 0, RIGHT = (LEFT+1);
 #include "AudioConnections.h"
 
 
@@ -48,21 +66,19 @@ const int LEFT = 0, RIGHT = (LEFT+1), FRONT = 0, REAR = (FRONT+1);
 BLE ble = BLE(&Serial1);
 String msgFromBle = String(""); // Message from ble
 int msgLen;
-usb_serial_class *USB_Serial = &Serial;
 
 //control display and serial interaction
-SerialManager                 serialManager;
+SerialManager                 serialManager(&ble);
 State                         myState(&audio_settings, &myTympan);
 String overall_name = String("Tympan: Earpieces with PDM Mics, SD, BLE");
 
 
 // ////////////// Setup the hardware
-void setupTympanHardware(void) {
+void setupAudioHardwareAndProcessing(void) {
   myTympan.enable(); // activate AIC
   earpieceShield.enable();
 
-
-  earpieceMixer.setTympanAndShield(&myTympan, &earpieceShield);
+  earpieceMixer.setTympanAndShield(&myTympan, &earpieceShield); //the earpiece mixer must interact with the hardware, so point it to the hardware
   connectClassesToOverallState();
 
   //enable the Tympman to detect whether something was plugged inot the pink mic jack
@@ -97,9 +113,19 @@ void connectClassesToOverallState(void) {
   myState.earpieceMixer = &earpieceMixer.state;
 }
 
+//set up the serial manager
+void setupSerialManager(void) {
+  //register all the UI elements here
+  serialManager.add_UI_element(&earpieceMixer);
+  serialManager.add_UI_element(&audioSDWriter);
+  serialManager.add_UI_element(&myState);
+  
+  serialManager.createTympanRemoteLayout();
+  
+}
 
 // Set up the BLE
-void setupBLE()
+void setupBLE(void)
 {
   myTympan.forceBTtoDataMode(false); //for BLE, it needs to be in command mode, not data mode
   
@@ -121,40 +147,32 @@ void serviceBLE(unsigned long curTime_millis, unsigned long updatePeriod_millis 
   //has enough time passed to update everything?
   if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0; //handle wrap-around of the clock
   if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
-    
     if (ble.isConnected() == false) {
-      Serial.println("serviceBLE: activating BLE advertising");
-      ble.advertise(true);  //not connected, ensure that we are advertising
+      if (ble.isAdvertising() == false) {
+        Serial.println("serviceBLE: activating BLE advertising");
+        ble.advertise(true);  //not connected, ensure that we are advertising
+      }
     }
-    
     lastUpdate_millis = curTime_millis; //we will use this value the next time around.
   }
 }
-
-
 
 // ///////////////// Main setup() and loop() as required for all Arduino programs
 void setup() {
   myTympan.beginBothSerial(); delay(1000);
   myTympan.setEchoAllPrintToBT(false);  //if we're using BLE, don't echo the print statements over the BT link
-  myTympan.print(overall_name); myTympan.println(": setup():...");
-  myTympan.print("Sample Rate (Hz): "); myTympan.println(audio_settings.sample_rate_Hz);
-  myTympan.print("Audio Block Size (samples): "); myTympan.println(audio_settings.audio_block_samples);
+  Serial.print(overall_name); Serial.println(": setup():...");
+  Serial.print("Sample Rate (Hz): "); Serial.println(audio_settings.sample_rate_Hz);
+  Serial.print("Audio Block Size (samples): "); Serial.println(audio_settings.audio_block_samples);
 
   //allocate the dynamic memory for audio processing blocks
   AudioMemory_F32(60,audio_settings); //I can only seem to allocate 400 blocks
 
   //Enable the Tympan and AIC shields to start the audio flowing!
-  setupTympanHardware();
-
-  //set headphone volume (will be overwritten by the volume pot)
-  myTympan.println("Setup: setOutputVolume_dB...");
-  setOutputVolume_dB(0.0); //dB, -63.6 to +24 dB in 0.5dB steps.
+  setupAudioHardwareAndProcessing();
  
   //Set the state of the LEDs
-  myTympan.println("Setup: setting LEDs...");
-  myTympan.setRedLED(HIGH);
-  myTympan.setAmberLED(LOW);
+  myTympan.setRedLED(HIGH);  myTympan.setAmberLED(LOW);
 
   //prepare the SD writer for the format that we want and any error statements
   audioSDWriter.setSerial(&myTympan);
@@ -162,15 +180,22 @@ void setup() {
   audioSDWriter.setWriteDataType(AudioSDWriter::WriteDataType::INT16);  //this is the built-in the default, but here you could change it to FLOAT32
   Serial.print("Setup: SD configured for "); Serial.print(audioSDWriter.getNumWriteChannels()); Serial.println(" channels.");
 
-while (Serial1.available()) Serial1.read(); //clear the incoming Serial1 (BT) buffer
+  while (Serial1.available()) Serial1.read(); //clear the incoming Serial1 (BT) buffer
 
   //setup BLE
   setupBLE();
 
-  //End of setup
-  myTympan.println("Setup: complete."); 
-  serialManager.printHelp();
+  //setup serial manager
+  setupSerialManager();
 
+  // start the MTP stuff, if applicable
+  #if (USE_MTP)
+    setup_MTP();
+  #endif
+
+  //End of setup
+  Serial.println("Setup: complete."); 
+  serialManager.printHelp();
 }
 
 void loop() {
@@ -194,8 +219,13 @@ void loop() {
   serviceBLE(millis(),5000);  //check every 5000 msec
 
   //periodically print the CPU and Memory Usage
-  if (myState.flag_printCPUandMemory) myTympan.printCPUandMemory(millis(),3000); //print every 3000 msec
-  if (myState.flag_printCPUtoGUI) serialManager.printCPUtoGUI(millis(),3000);
+  if (myState.flag_printCPUandMemory) myState.printCPUandMemory(millis(),3000); //print every 3000 msec
+  if (myState.flag_printCPUandMemory) myState.printCPUtoGUI(millis(),3000);
+
+  //service MTP
+  #if (USE_MTP)
+    mtpd.loop();
+  #endif
 }
 
 
@@ -219,9 +249,8 @@ void serviceLEDs(unsigned long curTime_millis) {
       lastUpdate_millis = curTime_millis;
     }
   } else {
-    //myTympan.setRedLED(HIGH); myTympan.setAmberLED(LOW); //Go Red
     if (dT_millis > 1000) {  //slow toggle
-      toggleLEDs(false,true); //just blink the red
+      toggleLEDs(true,true); //blink both
       lastUpdate_millis = curTime_millis;
     }
   }
@@ -298,43 +327,12 @@ void serviceSD(void) {
 
 // ////////////// Change settings of system
 
-//here's a function to change the volume settings.   We'll also invoke it from our serialManager
-float incrementInputGain(float increment_dB) {
-    return earpieceMixer.setInputGain_dB(myState.earpieceMixer->inputGain_dB + increment_dB);
-}
+//Increment the input (PGA) gain for the analog inputs
+float incrementInputGain(float increment_dB) { return earpieceMixer.setInputGain_dB(myState.earpieceMixer->inputGain_dB + increment_dB);}
 
-
-//Increment Headphone Output Volume
-float incrementKnobGain(float increment_dB) { 
-  return setOutputVolume_dB(myState.volKnobGain_dB+increment_dB);
-}
-float setOutputVolume_dB(float vol_dB) {
-  vol_dB = max(min(vol_dB, 24.0),-60.0);
-  myState.volKnobGain_dB = myTympan.volume_dB(vol_dB);                   // headphone amplifier.  -63.6 to +24 dB in 0.5dB steps.
-  earpieceShield.volume_dB(vol_dB);
-  serialManager.setOutputGainButtons(); //update the TympanRemote GUI...it's unfortunate that I have to do it here and not in SerialManager itself
-  return myState.volKnobGain_dB;
-}
-float setRearMicGain_dB(float gain_dB) {
-  myState.earpieceMixer->rearMicGain_dB = gain_dB;
-  earpieceMixer.configureFrontRearMixer(myState.earpieceMixer->input_frontrear_config);
-  return gain_dB;
-  
-}
-float incrementRearMicGain(float increment_dB) {
-  return setRearMicGain_dB(myState.earpieceMixer->rearMicGain_dB + increment_dB);
-}
-
-
-void printGainSettings(void) {
-  myTympan.print("Gain (dB): ");
-  myTympan.print("Knob = "); myTympan.print(myState.volKnobGain_dB, 1);
-  myTympan.print(", PGA = "); myTympan.print(myState.earpieceMixer->inputGain_dB, 1);
-
-//  myTympan.print(", Chan = ");
-//  for (int i = 0; i < myState.getNChan(); i++) {
-//    myTympan.print(expCompLim[LEFT][i].getGain_dB() - volKnobGain_dB, 1);
-//    myTympan.print(", ");
-//  }
-  myTympan.println();
+//Increment and Set the Digital Gain for both channels
+float incrementDigitalGain(float increment_dB) { return setDigitalGain_dB(myState.digitalGain_dB+increment_dB); }
+float setDigitalGain_dB(float gain_dB) {
+  gain[LEFT].setGain_dB(gain_dB);  
+  return myState.digitalGain_dB = gain[RIGHT].setGain_dB(gain_dB);
 }
