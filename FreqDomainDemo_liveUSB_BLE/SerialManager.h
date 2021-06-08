@@ -169,7 +169,7 @@ void SerialManager::setFullGUIState(bool activeButtonsOnly) {
 void SerialManager::updateFreqProcGUI(bool activeButtonsOnly) {
   
   //update formant shifting fields
-  Serial.print("SerialManager: updateFreqProcGUI: is_enabled_formant = ");Serial.println(myState.is_enabled_formant);
+  //Serial.print("SerialManager: updateFreqProcGUI: is_enabled_formant = ");Serial.println(myState.is_enabled_formant);
   if (myState.is_enabled_formant) {
     setButtonState("algForm",true);delay(3);
   } else {
@@ -180,19 +180,19 @@ void SerialManager::updateFreqProcGUI(bool activeButtonsOnly) {
 
 
   //update freq shifting fields
-  Serial.print("SerialManager: updateFreqProcGUI: is_enabled_freq = ");Serial.println(myState.is_enabled_freq);
+  //Serial.print("SerialManager: updateFreqProcGUI: is_enabled_freq = ");Serial.println(myState.is_enabled_freq);
   if (myState.is_enabled_freq) {
     setButtonState("algFreq",true);delay(3);
   } else {
     if (!activeButtonsOnly) { setButtonState("algFreq",false); delay(3); }
   }
-  Serial.println("SerialManager: updateFreqProcGUI: update freqShift");delay(10);
+  //Serial.println("SerialManager: updateFreqProcGUI: update freqShift");delay(10);
   setButtonText("freqShift", String(freqShift.getFrequencyOfBin(myState.cur_shift_bins)+0.0001f,1));delay(3);
 
 }
 
 void SerialManager::updateFormantScaleFacGUI(void) {
-  Serial.println("SerialManager: updateFreqProcGUI: update formShift");delay(10);
+  //Serial.println("SerialManager: updateFreqProcGUI: update formShift");delay(10);
   setButtonText("formShift", String(myState.cur_scale_factor,2));delay(3);  
 }
 
