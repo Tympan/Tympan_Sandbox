@@ -146,7 +146,7 @@ void SerialManager::createTympanRemoteLayout(void) {
       card_h->addButton("",  "",  "digGain",   4);  //displayed string (blank for now), command (blank), button ID, button width (out of 12)
       card_h->addButton("+", "k", "",          4);   //displayed string, command, button ID, button width (out of 12)
       
-    card_h = page_h->addCard("Frequency Knee (Hz)");  
+    card_h = page_h->addCard("Start of Processing (Knee, Hz)");  
       card_h->addButton("-", "T", "",          4);  //label, command, id, width
       card_h->addButton("",  "",  "freqKnee",  4);  //label, command, id, width //display the formant shift value
       card_h->addButton("+", "t", "",          4);  //label, command, id, width
@@ -156,7 +156,7 @@ void SerialManager::createTympanRemoteLayout(void) {
       card_h->addButton("",  "",  "freqCR",    4);  //label, command, id, width //display the formant shift value
       card_h->addButton("+", "r", "",          4);  //label, command, id, width
 
-    card_h = page_h->addCard("Compression Ratio (x)");  
+    card_h = page_h->addCard("Frequency Shifting (Hz)");  
       card_h->addButton("-", "F", "",          4);  //label, command, id, width
       card_h->addButton("",  "",  "freqShift", 4);  //label, command, id, width //display the formant shift value
       card_h->addButton("+", "f", "",          4);  //label, command, id, width
@@ -195,13 +195,13 @@ void SerialManager::setFullGUIState(bool activeButtonsOnly) {
   
   setNLFreqParams(activeButtonsOnly);
 }
-void SerialManager::setInputGainButtons(bool activeButtonsOnly = false) {
+void SerialManager::setInputGainButtons(bool activeButtonsOnly) {
    setButtonText("inGain", String(myState.input_gain_dB)); 
 };
 void SerialManager::setGainButtons(bool activeButtonsOnly) {
   setButtonText("digGain", String(myState.digital_gain_dB));
 }
-void SerialManager::setOutputGainButtons(bool activeButtonsOnly = false) {
+void SerialManager::setOutputGainButtons(bool activeButtonsOnly) {
   setButtonText("outGain", String(myState.output_gain_dB));
 }
 void SerialManager::setNLFreqParams(bool activeButtonsOnly) {

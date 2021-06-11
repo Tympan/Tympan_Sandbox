@@ -16,28 +16,28 @@
 //    fs = 24 kHz, N=256 results in shift being multiples of 24000/256 = 93.8 Hz
 //    fs = 44 kHz, N=256 results in shift being multiples of 44100/256 = 172 Hz
 //
-//    This processing is performed in the frequency domain where
-//    we take the FFT, shift the bins upward or downward, take
-//    the IFFT, and listen to the results.  In effect, this is
-//    single sideband modulation, which will sound very unnatural
-//    (like robot voices!).  Maybe you'll like it, or maybe not.
-//    Probably not, unless you like weird.  ;)
+// This processing is performed in the frequency domain where
+//   we take the FFT, shift the bins upward or downward, take
+//   the IFFT, and listen to the results.  In effect, this is
+//   single sideband modulation, which will sound very unnatural
+//   (like robot voices!).  Maybe you'll like it, or maybe not.
+//   Probably not, unless you like weird.  ;)
 //
-//    You can shift formants upward or downward with this algorithm.
-//    You can compress or expand formants with this algorithm
+//   You can shift formants upward or downward with this algorithm.
+//   You can compress or expand formants with this algorithm
 //
-//    To change the length of the FFT, you need to change the audio processing
-//    block size "audio_block_samples" and the FFT "overlap_factor".  The FFT
-//    ("N") is simply audio_block_samples*overlap_factor.  For example:
+// To change the length of the FFT, you need to change the audio processing
+//   block size "audio_block_samples" and the FFT "overlap_factor".  The FFT
+//   ("N") is simply audio_block_samples*overlap_factor.  For example:
 //
-//     64 sample blocks * 2 overlap_factor is an N_FFT of 128 points (with 50% overlap)
-//     64 sample blocks * 4 overlap_factor is an N_FFT of 256 points (with 75% overlap)
-//     128 sample blocks * 2 overlap_factor is an N_FFT of 256 points (with 50% overlap)
-//     128 sample blocks * 4 overlap_factor is an N_FFT of 512 points (with 75% overlap)
+//    64 sample blocks * 2 overlap_factor is an N_FFT of 128 points (with 50% overlap)
+//    64 sample blocks * 4 overlap_factor is an N_FFT of 256 points (with 75% overlap)
+//    128 sample blocks * 2 overlap_factor is an N_FFT of 256 points (with 50% overlap)
+//    128 sample blocks * 4 overlap_factor is an N_FFT of 512 points (with 75% overlap)
 //
-//    Be aware of being limited by how much computational power that is available.
-//    For Tympan RevD (ie, Teensy 3.6) running in stereo, here is the self-reported 
-//    CPU usage:
+// Be aware of being limited by how much computational power that is available.
+//   For Tympan RevD (ie, Teensy 3.6) running in stereo, here is the self-reported 
+//   CPU usage:
 //
 //      fs = 24kHz, stereo (analog inputs, -500 Hz shift):
 //        32 sample blocks, 4 overlap_fac (N=128, 75% overlap -> 188 Hz resolution): CPU = 46%  (9.6 msec latency?)
@@ -53,11 +53,11 @@
 //        128 sample blocks, 2 overlap_fac (N=256, 50% overlap -> 172 Hz resolution): CPU = 32% (12.5 msec latency?)
 //        128 sample blocks, 4 overlap_fac (N=512, 75% overlap -> 86 Hz resolution):  CPU = 98%+ (too slow!  try mono.)  (would be 18.3 msec latency?)
 //
-//    If you are using the Tympan RevE (ie, Teensy 4.1), however, it is much more efficient
-//        in executing FFT and IFFT operations, so you can probably do 4-5x more calcluations
-//        (ie CPU utilization will be 1/4 to 1/5 of the values shown above for the RevD.
+// If you are using the Tympan RevE (ie, Teensy 4.1), however, it is much more efficient
+//    in executing FFT and IFFT operations, so you can probably do 4-5x more calcluations
+//    (ie CPU utilization will be 1/4 to 1/5 of the values shown above for the RevD).
 //
-//  Latency (sec) is [ (17+21 samples) + 2*block_length + N_FFT) / sample_rate_Hz ]
+// Latency (sec) is probably something like [ (17+21 samples) + 2*block_length + N_FFT) / sample_rate_Hz ]
 //
 // Frequency Domain Processing:
 //    * Take samples in the time domain
@@ -204,8 +204,9 @@ void loop() {
   //check the potentiometer
   servicePotentiometer(millis(), 100); //service the potentiometer every 100 msec
 
-  //check to see whether to print the CPU and Memory Usage
-  if (enable_printCPUandMemory) myTympan.printCPUandMemory(millis(),3000); //print every 3000 mse
+  //periodically print the CPU and Memory Usage
+  if (myState.flag_printCPUandMemory) myState.printCPUandMemory(millis(),3000); //print every 3000 msec
+  if (myState.flag_printCPUandMemory) myState.printCPUtoGUI(millis(),3000);
 
 } //end loop();
 
@@ -266,7 +267,7 @@ void incrementDigitalGain(float increment_dB) { //"extern" to make it available 
 }
 
 void setDigitalGain_dB(float gain_dB) {
-  myState.digital_gain_dB = gain_L.setGain_dB(gain_R.setGain_dB(vol_knob_gain_dB));
+  myState.digital_gain_dB = gain_L.setGain_dB(gain_R.setGain_dB(gain_dB));
   printGainSettings();
 }
 
@@ -285,7 +286,7 @@ float incrementFreqCR(float incr_factor) {
   return setFreqCR(cur_val * incr_factor);
 }
 float setFreqCR(float new_val) {
-  return myState.freqCR = freqShift_R.setFreqCompRatio(freqShift_L.setFreqCompRatio(cur_val * incr_factor));
+  return myState.freq_CR = freqShift_R.setFreqCompRatio(freqShift_L.setFreqCompRatio(new_val));
 }
 
 float incrementFreqShift(float incr_factor) {
