@@ -7,13 +7,11 @@
 #include "State.h"
 
 //extern objects
-extern Tympan myTympan;
 extern State myState;
 
 //functions in the main sketch that I want to call from here
 extern void incrementDigitalGain(float);
 extern void printGainSettings(void);
-extern void togglePrintMemoryAndCPU(void);
 extern float incrementFreqKnee(float);
 extern float incrementFreqCR(float);
 extern float incrementFreqShift(float);
@@ -52,21 +50,23 @@ class SerialManager : public SerialManagerBase {
 void SerialManager::printHelp(void) {  
   Serial.println();
   Serial.println("SerialManager Help: Available Commands:");
+  Serial.println(" General: No Prefix");
   Serial.println("   h: Print this help");
   Serial.println("   g: Print the gain settings of the device.");
-  Serial.println("   C: Toggle printing of CPU and Memory usage");
   Serial.println("   p: Switch to built-in PCB microphones");
   Serial.println("   m: switch to external mic via mic jack");
   Serial.println("   l: switch to line-in via mic jack");
-  Serial.print("   k/K: Increase the gain of all channels (ie, knob gain) by "); Serial.print(channelGainIncrement_dB); Serial.println(" dB");
-  Serial.print("   t/T: Raise/Lower freq knee (change by "); Serial.print(freq_knee_increment_Hz); Serial.println(" Hz)");
-  Serial.print("   r/R: Raise/Lower freq compression (change by "); Serial.print(freq_cr_increment); Serial.println("x)");
-  Serial.print("   f/F: Raise/Lower freq shifting (change by "); Serial.print(freq_shift_increment_Hz); Serial.println(" Hz)");
+  Serial.print(  "   k/K: Increase the gain of all channels (ie, knob gain) by "); Serial.print(channelGainIncrement_dB); Serial.println(" dB");
+  Serial.print(  "   t/T: Raise/Lower freq knee (change by "); Serial.print(freq_knee_increment_Hz); Serial.println(" Hz)");
+  Serial.print(  "   r/R: Raise/Lower freq compression (change by "); Serial.print(freq_cr_increment); Serial.println("x)");
+  Serial.print(  "   f/F: Raise/Lower freq shifting (change by "); Serial.print(freq_shift_increment_Hz); Serial.println(" Hz)");
+  SerialManagerBase::printHelp();  ////in here, it automatically loops over the different UI elements issuing printHelp()
+    
 }
 
 
 //switch yard to determine the desired action
-bool SerialManager::processCharacter(char c) {
+bool SerialManager::processCharacter(char c) { //this is called by SerialManagerBase::respondToByte()
   //float old_val = 0.0, new_val = 0.0;
   bool return_val = true; //assume we'll use the given character
   switch (c) {
@@ -80,9 +80,6 @@ bool SerialManager::processCharacter(char c) {
     case 'K':   //which is "shift k"
       incrementDigitalGain(-channelGainIncrement_dB);  break;
       setGainButtons();
-    case 'C': case 'c':
-      Serial.println("Received: toggle printing of memory and CPU usage.");
-      togglePrintMemoryAndCPU(); break;
     case 'p':
       switchToPCBMics(); break;
     case 'm':
@@ -161,8 +158,6 @@ void SerialManager::createTympanRemoteLayout(void) {
       card_h->addButton("",  "",  "freqShift", 4);  //label, command, id, width //display the formant shift value
       card_h->addButton("+", "f", "",          4);  //label, command, id, width
 
-
-  
   //add second page to GUI
   page_h = myGUI.addPage("Globals");
   

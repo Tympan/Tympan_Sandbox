@@ -104,8 +104,6 @@ AudioConnection_F32       patchCord41(gain_R, 0, i2s_out, 1);      //connect to 
 BLE ble = BLE(&Serial1);
 
 //control display and serial interaction
-bool enable_printCPUandMemory = false;
-void togglePrintMemoryAndCPU(void) { enable_printCPUandMemory = !enable_printCPUandMemory; };
 SerialManager serialManager(&ble);
 State myState(&audio_settings, &myTympan);
 
@@ -195,7 +193,7 @@ void loop() {
   //respond to BLE
   if (ble.available() > 0) {
     String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
-    for (int i=0; i < msgLen; i++) serialManager.respondToByte(msgFromBle[i]);
+    for (int i=0; i < msgLen; i++) serialManager.respondToByte(msgFromBle[i]); //ends up in serialManager.processCharacter()
   }
 
   //If there is no BLE connection, make sure that we keep advertising

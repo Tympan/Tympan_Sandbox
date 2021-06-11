@@ -4,10 +4,10 @@
 
 // define structure for tracking state of system (for GUI)
 extern "C" char* sbrk(int incr);
-class State : public TympanStateBase_UI {
+class State : public TympanStateBase_UI { // look in TympanStateBase for more state variables and helpful methods!!
   public:
     State(AudioSettings_F32 *given_settings, Print *given_serial) : TympanStateBase_UI(given_settings, given_serial) {}
-
+    
     //Put states here to ease the updating of the GUI
     float input_gain_dB = 0.0;
     float digital_gain_dB = 0.0;
