@@ -49,8 +49,6 @@ AudioConnection          patchCord52(convertF32toI16, 0, i2s_out,         1);  /
 
 //Create BLE
 BLE ble = BLE(&Serial1);
-String msgFromBle = String(""); // allocate a string (and keep reusing it to minimize memory issues?)
-int msgLen;
 
 //control display and serial interaction
 SerialManager serialManager(&ble);
@@ -156,8 +154,8 @@ void loop() {
 
   //respond to BLE
   if (ble.available() > 0) {
-    msgFromBle = "";  msgLen = ble.recvBLE(&msgFromBle);
-    for (int i=0; i < msgLen; i++)  serialManager.respondToByte(msgFromBle[i]);
+    String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
+    for (int i=0; i < msgLen; i++) respondToByte(msgFromBle[i]);
   }
 
   //If there is no BLE connection, make sure that we keep advertising
