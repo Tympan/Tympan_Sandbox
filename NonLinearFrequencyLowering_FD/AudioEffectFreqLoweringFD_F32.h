@@ -58,23 +58,25 @@ class AudioEffectFreqLoweringFD_F32 : public AudioStream_F32
       if (N_FFT < 1) return N_FFT;
 
       //decide windowing
-      Serial.println("AudioEffectFormantShiftFD_F32: setting myFFT to use hanning...");
+      //Serial.println("AudioEffectFormantShiftFD_F32: setting myFFT to use hanning...");
       (myFFT.getFFTObject())->useHanningWindow(); //applied prior to FFT
       #if 1
         if (myIFFT.getNBuffBlocks() > 3) {
-          Serial.println("AudioEffectFormantShiftFD_F32: setting myIFFT to use hanning...");
+          //Serial.println("AudioEffectFormantShiftFD_F32: setting myIFFT to use hanning...");
           (myIFFT.getIFFTObject())->useHanningWindow(); //window again after IFFT
         }
       #endif
 
-      //print info about setup
-      Serial.println("AudioEffectFreqLoweringFD_F32: FFT parameters...");
-      Serial.print("    : N_FFT = "); Serial.println(N_FFT);
-      Serial.print("    : audio_block_samples = "); Serial.println(settings.audio_block_samples);
-      Serial.print("    : FFT N_BUFF_BLOCKS = "); Serial.println(myFFT.getNBuffBlocks());
-      Serial.print("    : IFFT N_BUFF_BLOCKS = "); Serial.println(myIFFT.getNBuffBlocks());
-      Serial.print("    : FFT use window = "); Serial.println(myFFT.getFFTObject()->get_flagUseWindow());
-      Serial.print("    : IFFT use window = "); Serial.println((myIFFT.getIFFTObject())->get_flagUseWindow());
+      #if 0
+        //print info about setup
+        Serial.println("AudioEffectFreqLoweringFD_F32: FFT parameters...");
+        Serial.print("    : N_FFT = "); Serial.println(N_FFT);
+        Serial.print("    : audio_block_samples = "); Serial.println(settings.audio_block_samples);
+        Serial.print("    : FFT N_BUFF_BLOCKS = "); Serial.println(myFFT.getNBuffBlocks());
+        Serial.print("    : IFFT N_BUFF_BLOCKS = "); Serial.println(myIFFT.getNBuffBlocks());
+        Serial.print("    : FFT use window = "); Serial.println(myFFT.getFFTObject()->get_flagUseWindow());
+        Serial.print("    : IFFT use window = "); Serial.println((myIFFT.getIFFTObject())->get_flagUseWindow());
+      #endif
 
       //allocate memory to hold frequency domain data
       complex_2N_buffer = new float32_t[2 * N_FFT];
@@ -100,11 +102,11 @@ class AudioEffectFreqLoweringFD_F32 : public AudioStream_F32
     float getStartFreq_Hz(void) { return start_freq_Hz; }
     
     float setShift_Hz(float freq_Hz) { //only allow setting to an amount equal to one FFT bin
-      Serial.print("AudioEffectFreqLowering: setShift_Hz: input = "); Serial.print(freq_Hz);
+      //Serial.print("AudioEffectFreqLowering: setShift_Hz: input = "); Serial.print(freq_Hz);
       int N_FFT = myFFT.getNFFT();
       float Hz_per_bin = sample_rate_Hz / ((float)N_FFT);
       int shift_bins = round(freq_Hz / Hz_per_bin);
-      Serial.print(", output = "); Serial.println(Hz_per_bin * (float)shift_bins);
+      //Serial.print(", output = "); Serial.println(Hz_per_bin * (float)shift_bins);
       return shift_Hz = Hz_per_bin * (float)shift_bins;
     }
     float getShift_Hz(void) { return shift_Hz; };

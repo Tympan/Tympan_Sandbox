@@ -101,6 +101,8 @@ AudioConnection_F32       patchCord30(gain_L, 0, i2s_out, 0);      //connect to 
 AudioConnection_F32       patchCord41(gain_R, 0, i2s_out, 1);      //connect to the right output
 
 //Create BLE
+#define USE_BLE (false)
+const bool use_ble = USE_BLE;
 BLE ble = BLE(&Serial1);
 
 //control display and serial interaction
@@ -131,7 +133,7 @@ void switchToMicInOnMicJack(void) {
       
 // define the setup() function, the function that is called once when the device is booting
 void setup() {
-  myTympan.beginBothSerial(); delay(1000);
+  myTympan.beginBothSerial(); delay(1500);
   myTympan.println("freqLowering: starting setup()...");
   myTympan.print("    : sample rate (Hz) = ");  myTympan.println(audio_settings.sample_rate_Hz);
   myTympan.print("    : block size (samples) = ");  myTympan.println(audio_settings.audio_block_samples);
@@ -176,8 +178,10 @@ void setup() {
   servicePotentiometer(millis(),0); //update based on the knob setting the "0" is not relevant here.
 
   //setup BLE
-  while (Serial1.available()) Serial1.read(); //clear the incoming Serial1 (BT) buffer
-  ble.setupBLE(myTympan);
+  #if USE_BLE
+    while (Serial1.available()) Serial1.read(); //clear the incoming Serial1 (BT) buffer
+    ble.setupBLE(myTympan);
+  #endif
 
   //finish the setup by printing the help menu to the serial connections
   serialManager.printHelp();
@@ -191,13 +195,15 @@ void loop() {
   while (Serial.available()) serialManager.respondToByte((char)Serial.read());   //USB Serial
 
   //respond to BLE
-  if (ble.available() > 0) {
-    String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
-    for (int i=0; i < msgLen; i++) serialManager.respondToByte(msgFromBle[i]); //ends up in serialManager.processCharacter()
-  }
-
-  //If there is no BLE connection, make sure that we keep advertising
-  ble.updateAdvertising(millis(),5000);  //check every 5000 msec
+  #if USE_BLE
+    if (ble.available() > 0) {
+      String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
+      for (int i=0; i < msgLen; i++) serialManager.respondToByte(msgFromBle[i]); //ends up in serialManager.processCharacter()
+    }
+  
+    //If there is no BLE connection, make sure that we keep advertising
+    ble.updateAdvertising(millis(),5000);  //check every 5000 msec
+  #endif
   
   //check the potentiometer
   servicePotentiometer(millis(), 100); //service the potentiometer every 100 msec
@@ -234,7 +240,9 @@ void servicePotentiometer(unsigned long curTime_millis, const unsigned long upda
       float gain_dB = 0.f + 30.0f * ((val - 0.5) * 2.0); //set volume as 0dB +/- 30 dB
       myTympan.print("Changing output volume to = "); myTympan.print(gain_dB); myTympan.println(" dB");
       setOutputGain_dB(gain_dB);
+      #if USE_BLE
       serialManager.setOutputGainButtons();
+      #endif
     }
 
     
@@ -246,9 +254,8 @@ void servicePotentiometer(unsigned long curTime_millis, const unsigned long upda
 void printGainSettings(void) {
   myTympan.print("Gain (dB): ");
   myTympan.print("  Input Gain = ");myTympan.println(myState.input_gain_dB);
-  myTympan.print("  Digital Gain = "); myTympan.print(myState.digital_gain_dB,1);
+  myTympan.print("  Digital Gain = "); myTympan.println(myState.digital_gain_dB,1);
   myTympan.print("  Output Gain = ");myTympan.println(myState.output_gain_dB);
-  myTympan.println();
 }
 
 

@@ -8,6 +8,7 @@
 
 //extern objects
 extern State myState;
+extern const bool use_ble;
 
 //functions in the main sketch that I want to call from here
 extern void incrementDigitalGain(float);
@@ -34,6 +35,7 @@ class SerialManager : public SerialManagerBase {
     void setGainButtons(bool activeButtonsOnly = false);
     void setOutputGainButtons(bool activeButtonsOnly = false);
     void setNLFreqParams(bool activeButtonsOnly = false);
+    void setButtonText(String s1, String s2);
     
     int N_CHAN;
     float channelGainIncrement_dB = 2.5f; 
@@ -61,7 +63,6 @@ void SerialManager::printHelp(void) {
   Serial.print(  "   r/R: Raise/Lower freq compression (change by "); Serial.print(freq_cr_increment); Serial.println("x)");
   Serial.print(  "   f/F: Raise/Lower freq shifting (change by "); Serial.print(freq_shift_increment_Hz); Serial.println(" Hz)");
   SerialManagerBase::printHelp();  ////in here, it automatically loops over the different UI elements issuing printHelp()
-    
 }
 
 
@@ -204,5 +205,10 @@ void SerialManager::setNLFreqParams(bool activeButtonsOnly) {
   setButtonText("freqCR",   String(myState.freq_knee_Hz,2));
   setButtonText("freqShift",String(myState.freq_knee_Hz,1));
 }
+
+void SerialManager::setButtonText(String s1, String s2) {
+  if (use_ble) SerialManagerBase::setButtonText(s1,s2);
+}
+
 
 #endif
