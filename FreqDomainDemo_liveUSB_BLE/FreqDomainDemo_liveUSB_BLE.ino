@@ -85,38 +85,6 @@ void setupSerialManager(void) {
   serialManager.createTympanRemoteLayout();
 }
 
-// Set up the BLE
-void setupBLE(void)
-{
-  myTympan.forceBTtoDataMode(false); //for BLE, it needs to be in command mode, not data mode
-  
-  int ret_val = ble.begin();
-  if (ret_val != 1) {  //via BC127.h, success is a value of 1
-    Serial.print("setupBLE: ble did not begin correctly.  error = ");  Serial.println(ret_val);
-    Serial.println("    : -1 = TIMEOUT ERROR");
-    Serial.println("    :  0 = GENERIC MODULE ERROR");
-  }
-
-  //start the advertising for a connection (whcih will be maintained in serviceBLE())
-  if (ble.isConnected() == false) ble.advertise(true);  //not connected, ensure that we are advertising
-}
-
-
-void serviceBLE(unsigned long curTime_millis, unsigned long updatePeriod_millis = 3000) {
-  static unsigned long lastUpdate_millis = 0;
-
-  //has enough time passed to update everything?
-  if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0; //handle wrap-around of the clock
-  if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
-    if (ble.isConnected() == false) {
-      if (ble.isAdvertising() == false) {
-        Serial.println("serviceBLE: activating BLE advertising");
-        ble.advertise(true);  //not connected, ensure that we are advertising
-      }
-    }
-    lastUpdate_millis = curTime_millis; //we will use this value the next time around.
-  }
-}
 
 // //////////////////////////////////////////////////////////////////////////
 
@@ -171,7 +139,7 @@ void setup() {
 
   //setup BLE
   while (Serial1.available()) Serial1.read(); //clear the incoming Serial1 (BT) buffer
-  setupBLE();
+  ble.setupBLE();
 
   //setup serial manager
   setupSerialManager();
@@ -192,8 +160,8 @@ void loop() {
     for (int i=0; i < msgLen; i++)  serialManager.respondToByte(msgFromBle[i]);
   }
 
-  //service the BLE (keep it alive to enabe connection)
-  serviceBLE(millis(),5000);  //check every 5000 msec
+  //If there is no BLE connection, make sure that we keep advertising
+  ble.updateAdvertising(millis(),5000);  //check every 5000 msec
 
   //periodically print the CPU and Memory Usage
   if (myState.flag_printCPUandMemory) myState.printCPUandMemory(millis(),3000); //print every 3000 msec
