@@ -23,7 +23,8 @@
 //    (like robot voices!).  Maybe you'll like it, or maybe not.
 //    Probably not, unless you like weird.  ;)
 //
-//    You can shift frequencies upward or downward with this algorithm.
+//    You can shift formants upward or downward with this algorithm.
+//    You can compress or expand formants with this algorithm
 //
 //    To change the length of the FFT, you need to change the audio processing
 //    block size "audio_block_samples" and the FFT "overlap_factor".  The FFT
@@ -101,66 +102,32 @@ AudioConnection_F32       patchCord41(gain_R, 0, i2s_out, 1);      //connect to 
 
 //Create BLE
 BLE ble = BLE(&Serial1);
-String msgFromBle = String(""); // allocate a string (and keep reusing it to minimize memory issues?)
-int msgLen;
 
 //control display and serial interaction
 bool enable_printCPUandMemory = false;
 void togglePrintMemoryAndCPU(void) { enable_printCPUandMemory = !enable_printCPUandMemory; };
 SerialManager serialManager(&ble);
+State myState(&audio_settings, &myTympan);
 
 //inputs and levels
-float input_gain_dB = 15.0f; //gain on the microphone
-float vol_knob_gain_dB = 0.0;      //will be overridden by volume knob
+float default_mic_input_gain_dB = 15.0f; //gain on the microphone
 void switchToPCBMics(void) {
   myTympan.println("Switching to PCB Mics.");
   myTympan.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the microphone jack - defaults to mic bias OFF
-  myTympan.setInputGain_dB(input_gain_dB);
+  setInputGain_dB(default_mic_input_gain_dB);
 }
 void switchToLineInOnMicJack(void) {
   myTympan.println("Switching to Line-in on Mic Jack.");
   myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the microphone jack - defaults to mic bias OFF  
-  myTympan.setInputGain_dB(0.0);
+  setInputGain_dB(0.0);
 }
 void switchToMicInOnMicJack(void) {
   myTympan.println("Switching to Mic-In on Mic Jack.");
   myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_MIC); // use the microphone jack - defaults to mic bias OFF   
   myTympan.setEnableStereoExtMicBias(true);  //put the mic bias on both channels
-  myTympan.setInputGain_dB(input_gain_dB);
+  setInputGain_dB(default_mic_input_gain_dB);
 }
 
-// Set up the BLE
-void setupBLE(void)
-{
-  myTympan.forceBTtoDataMode(false); //for BLE, it needs to be in command mode, not data mode
-  
-  int ret_val = ble.begin();
-  if (ret_val != 1) {  //via BC127.h, success is a value of 1
-    Serial.print("setupBLE: ble did not begin correctly.  error = ");  Serial.println(ret_val);
-    Serial.println("    : -1 = TIMEOUT ERROR");
-    Serial.println("    :  0 = GENERIC MODULE ERROR");
-  }
-
-  //start the advertising for a connection (whcih will be maintained in serviceBLE())
-  if (ble.isConnected() == false) ble.advertise(true);  //not connected, ensure that we are advertising
-}
-
-
-void serviceBLE(unsigned long curTime_millis, unsigned long updatePeriod_millis = 3000) {
-  static unsigned long lastUpdate_millis = 0;
-
-  //has enough time passed to update everything?
-  if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0; //handle wrap-around of the clock
-  if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
-    if (ble.isConnected() == false) {
-      if (ble.isAdvertising() == false) {
-        Serial.println("serviceBLE: activating BLE advertising");
-        ble.advertise(true);  //not connected, ensure that we are advertising
-      }
-    }
-    lastUpdate_millis = curTime_millis; //we will use this value the next time around.
-  }
-}
 
 // ////////////////////////////////////////////
       
@@ -183,13 +150,11 @@ void setup() {
   freqShift_R.setup(audio_settings, N_FFT); //do after AudioMemory_F32();
 
   //configure the frequency shifting
-  float shiftFreq_Hz = 0.0; //shift audio downward a bit
-  //float Hz_per_bin = audio_settings.sample_rate_Hz / ((float)N_FFT);
-  //int shift_bins = (int)(shiftFreq_Hz / Hz_per_bin + 0.5);  //round to nearest bin
-  //shiftFreq_Hz = shift_bins * Hz_per_bin;
-  Serial.print("Setting shift to "); Serial.print(shiftFreq_Hz); Serial.print(" Hz");
-  shiftFreq_Hz = freqShift_R.setShift_Hz(freqShift_L.setShift_Hz(shiftFreq_Hz)); //0 is no freq shifting.
-  Serial.print("FFT resolution allowed for a shift of "); Serial.print(shiftFreq_Hz); Serial.print(" Hz");
+  setFreqKnee_Hz(myState.freq_knee_Hz);
+  setFreqCR(myState.freq_CR);
+  setFreqShift_Hz(myState.freq_shift_Hz); //0 is no freq shifting.
+  Serial.print("FFT resolution allowed for a shift of "); Serial.print(myState.freq_shift_Hz); Serial.print(" Hz");
+
   
   //Enable the Tympan to start the audio flowing!
   myTympan.enable(); // activate AIC
@@ -207,15 +172,14 @@ void setup() {
   //switchToLineInOnMicJack();  //use Mic jack as line input (ie, no mic bias)
   
   //Set the desired volume levels
-  myTympan.volume_dB(0);                   // headphone amplifier.  -63.6 to +24 dB in 0.5dB steps.
+  setOutputGain_dB(myState.output_gain_dB);    // headphone amplifier.  -63.6 to +24 dB in 0.5dB steps.
    
   // configure the blue potentiometer
   servicePotentiometer(millis(),0); //update based on the knob setting the "0" is not relevant here.
 
   //setup BLE
   while (Serial1.available()) Serial1.read(); //clear the incoming Serial1 (BT) buffer
-  setupBLE();
-
+  ble.setupBLE(myTympan);
 
   //finish the setup by printing the help menu to the serial connections
   serialManager.printHelp();
@@ -230,12 +194,12 @@ void loop() {
 
   //respond to BLE
   if (ble.available() > 0) {
-    msgFromBle = "";  msgLen = ble.recvBLE(&msgFromBle);
-    for (int i=0; i < msgLen; i++)  serialManager.respondToByte(msgFromBle[i]);
+    String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
+    for (int i=0; i < msgLen; i++) respondToByte(msgFromBle[i]);
   }
 
-  //service the BLE (keep it alive to enabe connection)
-  serviceBLE(millis(),5000);  //check every 5000 msec
+  //If there is no BLE connection, make sure that we keep advertising
+  ble.updateAdvertising(millis(),5000);  //check every 5000 msec
   
   //check the potentiometer
   servicePotentiometer(millis(), 100); //service the potentiometer every 100 msec
@@ -268,10 +232,10 @@ void servicePotentiometer(unsigned long curTime_millis, const unsigned long upda
       prev_val = val;  //save the value for comparison for the next time around
 
       //change the volume
-      float vol_dB = 0.f + 30.0f * ((val - 0.5) * 2.0); //set volume as 0dB +/- 30 dB
-      myTympan.print("Changing output volume to = "); myTympan.print(vol_dB); myTympan.println(" dB");
-      myTympan.volume_dB(vol_dB);
-
+      float gain_dB = 0.f + 30.0f * ((val - 0.5) * 2.0); //set volume as 0dB +/- 30 dB
+      myTympan.print("Changing output volume to = "); myTympan.print(gain_dB); myTympan.println(" dB");
+      setOutputGain_dB(gain_dB);
+      serialManager.setOutputGainButtons();
     }
 
     
@@ -282,34 +246,52 @@ void servicePotentiometer(unsigned long curTime_millis, const unsigned long upda
 
 void printGainSettings(void) {
   myTympan.print("Gain (dB): ");
-  myTympan.print("Vol Knob = "); myTympan.print(vol_knob_gain_dB,1);
-  //myTympan.print(", Input PGA = "); myTympan.print(input_gain_dB,1);
+  myTympan.print("  Input Gain = ");myTympan.println(myState.input_gain_dB);
+  myTympan.print("  Digital Gain = "); myTympan.print(myState.digital_gain_dB,1);
+  myTympan.print("  Output Gain = ");myTympan.println(myState.output_gain_dB);
   myTympan.println();
 }
 
 
-void incrementKnobGain(float increment_dB) { //"extern" to make it available to other files, such as SerialManager.h
-  setVolKnobGain_dB(vol_knob_gain_dB+increment_dB);
+float setInputGain_dB(float gain_dB) {
+  return myState.input_gain_dB = myTympan.setInputGain_dB(gain_dB);
 }
 
-void setVolKnobGain_dB(float gain_dB) {
-  vol_knob_gain_dB = gain_dB;
-  gain_L.setGain_dB(vol_knob_gain_dB);gain_R.setGain_dB(vol_knob_gain_dB);
+float setOutputGain_dB(float gain_dB) {
+  return myState.output_gain_dB = myTympan.volume_dB(gain_dB);
+}
+
+void incrementDigitalGain(float increment_dB) { //"extern" to make it available to other files, such as SerialManager.h
+  setDigitalGain_dB(myState.digital_gain_dB +increment_dB);
+}
+
+void setDigitalGain_dB(float gain_dB) {
+  myState.digital_gain_dB = gain_L.setGain_dB(gain_R.setGain_dB(vol_knob_gain_dB));
   printGainSettings();
 }
 
 float incrementFreqKnee(float incr_factor) {
   float cur_val = freqShift_L.getStartFreq_Hz();
-  return freqShift_R.setStartFreq_Hz(freqShift_L.setStartFreq_Hz(cur_val + incr_factor));
+  return setFreqKnee_Hz(cur_val + incr_factor);
 }
+float setFreqKnee_Hz(float new_val) {
+  return myState.freq_knee_Hz =  freqShift_R.setStartFreq_Hz(freqShift_L.setStartFreq_Hz(new_val));
+}
+
 
 float incrementFreqCR(float incr_factor) {
   incr_factor = max(0.1,min(5.0,incr_factor));
   float cur_val = freqShift_L.getFreqCompRatio();
-  return freqShift_R.setFreqCompRatio(freqShift_L.setFreqCompRatio(cur_val * incr_factor));
+  return setFreqCR(cur_val * incr_factor);
+}
+float setFreqCR(float new_val) {
+  return myState.freqCR = freqShift_R.setFreqCompRatio(freqShift_L.setFreqCompRatio(cur_val * incr_factor));
 }
 
 float incrementFreqShift(float incr_factor) {
   float cur_val = freqShift_L.getShift_Hz();
-  return freqShift_R.setShift_Hz(freqShift_L.setShift_Hz(cur_val + incr_factor));
+  return setFreqShift_Hz(cur_val+incr_factor);
+}
+float setFreqShift_Hz(float new_val) {
+  return myState.freq_shift_Hz = freqShift_R.setShift_Hz(freqShift_L.setShift_Hz(new_val));
 }

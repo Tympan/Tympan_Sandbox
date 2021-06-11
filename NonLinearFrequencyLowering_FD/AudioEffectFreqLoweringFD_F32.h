@@ -131,7 +131,7 @@ class AudioEffectFreqLoweringFD_F32 : public AudioStream_F32
 
     virtual void update(void);
     //virtual void processAudioFD(float *audio, int N_FFT);
-    virtual void processAudioFD_vocode(float *audio, int N_FFT);
+    virtual void processAudioFD_NL_vocode(float *audio, int N_FFT);
     //virtual void processAudioFD_pitchShift(float *audio, int N_FFT);
 
   private:
@@ -169,7 +169,7 @@ void AudioEffectFreqLoweringFD_F32::update(void)
   // ////////////// Do your processing here!!!
 
   //if (shiftOnlyTheMagnitude) {
-    processAudioFD_vocode(complex_2N_buffer, myFFT.getNFFT()); 
+    processAudioFD_NL_vocode(complex_2N_buffer, myFFT.getNFFT()); 
   //} else {
   //  processAudioFD_pitchShift(complex_2N_buffer, myFFT.getNFFT()); 
   //}
@@ -191,7 +191,7 @@ void AudioEffectFreqLoweringFD_F32::update(void)
 
 
 //shift the audio by vocoding, which is the shifting of the FFT amplitudes but leaving the FFT phases in place
-void AudioEffectFreqLoweringFD_F32::processAudioFD_vocode(float32_t *comples_2N_buffer, int fftSize) { //define some variables
+void AudioEffectFreqLoweringFD_F32::processAudioFD_NL_vocode(float32_t *comples_2N_buffer, int fftSize) { //define some variables
   int N_2 = fftSize / 2 + 1;
   float Hz_per_bin = sample_rate_Hz / fftSize;
   float inv_shift_scale_fac = 1.0f / shift_scale_fac;
