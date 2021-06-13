@@ -146,7 +146,7 @@ void AudioEffectNoiseReduction_FD_F32::processAudioFD(float32_t *complex_2N_buff
   if (ave_spectrum == NULL) return; //if the memory for the average has yet to be initialized, return early
   if (gains == NULL) return;  //if the memory for the gain has yet to be initialized, return early
   int N_2 = NFFT / 2 + 1;
-  float Hz_per_bin = sample_rate_Hz /((float)NFFT); //sample_rate_Hz is from the base class AudioFreqDomainBase_FD_F32
+  //float Hz_per_bin = sample_rate_Hz /((float)NFFT); //sample_rate_Hz is from the base class AudioFreqDomainBase_FD_F32
   
   //compute the magnitude^2 of each FFT bin (up to Nyquist)
   float raw_pow[N_2]; //create memory to hold the magnitude^2 values
