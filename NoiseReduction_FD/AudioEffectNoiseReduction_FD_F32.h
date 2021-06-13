@@ -143,15 +143,13 @@ void AudioEffectNoiseReduction_FD_F32::calcGainBasedOnSpectrum(float32_t *curren
 //
 //  We get our data from complex_2N_buffer and we put our results back into complex_2N_buffer
 void AudioEffectNoiseReduction_FD_F32::processAudioFD(float32_t *complex_2N_buffer, const int NFFT) {
-
   if (ave_spectrum == NULL) return; //if the memory for the average has yet to be initialized, return early
   if (gains == NULL) return;  //if the memory for the gain has yet to be initialized, return early
-
   int N_2 = NFFT / 2 + 1;
   float Hz_per_bin = sample_rate_Hz /((float)NFFT); //sample_rate_Hz is from the base class AudioFreqDomainBase_FD_F32
   
-  //compute the magnitude^2 of each FFT bin (up to Nyquist
-  float raw_pow[N_2];
+  //compute the magnitude^2 of each FFT bin (up to Nyquist)
+  float raw_pow[N_2]; //create memory to hold the magnitude^2 values
   arm_cmplx_mag_squared_f32(complex_2N_buffer, raw_pow, N_2);  //get the magnitude for each FFT bin and store somewhere safes
 
   //loop over each bin and compute the long-term average, which we assume to be the "noise" background
@@ -159,6 +157,9 @@ void AudioEffectNoiseReduction_FD_F32::processAudioFD(float32_t *complex_2N_buff
  
   //calcluate the new gain values based on the current magnitude versus the ave magnitude
   calcGainBasedOnSpectrum(raw_pow);
+
+  //frequency and time smoothing of the gains
+  //TBD
 
   //Loop over each bin and apply the gain
   for (int ind = 0; ind < ave_spectrum_N; ind++) { //only process up to Nyquist...the class will automatically rebuild the frequencies above Nyquist
