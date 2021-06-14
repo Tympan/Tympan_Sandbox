@@ -15,11 +15,6 @@
 // FFT bins and not all of the detailed, tricky operations of going into and out of the frequency
 // domain.
 
-//
-// To Do: add frequency and time smoothing of the attenuated gain values to reduce
-// the "bubbling water" sound that results from this type of noise reduction.
-//
-
 class AudioEffectNoiseReduction_FD_F32 : public AudioFreqDomainBase_FD_F32   //AudioFreqDomainBase_FD_F32 is in Tympan_Library
 {
   public:
@@ -28,6 +23,7 @@ class AudioEffectNoiseReduction_FD_F32 : public AudioFreqDomainBase_FD_F32   //A
 
     //destructor...release all of the memory that has been allocated
     ~AudioEffectNoiseReduction_FD_F32(void) {
+      if (prev_gains != NULL) delete prev_gains;
       if (gains != NULL) delete gains;
       if (ave_spectrum != NULL) delete ave_spectrum;
     }
@@ -40,13 +36,13 @@ class AudioEffectNoiseReduction_FD_F32 : public AudioFreqDomainBase_FD_F32   //A
     float32_t getAveSpectrum(int ind) { if (ind < ave_spectrum_N) return ave_spectrum[ind]; }
     float32_t *getAveSpectrumPtr(void) { return ave_spectrum; }
     float32_t setAttack_sec(float32_t att) { 
-      if (att >= 0.0001) attack_sec = att; 
+      if (att >= 0.001f) attack_sec = att; 
       attack_coeff = calcCoeffGivenTimeConstant(attack_sec, getOverlappedFFTRate_Hz());     //getOverlappedFFTRate_Hz() is in AudioFreqDomainBase_FD_F32
       return attack_sec; 
     }
     float32_t getAttack_sec(void) { return attack_sec; }
     float32_t setRelease_sec(float32_t rel) { 
-      if (rel >= 0.0001) release_sec = rel; 
+      if (rel >= 0.001f) release_sec = rel; 
       release_coeff = calcCoeffGivenTimeConstant(release_sec, getOverlappedFFTRate_Hz()); //getOverlappedFFTRate_Hz() is in AudioFreqDomainBase_FD_F32
       return release_sec; 
     }
@@ -67,18 +63,29 @@ class AudioEffectNoiseReduction_FD_F32 : public AudioFreqDomainBase_FD_F32   //A
       return getTransitionWidth_dB();
     };
     float32_t getTransitionWidth_dB(void) { return 10.0f*log10f(transition_width); }
+    float32_t setGainSmoothing_octaves(float32_t val_oct) { return freq_smooth_octaves = max(0.0,val_oct); }
+    float32_t getGainSmoothing_octaves(void) { return freq_smooth_octaves; }
+    float32_t setGainSmoothing_sec(float32_t val_sec) {
+      if (val_sec >= 0.001f) smooth_sec = val_sec;
+      smooth_coeff = calcCoeffGivenTimeConstant(smooth_sec, getOverlappedFFTRate_Hz()); //getOverlappedFFTRate_Hz() is in AudioFreqDomainBase_FD_F32;
+      return smooth_sec;
+    }
+    float32_t getGainSmoothing_sec(void) { return smooth_sec; }
     float32_t calcCoeffGivenTimeConstant(float32_t time_const_sec, float32_t block_rate_Hz) {
       //http://www.tsdconseil.fr/tutos/tuto-iir1-en.pdf
       //normally, this is computed using the sample rate.  We however will be applying the filter
       //only once every time the FFT is computed, so we substitute the FFT rate for the sample rate 
-      return 1.0f - expf(-1.0f / (time_const_sec * block_rate_Hz));
+      float32_t val =  1.0f - expf(-1.0f / (time_const_sec * block_rate_Hz));
+      return max(0.0f,min(1.0f, val));
     }
     bool setEnableNoiseEstimationUpdates(bool true_is_update) { return enableNoiseEstimationUpdates = true_is_update; }
     bool getEnableNoiseEstimationUpdates(void) { return enableNoiseEstimationUpdates; }
    
-    void resetAveSpectrumAndGains(void) { for (int ind=0; ind < ave_spectrum_N; ind++) { ave_spectrum[ind]=0.0f; gains[ind] = 1.0f; } };
+    void resetAveSpectrumAndGains(void) { for (int ind=0; ind < ave_spectrum_N; ind++) { ave_spectrum[ind]=0.0f; gains[ind] = 1.0f; prev_gains[ind]=1.0; } };
     void updateAveSpectrum(float32_t *current_pow);
-    void calcGainBasedOnSpectrum(float32_t *current_pow);
+    void calcGainsBasedOnSpectrum(float32_t *current_pow);
+    void smoothGainsInTime(void);
+    void smoothGainsInFrequency(void);
 
     //this is the method from AudioFreqDomainBase that we are overriding where we will
     //put our own code for manipulating the frequency data.  This is called by update()
@@ -88,14 +95,16 @@ class AudioEffectNoiseReduction_FD_F32 : public AudioFreqDomainBase_FD_F32   //A
 
   protected:
     //create some data members specific to our processing
-    float *ave_spectrum = NULL, *gains = NULL;
+    float *ave_spectrum = NULL, *gains = NULL, *prev_gains = NULL;
     int ave_spectrum_N = 0;
-    float32_t attack_sec = 5.0f, attack_coeff = 0;
-    float32_t release_sec = 1.0f, release_coeff = 0;
+    float32_t attack_sec = 10.0f, attack_coeff = 0;
+    float32_t release_sec = 3.0f, release_coeff = 0;
+    float32_t smooth_sec = 0.01f, smooth_coeff = 1.0; 
     bool enableNoiseEstimationUpdates = true;
     float32_t max_gain = 1.0;               //linear not dB, amplitude not power (so 2.0 is 6 dB)
     float32_t SNR_for_max_atten = 2.0;     //linear not dB, but it is power  (so, 2.0 is 3dB)
     float32_t transition_width = 4.0;      //linear not dB, but it is power  (so, 4.0 is 6dB)
+    float32_t freq_smooth_octaves = 0.5;     //octave width of frequency-smoothing filter...larger results in more smoothing, lower results in less
    
 };
 
@@ -104,9 +113,11 @@ int AudioEffectNoiseReduction_FD_F32::setup(const AudioSettings_F32 &settings, c
   ave_spectrum_N = actual_N_FFT / 2 + 1;  // zero bin through Nyquist bin
   ave_spectrum = new float32_t[ave_spectrum_N];
   gains = new float32_t[ave_spectrum_N];
+  prev_gains = new float32_t[ave_spectrum_N];
   resetAveSpectrumAndGains();
   setAttack_sec(attack_sec);   //computes the underlying attack filter coefficient
-  setRelease_sec(release_sec); //computes the underlying release rilter coefficient
+  setRelease_sec(release_sec); //computes the underlying release filter coefficient
+  setGainSmoothing_sec(smooth_sec); //computes the underlying smoothing filter coefficient
   return actual_N_FFT;
 }
 
@@ -126,7 +137,7 @@ void AudioEffectNoiseReduction_FD_F32::updateAveSpectrum(float32_t *current_pow)
     }
 }
 
-void AudioEffectNoiseReduction_FD_F32::calcGainBasedOnSpectrum(float32_t *current_pow) {
+void AudioEffectNoiseReduction_FD_F32::calcGainsBasedOnSpectrum(float32_t *current_pow) {
   //loop over each bin, evaluate where the current level is relative to the average, and compute the desired gain
   float32_t SNR;
   const float32_t SNR_at_endTransition = SNR_for_max_atten*transition_width;
@@ -153,6 +164,55 @@ void AudioEffectNoiseReduction_FD_F32::calcGainBasedOnSpectrum(float32_t *curren
   }
 }
 
+//smooth gain values in frequency with simple first-order filter
+void AudioEffectNoiseReduction_FD_F32::smoothGainsInFrequency(void) {
+  const float32_t scale_fac_div2 = freq_smooth_octaves * 0.5f;
+  int count=0, start_ind=0, end_ind=0;
+  int n_ave_half = 0;
+  
+  //initialize
+  float32_t orig_gains[ave_spectrum_N];
+  for (int ind = 0; ind < ave_spectrum_N; ind++) orig_gains[ind] = gains[ind];
+
+  //loop over gains and smooth with neighbors
+  for (int ind = 1; ind < ave_spectrum_N; ind++) {
+    float32_t foo_out = orig_gains[ind]; count = 1;
+
+    //how much averaging?
+    n_ave_half = (int)(ind*scale_fac_div2 + 0.5f); //round
+    if (n_ave_half > 0) {
+
+      //left half
+      start_ind = max(0,ind - n_ave_half);      end_ind = ind;
+      for(int i=start_ind; i<end_ind;i++) {
+        foo_out += orig_gains[i]; count++;
+      }
+
+      if (ind < (ave_spectrum_N-1)) { //don't average to the right if we're at the last frequency bin
+        //right half
+        start_ind = ind+1;  end_ind = min(ave_spectrum_N-1, ind + n_ave_half);
+        for(int i=start_ind; i<end_ind;i++) {
+          foo_out += orig_gains[i]; count++;
+        }
+      }
+
+      //complete the averaging
+      foo_out /= ((float)count);
+    }
+    
+    gains[ind] = foo_out;
+  }
+}
+
+
+//smooth gain values in time with simple first-order filter
+void AudioEffectNoiseReduction_FD_F32::smoothGainsInTime(void) {
+  float32_t coeff_1 = 0.9999f*(1.0f-smooth_coeff);
+  for (int ind = 0; ind < ave_spectrum_N; ind++) {
+    gains[ind] = prev_gains[ind] = coeff_1 * prev_gains[ind] + smooth_coeff*gains[ind];
+  }
+}
+
 //Here is the method we are overriding with our own algorithm...REPLACE THIS WITH WHATEVER YOU WANT!!!!
 //  Argument 1: complex_2N_buffer is the float32_t array that holds the FFT results that we are going to
 //     manipulate.  It is 2*NFFT in length because it contains the real and imaginary data values
@@ -175,10 +235,11 @@ void AudioEffectNoiseReduction_FD_F32::processAudioFD(float32_t *complex_2N_buff
   if (enableNoiseEstimationUpdates) updateAveSpectrum(raw_pow); //updates ave_spectrum, which is one of the data members of this class
  
   //calcluate the new gain values based on the current magnitude versus the ave magnitude
-  calcGainBasedOnSpectrum(raw_pow);
+  calcGainsBasedOnSpectrum(raw_pow);
 
-  //frequency and time smoothing of the gains
-  //TBD
+  //smooth the gains in frequency and in time (to reducting the "bubbling water" artifacts)
+  smoothGainsInFrequency();
+  smoothGainsInTime();
 
   //Loop over each bin and apply the gain
   for (int ind = 0; ind < ave_spectrum_N; ind++) { //only process up to Nyquist...the class will automatically rebuild the frequencies above Nyquist

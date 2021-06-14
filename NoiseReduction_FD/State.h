@@ -15,11 +15,12 @@ class State : public TympanStateBase_UI { // look in TympanStateBase for more st
 
     //Frequency processing
     bool NR_enable = true;
-    float NR_attack_sec = 5.0;
-    float NR_release_sec = 2.0;
+    float NR_attack_sec = 10.0;
+    float NR_release_sec = 3.0;
     float NR_max_atten_dB = 16.0;
     float NR_SNR_at_max_atten_dB = 6.0;
     float NR_transition_width_dB = 6.0;
+    float NR_gain_smooth_sec = 0.005;
     bool NR_enable_noise_est_updates = true;
     
 };

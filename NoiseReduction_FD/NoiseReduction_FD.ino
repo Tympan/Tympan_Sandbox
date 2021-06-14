@@ -24,7 +24,7 @@
 
 //set the sample rate and block size
 const float sample_rate_Hz = 44100.f; ;   //24000 or 44117 (or other frequencies in the table in AudioOutputI2S_F32)
-const int audio_block_samples = 64;       //for freq domain processing choose a power of 2 (16, 32, 64, 128) but no higher than 128
+const int audio_block_samples = 32;       //for freq domain processing choose a power of 2 (16, 32, 64, 128) but no higher than 128
 const int FFT_overlap_factor = 4;         //2 is 50% overlap, 4 is 75% overlap
 AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 
@@ -50,9 +50,18 @@ BLE ble = BLE(&Serial1);
 SerialManager serialManager(&ble);
 State myState(&audio_settings, &myTympan);
 
+//set up the serial manager
+void setupSerialManager(void) {
+  //register all the UI elements here
+  serialManager.add_UI_element(&myState);
+
+  //create the GUI (but don't transmit it yet.  wait for the requuest from the phone.)
+  serialManager.createTympanRemoteLayout();
+}
+
 
 //inputs and levels
-float default_mic_input_gain_dB = 15.0f; //gain on the microphone
+float default_mic_input_gain_dB = 20.0f; //gain on the microphone
 void switchToPCBMics(void) {
   myTympan.println("Switching to PCB Mics.");
   myTympan.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the microphone jack - defaults to mic bias OFF
@@ -73,13 +82,13 @@ void switchToMicInOnMicJack(void) {
 // define the setup() function, the function that is called once when the device is booting
 void setup() {
   //begin the serial comms (for debugging)
-  myTympan.beginBothSerial();delay(3000);
+  myTympan.beginBothSerial();delay(1500);
   Serial.println("NoiseReduction_FD: starting setup()...");
   Serial.print("    : sample rate (Hz) = ");  Serial.println(audio_settings.sample_rate_Hz);
   Serial.print("    : block size (samples) = ");  Serial.println(audio_settings.audio_block_samples);
 
   // Allocate working memory for audio
-  AudioMemory_F32(20, audio_settings);
+  AudioMemory_F32(30, audio_settings);
 
   // Configure the FFT parameters algorithm
   int N_FFT = audio_block_samples * FFT_overlap_factor;//set to 2 or 4...which yields 50% or 75% overlap 
@@ -93,6 +102,7 @@ void setup() {
   set_NR_max_atten_dB(myState.NR_max_atten_dB);
   set_NR_SNR_at_max_atten_dB(myState.NR_SNR_at_max_atten_dB);
   set_NR_transition_width_dB(myState.NR_transition_width_dB);
+  set_NR_gain_smoothing_sec(myState.NR_gain_smooth_sec);
   set_NR_enable_noise_est_updates(myState.NR_enable_noise_est_updates);
 
  //Enable the Tympan to start the audio flowing!
@@ -121,6 +131,7 @@ void setup() {
   #endif
 
   //finish the setup by printing the help menu to the serial connections
+  setupSerialManager();
   serialManager.printHelp();
 }
 
@@ -217,12 +228,10 @@ bool set_NR_enable(bool val) {
 }
 float increment_NR_attack_sec(float incr_fac) { return set_NR_attack_sec(myState.NR_attack_sec * incr_fac); }
 float set_NR_attack_sec(float val_sec) { 
-  if (val_sec >= 0.001) val_sec = 0.001; 
   return myState.NR_attack_sec = noiseReduction.setAttack_sec(myState.NR_attack_sec);
 }
 float increment_NR_release_sec(float incr_fac) { return set_NR_release_sec(myState.NR_release_sec * incr_fac); }
 float set_NR_release_sec(float val_sec) { 
-  if (val_sec >= 0.001) val_sec = 0.001; 
   return myState.NR_release_sec = noiseReduction.setRelease_sec(myState.NR_release_sec); 
 }
 float increment_NR_max_atten_dB(float incr_dB) { return set_NR_max_atten_dB(myState.NR_max_atten_dB + incr_dB); }
@@ -236,6 +245,10 @@ float set_NR_SNR_at_max_atten_dB(float val_dB) {
 float increment_NR_transition_width_dB(float incr_dB) { return set_NR_transition_width_dB(myState.NR_transition_width_dB + incr_dB); }
 float set_NR_transition_width_dB(float val_dB) { 
   return myState.NR_transition_width_dB = noiseReduction.setTransitionWidth_dB(val_dB); 
+}
+float increment_NR_gain_smoothing_sec(float incr_fac) { return set_NR_gain_smoothing_sec(myState.NR_gain_smooth_sec * incr_fac); }
+float set_NR_gain_smoothing_sec(float val_sec) {
+  return myState.NR_gain_smooth_sec = noiseReduction.setGainSmoothing_sec(val_sec);
 }
 bool set_NR_enable_noise_est_updates(bool val) { 
   return myState.NR_enable_noise_est_updates = noiseReduction.setEnableNoiseEstimationUpdates(val); 
