@@ -17,11 +17,13 @@ extern void switchToPCBMics(void);
 extern void switchToMicInOnMicJack(void);
 extern void switchToLineInOnMicJack(void);
 
+extern bool set_NR_enable(bool val);
 extern float increment_NR_attack_sec(float incr_fac);
 extern float increment_NR_release_sec(float incr_fac); 
 extern float increment_NR_max_atten_dB(float incr_dB);
-extern float increment_NR_threshold_SNR_dB(float incr_dB);
-extern float set_NR_enable_noise_est_updates(bool val);
+extern float increment_NR_SNR_at_max_atten_dB(float incr_dB);
+extern float increment_NR_transition_width_dB(float incr_dB);
+extern bool set_NR_enable_noise_est_updates(bool val);
 
 //now, define the Serial Manager class
 class SerialManager : public SerialManagerBase {
@@ -47,7 +49,7 @@ class SerialManager : public SerialManagerBase {
     float gainIncrement = 2.5f; 
     float attack_release_fac = 1.414213562f; //will be used to multiply or divide the current attack and release time
     float incr_atten_dB = 1.0;
-    float incr_thresh_dB = 1.0;
+    float incr_SNR_dB = 1.0;
     
   private:
     TympanRemoteFormatter myGUI;  //Creates the GUI-writing class for interacting with TympanRemote App
@@ -66,11 +68,13 @@ void SerialManager::printHelp(void) {
   Serial.println("   l: switch to line-in via mic jack");
   Serial.print(  "   k/K: Increase the digital gain (cur:"); Serial.print(myState.digital_gain_dB); Serial.println(" dB)");
   Serial.println(" Noise Reduction: No Prefix");
+  Serial.print(  "   e/E: Enable/Disable NR (is_enabled = "); Serial.print(myState.NR_enable); Serial.println(")");
   Serial.print(  "   t/T: Raise/Lower attack time (cur: "); Serial.print(myState.NR_attack_sec); Serial.println(" sec)");
   Serial.print(  "   r/R: Raise/Lower release time (cur: "); Serial.print(myState.NR_release_sec); Serial.println(" sec)");
-  Serial.print(  "   a/A: Raise/Lower max atte (cur: "); Serial.print(myState.NR_max_atten_dB); Serial.println(" dB)");
-  Serial.print(  "   v/V: Raise/Lower SNR threshold (cur: "); Serial.print(myState.NR_threshold_SNR_dB); Serial.println( " dB)");
-  Serial.print(  "   u/U: Enable/Disable updating noise estimate (is_enabled = "); Serial.print(myState.NR_enable_noise_est_updates); Serial.print(")");
+  Serial.print(  "   a/A: Raise/Lower max atten (cur: "); Serial.print(myState.NR_max_atten_dB); Serial.println(" dB)");
+  Serial.print(  "   v/V: Raise/Lower SNR for max atten (cur: "); Serial.print(myState.NR_SNR_at_max_atten_dB); Serial.println( " dB)");
+  Serial.print(  "   y/Y: Raise/Lower SNR transition width (cur: "); Serial.print(myState.NR_transition_width_dB); Serial.println( " dB)");
+  Serial.print(  "   u/U: Enable/Disable updating noise estimate (is_enabled = "); Serial.print(myState.NR_enable_noise_est_updates); Serial.println(")");
   SerialManagerBase::printHelp();  ////in here, it automatically loops over the different UI elements issuing printHelp()
 }
 
@@ -96,6 +100,16 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       switchToMicInOnMicJack(); break;
     case 'l':
       switchToLineInOnMicJack();break;
+    case 'e':
+      { bool new_val = set_NR_enable(true);
+      Serial.print("Recieved: enable noise reduction = "); Serial.println(new_val);}
+      setNoiseRedButtons();
+      break;
+    case 'E':
+      { bool new_val = set_NR_enable(false);
+      Serial.print("Recieved: enable noise reduction = "); Serial.println(new_val);}
+      setNoiseRedButtons();;
+      break;      
     case 't':
       { float new_val = increment_NR_attack_sec(attack_release_fac);
       Serial.print("Recieved: new attack (sec) = "); Serial.println(new_val);}
@@ -127,15 +141,25 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       setNoiseRedButtons();;
       break;
      case 'v':
-      { float new_val = increment_NR_threshold_SNR_dB(incr_thresh_dB);
-      Serial.print("Recieved: new SNR threshold (dB) = "); Serial.println(new_val);}
+      { float new_val = increment_NR_SNR_at_max_atten_dB(incr_SNR_dB);
+      Serial.print("Recieved: new SNR at max atten (dB) = "); Serial.println(new_val);}
       setNoiseRedButtons();
       break;
     case 'V':
-      { float new_val = increment_NR_threshold_SNR_dB(-incr_thresh_dB);
-      Serial.print("Recieved: new SNR threshold (dB) = "); Serial.println(new_val);}
+      { float new_val = increment_NR_SNR_at_max_atten_dB(-incr_SNR_dB);
+      Serial.print("Recieved: new SNR  at max atten (dB) = "); Serial.println(new_val);}
       setNoiseRedButtons();;
       break;
+     case 'y':
+      { float new_val = increment_NR_transition_width_dB(incr_SNR_dB);
+      Serial.print("Recieved: new transition width (dB) = "); Serial.println(new_val);}
+      setNoiseRedButtons();
+      break;
+    case 'Y':
+      { float new_val = increment_NR_transition_width_dB(-incr_SNR_dB);
+      Serial.print("Recieved: new transition width (dB) = "); Serial.println(new_val);}
+      setNoiseRedButtons();;
+      break;      
     case 'u':
       { bool new_val = set_NR_enable_noise_est_updates(true);
       Serial.print("Recieved: enable noise esimation updates = "); Serial.println(new_val);}
@@ -172,16 +196,25 @@ void SerialManager::createTympanRemoteLayout(void) {
       card_h->addButton("-", "K", "",          4);  //displayed string, command, button ID, button width (out of 12)
       card_h->addButton("",  "",  "digGain",   4);  //displayed string (blank for now), command (blank), button ID, button width (out of 12)
       card_h->addButton("+", "k", "",          4);   //displayed string, command, button ID, button width (out of 12)
+
+    card_h = page_h->addCard("NR: Enable");  
+      card_h->addButton("Enable", "e", "NRenable",6);  //label, command, id, width
+      card_h->addButton("Disable", "E", "",       6);  //label, command, id, width //display the formant shift value
       
     card_h = page_h->addCard("NR: Max Atten (dB)");  
       card_h->addButton("-", "A", "",          4);  //label, command, id, width
       card_h->addButton("",  "",  "NRatten",   4);  //label, command, id, width //display the formant shift value
       card_h->addButton("+", "a", "",          4);  //label, command, id, width
 
-    card_h = page_h->addCard("NR: SNR Thresh (dB)");  
+    card_h = page_h->addCard("NR: SNR for Max Atten (dB)");  
       card_h->addButton("-", "v", "",          4);  //label, command, id, width
       card_h->addButton("",  "",  "NRthresh",  4);  //label, command, id, width //display the formant shift value
       card_h->addButton("+", "V", "",          4);  //label, command, id, width
+
+    card_h = page_h->addCard("NR: Transition Width (dB)");  
+      card_h->addButton("-", "y", "",          4);  //label, command, id, width
+      card_h->addButton("",  "",  "NRtrans",  4);  //label, command, id, width //display the formant shift value
+      card_h->addButton("+", "Y", "",          4);  //label, command, id, width
 
   page_h = myGUI.addPage("Noise Learning");
 
@@ -239,8 +272,10 @@ void SerialManager::setGainButtons(bool activeButtonsOnly) {  setButtonText("dig
 void SerialManager::setOutputGainButtons(bool activeButtonsOnly) {  setButtonText("outGain", String(myState.output_gain_dB)); }
 
 void SerialManager::setNoiseRedButtons(bool activeButtonsOnly) {
+  setButtonState("NRenable",myState.NR_enable);
   setButtonText("NRatten",String(myState.NR_max_atten_dB,1));
-  setButtonText("NRthresh",String(myState.NR_threshold_SNR_dB,1));
+  setButtonText("NRthresh",String(myState.NR_SNR_at_max_atten_dB,1));
+  setButtonText("NRtrans",String(myState.NR_transition_width_dB,1));
 }
 void SerialManager::setNoiseLearningButtons(bool activeButtonsOnly) {
   setButtonState("NRupdate",myState.NR_enable_noise_est_updates);

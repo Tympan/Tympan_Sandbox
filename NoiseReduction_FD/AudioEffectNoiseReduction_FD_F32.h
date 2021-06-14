@@ -14,6 +14,12 @@
 // audio buffering and FFT/IFFT operations.  That allows us to just focus on manipulating the 
 // FFT bins and not all of the detailed, tricky operations of going into and out of the frequency
 // domain.
+
+//
+// To Do: add frequency and time smoothing of the attenuated gain values to reduce
+// the "bubbling water" sound that results from this type of noise reduction.
+//
+
 class AudioEffectNoiseReduction_FD_F32 : public AudioFreqDomainBase_FD_F32   //AudioFreqDomainBase_FD_F32 is in Tympan_Library
 {
   public:
@@ -45,10 +51,22 @@ class AudioEffectNoiseReduction_FD_F32 : public AudioFreqDomainBase_FD_F32   //A
       return release_sec; 
     }
     float32_t getRelease_sec(void) { return release_sec; }
-    float32_t setMaxAttenuation_dB(float32_t atten_dB) { return max_gain = sqrtf(powf(10.0f, 0.1f*atten_dB)); }
-    float32_t getMaxAttenuation_dB(void) { return 10.0f*log10f(max_gain*max_gain); }
-    float32_t setThresholdSNR_dB(float32_t val_dB) { return SNR_thresh_for_signal = sqrtf(powf(10.0f, 0.1f*val_dB)); }
-    float32_t getThresholdSNR_dB(void) { return 10.0f*log10f(SNR_thresh_for_signal*SNR_thresh_for_signal); }
+    float32_t setMaxAttenuation_dB(float32_t atten_dB) { 
+      max_gain = sqrtf(powf(10.0f, 0.1f*(-atten_dB))); //linear value, amplitude not power
+      return getMaxAttenuation_dB();
+    }
+    float32_t getMaxAttenuation_dB(void) { return -10.0f*log10f(max_gain*max_gain); }
+    float32_t setSNRforMaxAttenuation_dB(float32_t val_dB) { 
+      SNR_for_max_atten = powf(10.0f, 0.1f*val_dB); //linear not dB, but it is power (ie, signal^2)
+      return getSNRforMaxAttenuation_dB();
+      };
+    float32_t getSNRforMaxAttenuation_dB(void) { return 10.0f*log10f(SNR_for_max_atten); };
+    float32_t setTransitionWidth_dB(float32_t val_dB) { 
+      val_dB = max(1.0f, val_dB);
+      transition_width = powf(10.0f, 0.1f*val_dB);  //linear not dB, but it is power (ie, signal^2)
+      return getTransitionWidth_dB();
+    };
+    float32_t getTransitionWidth_dB(void) { return 10.0f*log10f(transition_width); }
     float32_t calcCoeffGivenTimeConstant(float32_t time_const_sec, float32_t block_rate_Hz) {
       //http://www.tsdconseil.fr/tutos/tuto-iir1-en.pdf
       //normally, this is computed using the sample rate.  We however will be applying the filter
@@ -75,8 +93,9 @@ class AudioEffectNoiseReduction_FD_F32 : public AudioFreqDomainBase_FD_F32   //A
     float32_t attack_sec = 5.0f, attack_coeff = 0;
     float32_t release_sec = 1.0f, release_coeff = 0;
     bool enableNoiseEstimationUpdates = true;
-    float32_t max_gain = 1.0;               //linear, not dB
-    float32_t SNR_thresh_for_signal = 3.0;  //linear, not dB  (so, 10dB is about 3.0)
+    float32_t max_gain = 1.0;               //linear not dB, amplitude not power (so 2.0 is 6 dB)
+    float32_t SNR_for_max_atten = 2.0;     //linear not dB, but it is power  (so, 2.0 is 3dB)
+    float32_t transition_width = 4.0;      //linear not dB, but it is power  (so, 4.0 is 6dB)
    
 };
 
@@ -110,26 +129,26 @@ void AudioEffectNoiseReduction_FD_F32::updateAveSpectrum(float32_t *current_pow)
 void AudioEffectNoiseReduction_FD_F32::calcGainBasedOnSpectrum(float32_t *current_pow) {
   //loop over each bin, evaluate where the current level is relative to the average, and compute the desired gain
   float32_t SNR;
-  const float32_t SNR_at_max_gain = 1.0;    //linear.  SNR=1.0 is SNR of 0 dB
-  const float32_t gain_at_threshold =1.0; //linear.  Gain=1.0 is gain of 0 dB
+  const float32_t SNR_at_endTransition = SNR_for_max_atten*transition_width;
+  const float32_t gain_at_endTransition =1.0; //linear.  Gain=1.0 is gain of 0 dB
 
   //loop over each frequency bin (up to Nyquist)
-  const float32_t coeff = (gain_at_threshold - max_gain)/(SNR_thresh_for_signal - SNR_at_max_gain);
+  const float32_t coeff = (gain_at_endTransition - max_gain)/(SNR_at_endTransition - SNR_for_max_atten);
   for (int ind=0; ind < ave_spectrum_N; ind++) {
     SNR = current_pow[ind] / ave_spectrum[ind]; //compute signal to noise ratio (linear, not dB)
 
     //calculate gain differently based on different SNR regimes
-    if (SNR < SNR_at_max_gain) { //note SNR=1.0 is an SNR of 0 dB
+    if (SNR <= SNR_for_max_atten) { //note SNR=1.0 is an SNR of 0 dB
       //this is definitely noise.  max attenuation
       gains[ind] = max_gain; //linear value, not dB
       
-    } else if (SNR >  SNR_thresh_for_signal) {
+    } else if (SNR >=  SNR_at_endTransition) {
       //this is definitely signal.  no attenuation
-      gains[ind] = gain_at_threshold; //linear value, not dB
+      gains[ind] = gain_at_endTransition; //linear value, not dB
       
     } else {
       //we're in-between, so it's a transition region.  This transition is best done in dB space, but let's try it in linear space
-      gains[ind]= (SNR - SNR_at_max_gain) * coeff + max_gain ;
+      gains[ind]= (SNR - SNR_for_max_atten) * coeff + max_gain ;
     }
   }
 }

@@ -42,7 +42,7 @@ AudioConnection_F32       patchCord11(gain_L, 0, i2s_out, 0);         //connect 
 AudioConnection_F32       patchCord12(gain_L, 0, i2s_out, 1);         //connect the gain to the right output
 
 //Create BLE
-#define USE_BLE (true)
+#define USE_BLE (false)
 const bool use_ble = USE_BLE;
 BLE ble = BLE(&Serial1);
 
@@ -87,10 +87,12 @@ void setup() {
   noiseReduction.setup(audio_settings, N_FFT); //do after AudioMemory_F32();
 
   //configure the noise reduction
+  set_NR_enable(myState.NR_enable);
   set_NR_attack_sec(myState.NR_attack_sec); 
   set_NR_release_sec(myState.NR_release_sec);
   set_NR_max_atten_dB(myState.NR_max_atten_dB);
-  set_NR_threshold_SNR_dB(myState.NR_threshold_SNR_dB);
+  set_NR_SNR_at_max_atten_dB(myState.NR_SNR_at_max_atten_dB);
+  set_NR_transition_width_dB(myState.NR_transition_width_dB);
   set_NR_enable_noise_est_updates(myState.NR_enable_noise_est_updates);
 
  //Enable the Tympan to start the audio flowing!
@@ -210,6 +212,9 @@ void incrementDigitalGain(float increment_dB) { setDigitalGain_dB(myState.digita
 void setDigitalGain_dB(float gain_dB) {  myState.digital_gain_dB = gain_L.setGain_dB(gain_dB); }
 
 // // Noise reduction parameters
+bool set_NR_enable(bool val) { 
+  return myState.NR_enable = noiseReduction.enable(val); 
+}
 float increment_NR_attack_sec(float incr_fac) { return set_NR_attack_sec(myState.NR_attack_sec * incr_fac); }
 float set_NR_attack_sec(float val_sec) { 
   if (val_sec >= 0.001) val_sec = 0.001; 
@@ -224,10 +229,14 @@ float increment_NR_max_atten_dB(float incr_dB) { return set_NR_max_atten_dB(mySt
 float set_NR_max_atten_dB(float val_dB) { 
   return myState.NR_max_atten_dB = noiseReduction.setMaxAttenuation_dB(val_dB); 
 }
-float increment_NR_threshold_SNR_dB(float incr_dB) { return set_NR_threshold_SNR_dB(myState.NR_threshold_SNR_dB + incr_dB); }
-float set_NR_threshold_SNR_dB(float val_dB) { 
-  return myState.NR_threshold_SNR_dB = noiseReduction.setThresholdSNR_dB(val_dB); 
+float increment_NR_SNR_at_max_atten_dB(float incr_dB) { return set_NR_SNR_at_max_atten_dB(myState.NR_SNR_at_max_atten_dB + incr_dB); }
+float set_NR_SNR_at_max_atten_dB(float val_dB) { 
+  return myState.NR_SNR_at_max_atten_dB = noiseReduction.setSNRforMaxAttenuation_dB(val_dB); 
 }
-float set_NR_enable_noise_est_updates(bool val) { 
+float increment_NR_transition_width_dB(float incr_dB) { return set_NR_transition_width_dB(myState.NR_transition_width_dB + incr_dB); }
+float set_NR_transition_width_dB(float val_dB) { 
+  return myState.NR_transition_width_dB = noiseReduction.setTransitionWidth_dB(val_dB); 
+}
+bool set_NR_enable_noise_est_updates(bool val) { 
   return myState.NR_enable_noise_est_updates = noiseReduction.setEnableNoiseEstimationUpdates(val); 
 }
