@@ -26,7 +26,7 @@ AudioConnection_F32           patchCord1(i2s_in, 0, i2s_out, 0); //connect left 
 AudioConnection_F32           patchCord2(i2s_in, 1, i2s_out, 1); //connect right input to right output
 #else
 AudioConnection_F32           patchCord1(i2s_in,0,mixerL,0);
-AudioConnection_F32           patchCord2(i2s_in,1,mixerL,1);
+AudioConnection_F32           patchCord2(i2s_in,1,mixerR,1);
 AudioConnection_F32           patchCord5(mixerL,0,gainL,0);
 AudioConnection_F32           patchCord6(mixerR,0,gainR,0);
 AudioConnection_F32           patchCord11(gainL,0,i2s_out,0);
@@ -48,7 +48,7 @@ void setup(void)
   //begin the serial comms (for debugging)
   myTympan.beginBothSerial();  delay(500);
   myTympan.setEchoAllPrintToBT(true);
-  Serial.println("BluetoothAudio_PassThru: Starting setup()...");
+  Serial.println("BluetoothAudioSpeaker: Starting setup()...");
 
   //allocate the dynamic memory for audio processing blocks
   AudioMemory_F32(10); 
