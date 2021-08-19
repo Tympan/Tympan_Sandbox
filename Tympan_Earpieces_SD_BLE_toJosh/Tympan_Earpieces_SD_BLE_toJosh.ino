@@ -32,7 +32,7 @@
 #include <SD.h>  
 
 
-#define USE_MTP true  //set to true to enable "MTP", which is USB access to the SD card when plugged into a computer
+#define USE_MTP false  //set to true to enable "MTP", which is USB access to the SD card when plugged into a computer
 #if (USE_MTP)
   // Get the MTP library from: https://github.com/WMXZ-EU/MTP_t4
   // You do not need the USB2 stuff.

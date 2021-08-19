@@ -104,7 +104,7 @@ void SerialManager::createTympanRemoteLayout(void) {
     card_h = myState.addCard_cpuReporting(page_h);
     card_h = audioSDWriter.addCard_sdRecord(page_h);
     
-  //myGUI.addPredefinedPage("serialMonitor");
+  myGUI.addPredefinedPage("serialMonitor");
 }
 
 void SerialManager::printTympanRemoteLayout(void) {
