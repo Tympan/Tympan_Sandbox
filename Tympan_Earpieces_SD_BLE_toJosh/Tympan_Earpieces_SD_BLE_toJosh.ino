@@ -53,7 +53,7 @@ const int audio_block_samples = 128;     //do not make bigger than AUDIO_BLOCK_S
 AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 
 //setup the  Tympan using the default settings
-Tympan          myTympan(TympanRev::E);    //note: Rev C is not compatible with the AIC shield
+Tympan          myTympan(TympanRev::E, audio_settings);    //note: Rev C is not compatible with the AIC shield
 EarpieceShield  earpieceShield(TympanRev::E, AICShieldRev::A);
 SDClass sdx; // define SD card parameters (will get passed to AudioSDWriter and to MTP stuff
 
@@ -62,15 +62,10 @@ const int LEFT = 0, RIGHT = (LEFT+1);
 #include "AudioConnections.h"
 
 
-//Creare BLE
-BLE ble = BLE(&Serial1);
-String msgFromBle = String(""); // Message from ble
-int msgLen;
-
 //control display and serial interaction
-SerialManager                 serialManager(&ble);
-State                         myState(&audio_settings, &myTympan);
-String overall_name = String("Tympan: Earpieces with PDM Mics, SD, BLE");
+BLE_UI          ble(&Serial1);           //create bluetooth BLE class
+SerialManager   serialManager(&ble);
+State           myState(&audio_settings, &myTympan);
 
 
 // ////////////// Setup the hardware
@@ -116,52 +111,21 @@ void connectClassesToOverallState(void) {
 //set up the serial manager
 void setupSerialManager(void) {
   //register all the UI elements here
+  serialManager.add_UI_element(&myState);
+  serialManager.add_UI_element(&ble);
   serialManager.add_UI_element(&earpieceMixer);
   serialManager.add_UI_element(&audioSDWriter);
-  serialManager.add_UI_element(&myState);
-  
+
   serialManager.createTympanRemoteLayout();
   
 }
 
-// Set up the BLE
-void setupBLE(void)
-{
-  myTympan.forceBTtoDataMode(false); //for BLE, it needs to be in command mode, not data mode
-  
-  int ret_val = ble.begin();
-  if (ret_val != 1) {  //via BC127.h, success is a value of 1
-    Serial.print("setupBLE: ble did not begin correctly.  error = ");  Serial.println(ret_val);
-    Serial.println("    : -1 = TIMEOUT ERROR");
-    Serial.println("    :  0 = GENERIC MODULE ERROR");
-  }
-
-  //start the advertising for a connection (whcih will be maintained in serviceBLE())
-  if (ble.isConnected() == false) ble.advertise(true);  //not connected, ensure that we are advertising
-}
-
-
-void serviceBLE(unsigned long curTime_millis, unsigned long updatePeriod_millis = 3000) {
-  static unsigned long lastUpdate_millis = 0;
-
-  //has enough time passed to update everything?
-  if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0; //handle wrap-around of the clock
-  if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
-    if (ble.isConnected() == false) {
-      if (ble.isAdvertising() == false) {
-        Serial.println("serviceBLE: activating BLE advertising");
-        ble.advertise(true);  //not connected, ensure that we are advertising
-      }
-    }
-    lastUpdate_millis = curTime_millis; //we will use this value the next time around.
-  }
-}
 
 // ///////////////// Main setup() and loop() as required for all Arduino programs
 void setup() {
   myTympan.beginBothSerial(); delay(1000);
   myTympan.setEchoAllPrintToBT(false);  //if we're using BLE, don't echo the print statements over the BT link
-  Serial.print(overall_name); Serial.println(": setup():...");
+  Serial.print("Tympan: Earpieces with PDM Mics, SD, BLE: setup():...");
   Serial.print("Sample Rate (Hz): "); Serial.println(audio_settings.sample_rate_Hz);
   Serial.print("Audio Block Size (samples): "); Serial.println(audio_settings.audio_block_samples);
 
@@ -183,8 +147,8 @@ void setup() {
   while (Serial1.available()) Serial1.read(); //clear the incoming Serial1 (BT) buffer
 
   //setup BLE
-  setupBLE();
-
+  delay(500); ble.setupBLE(myTympan.getBTFirmwareRev()); delay(500); //Assumes the default Bluetooth firmware. You can override!
+  
   //setup serial manager
   setupSerialManager();
 
@@ -205,8 +169,8 @@ void loop() {
 
   //respond to BLE
   if (ble.available() > 0) {
-    msgFromBle = "";  msgLen = ble.recvBLE(&msgFromBle);
-    for (int i=0; i < msgLen; i++)  serialManager.respondToByte(msgFromBle[i]);
+    String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
+    for (int i=0; i < msgLen; i++) serialManager.respondToByte(msgFromBle[i]);  //respondToByte is in SerialManagerBase...it then calls SerialManager.processCharacter(c)
   }
 
   //service the SD recording
@@ -215,8 +179,8 @@ void loop() {
   //service the LEDs
   serviceLEDs(millis());
 
-  //service the BLE (keep it alive to enabe connection)
-  serviceBLE(millis(),5000);  //check every 5000 msec
+  //service the BLE advertising state
+  ble.updateAdvertising(millis(),5000); //check every 5000 msec to ensure it is advertising (if not connected)
 
   //periodically print the CPU and Memory Usage
   if (myState.flag_printCPUandMemory) myState.printCPUandMemory(millis(),3000); //print every 3000 msec
