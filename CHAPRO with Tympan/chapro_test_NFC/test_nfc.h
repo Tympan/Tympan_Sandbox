@@ -1,5 +1,5 @@
  
- //code extracted from CHA test_nfc.c
+ //code extracted from CHA tst_nfc.c
 
 #define MAX_MSG 256
 
@@ -16,7 +16,7 @@ typedef struct
 
 /***********************************************************/
 
-static char msg[MAX_MSG] = {0};
+//static char msg[MAX_MSG] = {0};
 static double srate = 24000; // sampling rate (Hz)
 static int chunk = 32;       // chunk size
 static int prepared = 0;
@@ -55,10 +55,10 @@ prepare(I_O *io, CHA_PTR cp)
 
 /***********************************************************/
 
+
 static void
 configure_nfc()
 {
-    //Serial.println("test_nfc.h: configure_nfc()...");
     // NFC parameters
     nfc.cs = chunk; // chunk size
     nfc.f1 = 3000;  // compression-lower-bound frequency
@@ -79,35 +79,47 @@ configure_nfc()
 static void
 configure(I_O *io)
 {
-  //Serial.println("test_nfc.h: configure()...");
-  
 //    static char *ifn = "test/cat.wav";
 //    static char *wfn = "test/tst_nfc.wav";
+//    static char *mfn = "test/tst_nfc.mat";
 
     // initialize CHAPRO variables
     configure_nfc();
-    /*
-    // initialize I/O
-#ifdef ARSCLIB_H
-    io->iod = ar_find_dev(ARSC_PREF_SYNC); // find preferred audio device
-#endif                                     // ARSCLIB_H
-    io->iwav = NULL;
-    io->owav = NULL;
-    io->ifn = args.ifn ? args.ifn : ifn;
-    io->ofn = args.play ? args.ofn : wfn;
-    io->dfn = 0;
-    io->mat = 0;
-    io->nrep = (args.nrep < 1) ? 1 : args.nrep;
-    */
+//    // initialize I/O
+//#ifdef ARSCLIB_H
+//    io->iod = ar_find_dev(ARSC_PREF_SYNC); // find preferred audio device
+//#endif                                     // ARSCLIB_H
+//    io->iwav = NULL;
+//    io->owav = NULL;
+//    io->ifn  = args.ifn  ? args.ifn : ifn;
+//    io->ofn  = args.play ? args.ofn : wfn; 
+//    io->dfn  = mfn; 
+//    io->mat  = args.mat;
+//    io->nrep = (args.nrep < 1) ? 1 : args.nrep;
 }
 
 /***********************************************************/
+
+
+// /////////////////////////////////// Note from WEA (Creare)
+//
+// Here is the main() for this program.  It creates the main data array ("cp") and
+// it creates a secondary data structure ("io") for I/O.  In his main, he passes
+// these two structures to all the piece of the overall program.
+//
+// For Arduino, there is no "main".  Instead, there is a "setup()" and a "loop()".
+// The question is where do we create "cp" and "io".  I have chosen to create
+// then in the global space so that they are most easily accesible by both setup()
+// and loop().  There are other ways that this could be done.
+//
+// I then comment out all of the other actions because these will be done
+// in setup() and in loop().
 
 //int main(int ac, char *av[])
 //{
     static void *cp[NPTR] = {0};
     static I_O io;
-
+//
 //    parse_args(ac, av);
 //    configure(&io);
 //    report();
@@ -116,3 +128,4 @@ configure(I_O *io)
 //    cleanup(&io, cp);
 //    return (0);
 //}
+//#endif
