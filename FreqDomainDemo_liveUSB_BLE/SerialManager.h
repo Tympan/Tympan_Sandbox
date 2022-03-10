@@ -60,6 +60,14 @@ bool SerialManager::processCharacter(char c) {
   switch (c) {
     case 'h':
       printHelp(); break;
+    case 'c':
+      Serial.println("Received: enable printing CPU/Memory");
+      myState.flag_printCPUandMemory = true;
+      break;      
+    case 'C':
+      Serial.println("Received: disable printing CPU/Memory");
+      myState.flag_printCPUandMemory = false;
+      break;      
     case '1':
       Serial.println("Received: enable Formant shifting.");
       enableFormantShift(true);

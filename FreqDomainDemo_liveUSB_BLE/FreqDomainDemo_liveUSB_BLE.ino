@@ -19,8 +19,8 @@
 #include "State.h"
 #include "SerialManager.h"
 
-Tympan              myTympan(TympanRev::E);     //do TympanRev::C or TympanRev::D or TympanRev::E
-AudioSettings_F32   audio_settings;  //use the defaults...as required for using USB audio
+AudioSettings_F32   audio_settings;                         //use the defaults...as required for using USB audio
+Tympan              myTympan(TympanRev::E,audio_settings);  //TympanRev::D or TympanRev::E
 
 float assumed_sample_rate_Hz = audio_settings.sample_rate_Hz;
 int assumed_audio_block_samples = audio_settings.audio_block_samples;
