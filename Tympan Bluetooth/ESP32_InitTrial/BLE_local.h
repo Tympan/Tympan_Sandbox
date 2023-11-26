@@ -6,7 +6,11 @@ class BLE_local {
       send(String(c));
     }
     int send(const String &str) {
-      if (BLE_TX_ptr == NULL) return 0;
+      if (BLE_TX_ptr == NULL) {
+        Serial.println("BLE_local.send: *** ERROR ***: BLE_TX_ptr is NULL.  Cannot send.");
+        Serial.println("    : Returning without sending str.");
+        return 0;
+      }
       uint8_t tx_array[str.length()];
       for (int i=0; i<str.length(); i++) tx_array[i] = (uint8_t)str[i];
       BLE_TX_ptr->setValue(tx_array, str.length());
