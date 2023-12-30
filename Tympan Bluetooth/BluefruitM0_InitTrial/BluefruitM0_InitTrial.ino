@@ -1,29 +1,22 @@
-/*********************************************************************
- This is an example for our nRF51822 based Bluefruit LE modules
 
- Pick one up today in the adafruit shop!
-
- Adafruit invests time and resources providing this open source code,
- please support Adafruit and open-source hardware by purchasing
- products from Adafruit!
-
- MIT license, check LICENSE for more information
- All text above, and the splash screen below must be included in
- any redistribution
-*********************************************************************/
+/* 
+ *  Bluefruit_Mo_InitTrial
+ *  
+ *  Purpose: Communicate with Tympan App, both directions
+ *  Created: Chip Audette, Dec 30, 2023
+ *  
+ *  Hardware: Adafruit Feather M0 Bluefruit
+ *  
+ */
 
 #include <Arduino.h>
 #include <SPI.h>
 #include "Adafruit_BLE.h"
 #include "Adafruit_BluefruitLE_SPI.h"
-#include "Adafruit_BluefruitLE_UART.h"
 
 #include "BluefruitConfig.h"
 #include "BLE_local.h"
 
-#if SOFTWARE_SERIAL_AVAILABLE
-  #include <SoftwareSerial.h>
-#endif
 
 /* This example demonstrates how to use Bluefruit callback API :
  * - setConnectCallback(), setDisconnectCallback(), setBleUartRxCallback(),
@@ -77,13 +70,7 @@
 /* ...hardware SPI, using SCK/MOSI/MISO hardware SPI pins and then user selected CS/IRQ/RST */
 Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_CS, BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
 
-/* ...software SPI, using SCK/MOSI/MISO user-defined SPI pins and then user selected CS/IRQ/RST */
-//Adafruit_BluefruitLE_SPI ble(BLUEFRUIT_SPI_SCK, BLUEFRUIT_SPI_MISO,
-//                             BLUEFRUIT_SPI_MOSI, BLUEFRUIT_SPI_CS,
-//                             BLUEFRUIT_SPI_IRQ, BLUEFRUIT_SPI_RST);
-
 int32_t charid_string;
-
 BLE_local ble_local;
 
 // A small helper
@@ -126,10 +113,7 @@ void disconnected(void) {
   startAdvertising();
 }
 
-void sendTympanRemoteJSON(void) {
-  String tympanResponse = String("JSON={'icon':'tympan.png','pages':[{'title':'Treble Boost Demo','cards':[{'name':'Highpass Gain (dB)','buttons':[{'label':'-','cmd':'K','width':'4'},{'id':'gainIndicator','width':'4'},{'label':'+','cmd':'k','width':'4'}]},{'name':'Highpass Cutoff (Hz)','buttons':[{'label':'-','cmd':'T','width':'4'},{'id':'cutoffHz','width':'4'},{'label':'+','cmd':'t','width':'4'}]}]},{'title':'Globals','cards':[{'name':'Analog Input Gain (dB)','buttons':[{'id':'inpGain','width':'12'}]},{'name':'CPU Usage (%)','buttons':[{'label':'Start','cmd':'c','id':'cpuStart','width':'4'},{'id':'cpuValue','width':'4'},{'label':'Stop','cmd':'C','width':'4'}]}]}],'prescription':{'type':'BoysTown','pages':['serialMonitor']}}");
-  ble_local.sendMessage(tympanResponse);
-}
+#include "SerialManager.h"
 
 void BleGattRX(int32_t chars_id, uint8_t data[], uint16_t len)
 {
@@ -145,13 +129,13 @@ void BleGattRX(int32_t chars_id, uint8_t data[], uint16_t len)
 
     //look to see if it matches one of our target characters for responding!
     for (int i=0; i<len; i++) { //loop over all characters in the payload
-      if ( (((char)data[i]) == 'J') || (((char)data[i]) == 'j') ) {
-        Serial.println("BleGattRX: Detected 'J' (or 'j').  Sending TympanRemote layout");
-        sendTympanRemoteJSON();
-      }
+      char c = (char)data[i];
+      respondToChar(c);
     }
   }
 }
+
+
 
 /**************************************************************************/
 /*!
@@ -161,15 +145,12 @@ void BleGattRX(int32_t chars_id, uint8_t data[], uint16_t len)
 /**************************************************************************/
 void setup(void)
 {
-  while (!Serial);  // required for Flora & Micro
+  //while (!Serial);  // required for Flora & Micro
   delay(500);
 
   Serial.begin(115200);
   Serial.println(F("Adafruit Bluefruit Callbacks Example"));
   Serial.println(F("-------------------------------------"));
-
-  /* Initialise the module */
-  Serial.print(F("Initialising the Bluefruit LE module: "));
 
   if ( !ble.begin(VERBOSE_MODE) )  {
     error(F("Couldn't find Bluefruit, make sure it's in CoMmanD mode & check wiring?"));
@@ -228,5 +209,11 @@ void setup(void)
 /**************************************************************************/
 void loop(void)
 {  
-  ble.update(200);
+  while (Serial.available() > 0) {
+    char c = Serial.read();
+    if ( (c != '\n') && (c != '\r') ) {
+      respondToChar(c);
+    }
+  }
+  ble.update(100);
 }
