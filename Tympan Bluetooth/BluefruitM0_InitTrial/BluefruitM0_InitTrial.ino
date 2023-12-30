@@ -67,8 +67,8 @@
                             
     MINIMUM_FIRMWARE_VERSION  Minimum firmware version to have some new features    
     -----------------------------------------------------------------------*/
-    #define FACTORYRESET_ENABLE        1
-/*=========================================================================*/
+    #define FACTORYRESET_ENABLE        0   //WEA set to to zero, Dec 30, 2023
+ /*=========================================================================*/
 
 
 
@@ -145,8 +145,8 @@ void BleGattRX(int32_t chars_id, uint8_t data[], uint16_t len)
 
     //look to see if it matches one of our target characters for responding!
     for (int i=0; i<len; i++) { //loop over all characters in the payload
-      if ( ((char)data[i]) == 'J' ) {
-        Serial.println("BleGattRX: Detected 'J'.  Sending TympanRemote layout");
+      if ( (((char)data[i]) == 'J') || (((char)data[i]) == 'j') ) {
+        Serial.println("BleGattRX: Detected 'J' (or 'j').  Sending TympanRemote layout");
         sendTympanRemoteJSON();
       }
     }
