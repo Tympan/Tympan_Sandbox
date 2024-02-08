@@ -101,6 +101,12 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       updateGUI_inputSelect();
       updateGUI_inputGain(); //changing inputs changes the input gain, too
       break;
+    case 'E':
+      Serial.println("Received: Switch input to digital PDM mics");
+      setConfiguration(State::INPUT_PDM_MICS);
+      updateGUI_inputSelect();
+      updateGUI_inputGain(); //changing inputs changes the input gain, too
+      break;
     case 'k':
       incrementChirpLoudness(3.0);
       Serial.println("Increased chirp loudness to " + String(myState.chirp_amp_dBFS,1) + " dBFS");
@@ -165,9 +171,10 @@ void SerialManager::createTympanRemoteLayout(void) {
   page_h = myGUI.addPage("Audio Recorder");
       //Add a button group for selecting the input source
       card_h = page_h->addCard("Select Input");
-          card_h->addButton("PCB Mics",      "w", "configPCB",   12);  //displayed string, command, button ID, button width (out of 12)
-          card_h->addButton("Jack as Mic",   "W", "configMIC",   12);  //displayed string (blank for now), command (blank), button ID, button width (out of 12)
+          card_h->addButton("PCB Mics",       "w", "configPCB",   12);  //displayed string, command, button ID, button width (out of 12)
+          card_h->addButton("Jack as Mic",    "W", "configMIC",   12);  //displayed string (blank for now), command (blank), button ID, button width (out of 12)
           card_h->addButton("Jack as Line-In","e", "configLINE",  12);  //displayed string, command, button ID, button width (out of 12) 
+          card_h->addButton("Digital Mics"   ,"E", "configPDM",  12);  //displayed string, command, button ID, button width (out of 12) 
 
       //Add a button group for SD recording...use a button set that is built into AudioSDWriter_F32_UI for you!
       card_h = audioSDWriter.addCard_sdRecord(page_h);
@@ -216,6 +223,7 @@ void SerialManager::updateGUI_inputSelect(bool activeButtonsOnly) {
     setButtonState("configPCB",false);
     setButtonState("configMIC",false);
     setButtonState("configLINE",false);
+    setButtonState("configPDM",false);
   }
   switch (myState.input_source) {
     case (State::INPUT_PCBMICS):
@@ -226,6 +234,9 @@ void SerialManager::updateGUI_inputSelect(bool activeButtonsOnly) {
       break;
     case (State::INPUT_JACK_LINE): 
       setButtonState("configLINE",true);
+      break;
+    case (State::INPUT_PDM_MICS): 
+      setButtonState("configPDM",true);
       break;
   }
 }
