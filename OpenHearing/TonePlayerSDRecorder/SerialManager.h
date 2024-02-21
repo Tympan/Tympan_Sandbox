@@ -38,6 +38,9 @@ class SerialManager : public SerialManagerBase  {  // see Tympan_Library for Ser
     //void updateGUI_inputGain(bool activeButtonsOnly = false);
     void updateGUI_inputSelect(bool activeButtonsOnly = false);
 
+    int bigLoudnessIncrement_dB = 6.0;
+    int smallLoudnessIncrement_dB = 1.0;
+
   private:
     TympanRemoteFormatter myGUI;  //Creates the GUI-writing class for interacting with TympanRemote App    
 };
@@ -51,7 +54,8 @@ void SerialManager::printHelp(void) {
   Serial.println("   e  : INPUT: Switch to the pink jacks (as line input)");
   //Serial.println("   E  : INPUT: Switch to the digital mics");
   Serial.println("   a/A: TONE : Activate (a) or Mute (A) the tone (is_active = " + String(myState.is_tone_active) + ")");
-  Serial.println("   k/K: TONE : Incr/decrease loudness of tone (cur = " + String(myState.tone_dBFS,1) + " dBFS)");
+  Serial.println("   k/K: TONE : Incr/decrease loudness of tone by " + String(bigLoudnessIncrement_dB) + " dB (cur = " + String(myState.tone_dBFS,1) + " dBFS)");
+  Serial.println("   l/L: TONE : Incr/decrease loudness of tone by " + String(smallLoudnessIncrement_dB) + " dB (cur = " + String(myState.tone_dBFS,1) + " dBFS)");
   Serial.println("   f/F: TONE : Incr/decrease frequency of tone (cur = " + String(myState.tone_Hz,1) + " Hz)");
   Serial.println("   r/s: SD   : Start/Stop recording");
   #if defined(USE_MTPDISK) || defined(USB_MTPDISK_SERIAL)  //detect whether "MTP Disk" or "Serial + MTP Disk" were selected in the Arduino IDEA
@@ -105,11 +109,19 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       Serial.println("Muting the tone...");
       break;
     case 'k':
-      incrementToneLoudness(6.0);
+      incrementToneLoudness(bigLoudnessIncrement_dB);
       Serial.println("Increased tone loudness to " + String(myState.tone_dBFS,1) + " dBFS");
       break;
     case 'K':
-      incrementToneLoudness(-6.0);
+      incrementToneLoudness(-bigLoudnessIncrement_dB);
+      Serial.println("Decreased tone loudness to " + String(myState.tone_dBFS,1) + " dBFS");
+      break;
+    case 'l':
+      incrementToneLoudness(smallLoudnessIncrement_dB);
+      Serial.println("Increased tone loudness to " + String(myState.tone_dBFS,1) + " dBFS");
+      break;
+    case 'L':
+      incrementToneLoudness(-smallLoudnessIncrement_dB);
       Serial.println("Decreased tone loudness to " + String(myState.tone_dBFS,1) + " dBFS");
       break;
     case 'f':
