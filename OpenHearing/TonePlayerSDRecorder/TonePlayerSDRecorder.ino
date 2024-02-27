@@ -195,6 +195,21 @@ float incrementToneFrequency(float incr_fac) {
   return setToneFrequency(myState.tone_Hz*incr_fac);
 }
 
+//set the amplifier gain
+float setAmplifierGain(float gain_dB) {
+  static const float min_output_gain_dB = -6.0;
+  static const float max_output_gain_dB = 14.0;
+  myState.output_gain_dB = max(min_output_gain_dB,min(max_output_gain_dB, gain_dB));
+  myTympan.volume_dB(myState.output_gain_dB);
+  return myState.output_gain_dB;
+}
+
+//increment the amplifier gain
+float incrementAmplifierGain(float incr_dB) {
+  return setAmplifierGain(myState.output_gain_dB + incr_dB);
+}
+
+
 //mute the tone
 bool activateTone(bool enable) {
   if (enable) {
