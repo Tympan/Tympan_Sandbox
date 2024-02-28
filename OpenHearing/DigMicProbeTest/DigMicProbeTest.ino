@@ -173,11 +173,13 @@ void loop() {
   //respond to Serial commands
   if (Serial.available()) serialManager.respondToByte((char)Serial.read());   //USB Serial
 
+  #if 0
   //respond to BLE
   if (ble.available() > 0) {
     String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
     for (int i=0; i < msgLen; i++) serialManager.respondToByte(msgFromBle[i]);
   }
+  #endif
 
   //service the SD recording
   audioSDWriter.serviceSD_withWarnings(i2s_in); //For the warnings, it asks the i2s_in class for some info
@@ -192,9 +194,11 @@ void loop() {
   
   } else { //do everything else!
 
+    #if 0
     //service the BLE advertising state
     ble.updateAdvertising(millis(),5000); //check every 5000 msec to ensure it is advertising (if not connected)
-   
+    #endif 
+     
     //service the LEDs...blink slow normally, blink fast if recording
     myTympan.serviceLEDs(millis(),audioSDWriter.getState() == AudioSDWriter::STATE::RECORDING); 
   
