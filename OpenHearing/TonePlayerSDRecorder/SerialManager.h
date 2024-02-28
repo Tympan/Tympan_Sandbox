@@ -18,7 +18,7 @@ extern float incrementInputGain(float);
 extern bool activateTone(bool);
 extern float incrementToneLoudness(float);
 extern float incrementToneFrequency(float);
-
+extern float incrementAmplifierGain(float incr_dB);
 
 //externals for MTP
 extern void start_MTP(void);
@@ -57,6 +57,7 @@ void SerialManager::printHelp(void) {
   Serial.println("   k/K: TONE : Incr/decrease loudness of tone by " + String(bigLoudnessIncrement_dB) + " dB (cur = " + String(myState.tone_dBFS,1) + " dBFS)");
   Serial.println("   l/L: TONE : Incr/decrease loudness of tone by " + String(smallLoudnessIncrement_dB) + " dB (cur = " + String(myState.tone_dBFS,1) + " dBFS)");
   Serial.println("   f/F: TONE : Incr/decrease frequency of tone (cur = " + String(myState.tone_Hz,1) + " Hz)");
+  Serial.println("   g/G: GAIN : Incr/decrease headphone amplifier gain (cur = " + String(myState.output_gain_dB,1) + " dB)");
   Serial.println("   r/s: SD   : Start/Stop recording");
   #if defined(USE_MTPDISK) || defined(USB_MTPDISK_SERIAL)  //detect whether "MTP Disk" or "Serial + MTP Disk" were selected in the Arduino IDEA
     Serial.println("   >  : SD   : Start MTP mode to read SD from PC");
@@ -131,6 +132,14 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
     case 'F':
       incrementToneFrequency(powf(2.0,-1.0/3.0));  //third octave step decrease
       Serial.println("Decreased tone frequency to " + String(myState.tone_Hz,1) + " Hz");
+      break;
+    case 'g':
+      incrementAmplifierGain(1.0);  // 1 dB increase
+      Serial.println("Increased amplifier gain to " + String(myState.output_gain_dB,1) + " dB");
+      break;
+    case 'G':
+      incrementAmplifierGain(-1.0);  // 1 dB decrease
+      Serial.println("Decreased amplifier gain to " + String(myState.output_gain_dB,1) + " dB");
       break;
     case 'r':
       audioSDWriter.startRecording();
