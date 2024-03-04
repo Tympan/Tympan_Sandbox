@@ -5,6 +5,8 @@
 *   Purpose: Compute the current sound level, dBA-Fast or whatever
 *            Uses exponential time weighting.
 *
+*   March 2024: Extended to show loudness in octave bands
+*
 *   Uses Tympan RevC, RevD, or RevE.
 *   Uses BLE and TympanRemote App
 *
@@ -20,18 +22,12 @@ const float sample_rate_Hz = 44100.0f ; //24000 or 44117 (or other frequencies i
 const int audio_block_samples = 128;     //do not make bigger than AUDIO_BLOCK_SAMPLES from AudioStream.h (which is 128)
 AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 
-//create audio library objects for handling the audio
-Tympan                          myTympan(TympanRev::E);   //use TympanRev::E or TympanRev::D or TympanRev::C
-AudioInputI2S_F32               i2s_in(audio_settings);       //Digital audio in *from* the Teensy Audio Board ADC.
-AudioFilterFreqWeighting_F32    freqWeight1(audio_settings);  //A-weighting filter (optionally C-weighting)
-AudioCalcLevel_F32              calcLevel1(audio_settings);    //use this to square the signal
-AudioOutputI2S_F32              i2s_out(audio_settings);      //Digital audio out *to* the Teensy Audio Board DAC.
+#define N_FILTER_BANDS 9   //throw-away the top and bottom (which are shelving filters), it leaves 7 proper octave-band filters in the middle
+#define FILTER_ORDER 6     //what filter order to use for each of the filters in the filterbank
 
-//Make all of the audio connections
-AudioConnection_F32       patchCord1(i2s_in, 0, freqWeight1, 0);      //connect the Left input to frequency weighting
-AudioConnection_F32       patchCord2(freqWeight1, 0, calcLevel1, 0);  //connect the frqeuency weighting to the level time weighting
-AudioConnection_F32       patchCord3(i2s_in, 0, i2s_out, 0);      //echo the original signal to the left output
-AudioConnection_F32       patchCord4(calcLevel1, 0, i2s_out, 1);     //connect level to the right output
+//create audio library objects for handling the audio
+Tympan    myTympan(TympanRev::E);            //use TympanRev::E or TympanRev::D or TympanRev::C
+#include "AudioConnections.h"
 
 //Create BLE and serialManager
 BLE ble(&myTympan); //&Serial1 is the serial connected to the Bluetooth module
@@ -47,6 +43,9 @@ bool enablePrintMemoryAndCPU(bool _enable) { return enable_printCPUandMemory = _
 bool enablePrintLoudnessLevels(bool _enable) { return myState.enable_printTextToUSB = _enable; };
 bool enablePrintingToBLE(bool _enable = true) {return myState.enable_printTextToBLE = _enable; };
 bool enablePrintingToBLEplotter(bool _enable = true) { return myState.enable_printPlotToBLE = _enable; };
+bool enablePrintOctaveLevels(bool _enable) { return myState.enable_printOctaveToUSB = _enable; };
+bool enablePrintOctaveToBLE(bool _enable = true) {return myState.enable_printOctaveToBLE = _enable; };
+bool enablePrintOctaveToBLEplotter(bool _enable = true) { return myState.enable_printOctaveToBLEplot = _enable; };
 
 // define the setup() function, the function that is called once when the device is booting
 const float input_gain_dB = 15.0f; //gain on the microphone
@@ -54,6 +53,9 @@ void setup() {
   //begin the serial comms (for debugging)
   myTympan.beginBothSerial(); delay(1000);
   myTympan.println("SoundLevelMeter: Starting setup()...");
+
+  //make the remaining audio connections
+  makePerBandAudioConnections();  //see AudioConnections.h
 
   //allocate the dynamic memory for audio processing blocks
   AudioMemory_F32(50,audio_settings); 
@@ -70,15 +72,20 @@ void setup() {
   myTympan.volume_dB(0);                   // headphone amplifier.  -63.6 to +24 dB in 0.5dB steps.
   myTympan.setInputGain_dB(input_gain_dB); // set input volume, 0-47.5dB in 0.5dB setps
 
-  //Set the time weight.  See #define in https://github.com/Tympan/Tympan_Library/blob/master/src/AudioFilterTimeWeighting_F32.h
+  // Configure the octave-band level monitoring, set the processing parametes
+  configOctaveBandProcessing(N_FILTER_BANDS,FILTER_ORDER,State::TIME_SLOW);  //see AudioConnections.h
+
+  //Set frequency weighting for broadband processing.  See #define in: https://github.com/Tympan/Tympan_Library/blob/master/src/utility/FreqWeighting_IEC1672.h
   myTympan.println("Frequency Weighting: A_WEIGHT");
   setFreqWeightType(State::FREQ_A_WEIGHT);
-  
-  //Set frequency weighting.  See #define in: https://github.com/Tympan/Tympan_Library/blob/master/src/utility/FreqWeighting_IEC1672.h
+
+  // Set Time-weighting for all level measuring objects.  See #define in https://github.com/Tympan/Tympan_Library/blob/master/src/AudioFilterTimeWeighting_F32.h
   myTympan.println("Time Weighting: SLOW");
   setTimeAveragingType(State::TIME_SLOW);
 
-  //setup BLE
+  
+
+  // //////////// setup BLE
   while (Serial1.available()) Serial1.read(); //clear the incoming Serial1 (BT) buffer
   ble.setupBLE(myTympan.getBTFirmwareRev());
 
@@ -105,6 +112,7 @@ void loop() {
   
   //printing of sound level
   if (myState.enable_printTextToUSB) printLoudnessLevels(millis(),1000);  //print a value every 1000 msec
+  if (myState.enable_printOctaveToUSB) printOctaveLoudnessLevels(millis(),1000);  //print a value every 1000 msec
 
   //check to see whether to print the CPU and Memory Usage
   if (enable_printCPUandMemory) myTympan.printCPUandMemory(millis(),3000); //print every 3000 msec
@@ -143,10 +151,49 @@ void printLoudnessLevels(unsigned long curTime_millis, unsigned long updatePerio
       //serialManager.setButtonText("now",String(cur_SPL_dB,1));
       //serialManager.setButtonText("max",String(max_SPL_dB,1));
     }
-    
+
     lastUpdate_millis = curTime_millis; //we will use this value the next time around.
   }
 }
+
+//This routine prints the current SPL per octave band
+void printOctaveLoudnessLevels(unsigned long curTime_millis, unsigned long updatePeriod_millis) {
+  static bool firstTime = true;
+  static unsigned long lastUpdate_millis = 0;
+
+  //has enough time passed to update everything?
+  if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0; //handle wrap-around of the clock
+  if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
+    if (firstTime) {
+      myTympan.println("Printing: current SPL (dB) per octave-band");
+      firstTime = false;
+    }
+    
+    float32_t cal_factor_dB = -mic_cal_dBFS_at94dBSPL_at_0dB_gain + 94.0f - input_gain_dB;
+    String msg = String("");
+    for (int i=1; i < (N_FILTER_BANDS-1);i++) {  //skip the first and last filter because they're shelving and not octave-band
+      float32_t cur_SPL_dB = calcLevelPerOct[i].getCurrentLevel_dB() + cal_factor_dB;
+      msg.append(String(cur_SPL_dB,2));
+      if (i < (N_FILTER_BANDS-1-1)) msg.append(", ");
+      //if (myState.enable_printOctaveToBLE) serialManager.setButtonText(String("lvl")+String(i),String(cur_SPL_dB,1));
+    }
+    
+    //print the text string to the Serial
+    myTympan.println(msg);
+
+    //if allowed, send it over BLE with the special prefix to allow it to be printed by the SerialPlotter
+    //https://github.com/Tympan/Docs/wiki/Making-a-GUI-in-the-TympanRemote-App
+    if (myState.enable_printOctaveToBLEplot) ble.sendMessage(String("P ") + msg); //prepend "P " for the serial plotter 
+    if (myState.enable_printOctaveToBLE) {
+      ble.sendMessage("TEXT=" + msg); // This is the line required for Tabsint
+      //serialManager.setButtonText("now",String(cur_SPL_dB,1));
+      //serialManager.setButtonText("max",String(max_SPL_dB,1));
+    }
+
+    lastUpdate_millis = curTime_millis; //we will use this value the next time around.
+  }
+}
+
 
 //Set the frequency weighting.  Options include State::FREQ_A_WEIGHT and State::FREQ_C_WEIGHT
 int setFreqWeightType(int type) {
@@ -170,13 +217,16 @@ int setTimeAveragingType(int type) {
   switch (type) {
     case State::TIME_SLOW:
       calcLevel1.setTimeConst_sec(TIME_CONST_SLOW);
+      for (int i=0; i < N_FILTER_BANDS; i++) calcLevelPerOct[i].setTimeConst_sec(TIME_CONST_SLOW);
       break;
     case State::TIME_FAST:
       calcLevel1.setTimeConst_sec(TIME_CONST_FAST);
+      for (int i=0; i < N_FILTER_BANDS; i++) calcLevelPerOct[i].setTimeConst_sec(TIME_CONST_FAST);
       break;
     default:
       type = State::TIME_SLOW;
       calcLevel1.setTimeConst_sec(TIME_CONST_SLOW);
+      for (int i=0; i < N_FILTER_BANDS; i++) calcLevelPerOct[i].setTimeConst_sec(TIME_CONST_SLOW);
       break;
   }
   return myState.cur_time_averaging = type;
