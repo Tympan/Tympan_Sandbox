@@ -28,7 +28,7 @@ AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 // /////////// Define audio objects
 
 // define classes to control the Tympan and the Earpiece shield
-Tympan                        myTympan(TympanRev::D);      //do TympanRev::D or TympanRev::E
+Tympan                        myTympan(TympanRev::E);      //do TympanRev::D or TympanRev::E
 
 //create audio library objects for handling the audio
 AudioInputI2S_F32          i2s_in(audio_settings);         //Bring audio in
@@ -50,7 +50,8 @@ AudioConnection_F32           patchcord12(audioMixer, 0, i2s_out, 1);   //right 
 
 //Connect the audio input to the SD recording
 AudioConnection_F32           patchcord21(i2s_in, 0, audioSDWriter, 0);   //connect Raw audio to left channel of SD writer
-AudioConnection_F32           patchcord22(i2s_in, 1, audioSDWriter, 1);   //connect Raw audio to right channel of SD writer
+AudioConnection_F32           patchcord22(sineTone, 0, audioSDWriter, 1);   //connect Raw audio to right channel of SD writer
+//AudioConnection_F32         patchcord21(i2s_in, 1, audioSDWriter, 1);   //connect Raw audio to left channel of SD writer
 
 
 // /////////// Create classes for controlling the system, espcially via USB Serial and via the App
@@ -218,4 +219,52 @@ bool activateTone(bool enable) {
     audioMixer.gain(0,0.0); //get gain in mixer to zeor.  Tone should be connected to channel 0
   }
   return enable;
+}
+
+#include <math.h>
+float testSineAccuracy(float32_t freq_Hz) {
+  //float32_t freq_Hz = 1000.0;
+  int nsamp = int(1.0*sample_rate_Hz);
+
+  //allocate memory and the set the constants
+  double two_pi_d = 2.0d*acos(0.0d);
+  double highResPhase = 0.0d;
+  double highRes_dPhase = two_pi_d * double(freq_Hz)/double(sample_rate_Hz);
+  double hiRes;
+  float32_t two_pi_f = 2.0f*acosf(0.0f);
+  float32_t lowResPhase = 0.0f;
+  float32_t lowRes_dPhase = two_pi_f * (float32_t)freq_Hz /float32_t(sample_rate_Hz);
+  float32_t lowRes;
+
+  //Serial.println("testSineAccuracy: two_pi = " + String(two_pi_f,6) + ", " + String(two_pi_d,6));
+
+  //loop through time and compute everything
+  double sum_diff2 = 0.0d;
+  for (int i=0; i < nsamp; i++) {
+    //compute high res (double precision)
+    hiRes = sin(highResPhase);  //should use double-precision
+    highResPhase += highRes_dPhase; 
+    if (highResPhase > two_pi_d) highResPhase -= two_pi_d;
+
+    //compute lower res (single precision)
+    if (0) {
+      lowRes = sinf(lowResPhase); 
+    } else {
+      //use single-precision, as does the ARM math library, as used by Tympan_Library
+      lowRes = arm_sin_f32(lowResPhase);
+    }
+    lowResPhase += lowRes_dPhase; 
+    if (lowResPhase > two_pi_f) lowResPhase -= two_pi_f;
+
+    //compute the average difference between samples
+    double diff = hiRes - double(lowRes);
+    sum_diff2 += (diff * diff);
+  }
+
+
+  for (int i=0; i<nsamp; i++) {
+
+  }
+  double rms_diff = sum_diff2 / double(nsamp);
+  return rms_diff;
 }

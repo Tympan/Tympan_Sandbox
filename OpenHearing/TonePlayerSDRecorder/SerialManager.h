@@ -19,6 +19,7 @@ extern bool activateTone(bool);
 extern float incrementToneLoudness(float);
 extern float incrementToneFrequency(float);
 extern float incrementAmplifierGain(float incr_dB);
+extern float testSineAccuracy(float32_t freq_Hz);
 
 //externals for MTP
 extern void start_MTP(void);
@@ -49,6 +50,7 @@ void SerialManager::printHelp(void) {
   Serial.println("SerialManager Help: Available Commands:");
   Serial.println(" General: No Prefix");
   Serial.println("   h  : Print this help");
+  Serial.println("   t  : TEST: Calc diff in F32 vs F64 sine()");
   Serial.println("   w  : INPUT: Switch to the PCB Mics");
   Serial.println("   W  : INPUT: Switch to the pink jacks (with mic bias)");
   Serial.println("   e  : INPUT: Switch to the pink jacks (as line input)");
@@ -82,7 +84,14 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       break;
     case 'J': case 'j':           //The TympanRemote app sends a 'J' to the Tympan when it connects
       printTympanRemoteLayout();  //in resonse, the Tympan sends the definition of the GUI that we'd like
-      break;      
+      break; 
+    case 't':
+      {
+      Serial.println("Received: performing sine wave accuracy test at 1000 Hz");
+      float32_t rms_diff = testSineAccuracy(1000.0);
+      Serial.println("    : difference is = " + String(20.0f*log10f(rms_diff / sqrt(2.0))) + " dB");
+      }
+      break;
     case 'w':
       Serial.println("Received: Switch input to PCB Mics");
       setInputConfiguration(State::INPUT_PCBMICS);
