@@ -18,8 +18,9 @@ extern float incrementInputGain(float);
 extern bool activateTone(bool);
 extern float incrementToneLoudness(float);
 extern float incrementToneFrequency(float);
-extern float incrementAmplifierGain(float incr_dB);
+extern float incrementDacOutputGain(float incr_dB);
 extern float testSineAccuracy(float32_t freq_Hz);
+extern float overallTonePlusDacLoudness(void);
 
 //externals for MTP
 extern void start_MTP(void);
@@ -46,21 +47,23 @@ class SerialManager : public SerialManagerBase  {  // see Tympan_Library for Ser
     TympanRemoteFormatter myGUI;  //Creates the GUI-writing class for interacting with TympanRemote App    
 };
 
+
 void SerialManager::printHelp(void) {  
   Serial.println("SerialManager Help: Available Commands:");
   Serial.println(" General: No Prefix");
   Serial.println("   h  : Print this help");
-  Serial.println("   t  : TEST: Calc diff in F32 vs F64 sine()");
-  Serial.println("   w  : INPUT: Switch to the PCB Mics");
-  Serial.println("   W  : INPUT: Switch to the pink jacks (with mic bias)");
-  Serial.println("   e  : INPUT: Switch to the pink jacks (as line input)");
+  Serial.println("   t  : TEST : Calc diff in F32 vs F64 sine()");
+  Serial.println("   w  : INPUT : Switch to the PCB Mics");
+  Serial.println("   W  : INPUT : Switch to the pink jacks (with mic bias)");
+  Serial.println("   e  : INPUT : Switch to the pink jacks (as line input)");
   //Serial.println("   E  : INPUT: Switch to the digital mics");
   Serial.println("   a/A: TONE : Activate (a) or Mute (A) the tone (is_active = " + String(myState.is_tone_active) + ")");
   Serial.println("   k/K: TONE : Incr/decrease loudness of tone by " + String(bigLoudnessIncrement_dB) + " dB (cur = " + String(myState.tone_dBFS,1) + " dBFS)");
   Serial.println("   l/L: TONE : Incr/decrease loudness of tone by " + String(smallLoudnessIncrement_dB) + " dB (cur = " + String(myState.tone_dBFS,1) + " dBFS)");
   Serial.println("   f/F: TONE : Incr/decrease frequency of tone (cur = " + String(myState.tone_Hz,1) + " Hz)");
-  Serial.println("   g/G: GAIN : Incr/decrease headphone amplifier gain (cur = " + String(myState.output_gain_dB,1) + " dB)");
-  Serial.println("   r/s: SD   : Start/Stop recording");
+  Serial.println("   b/B: OUTPUT : Incr/decrease DAC output gain by " + String(bigLoudnessIncrement_dB) + " dB (cur = " + String(myState.output_dacGain_dB,1) + " dB)");
+  Serial.println("   g/G: OUTPUT : Incr/decrease DAC output gain by " + String(smallLoudnessIncrement_dB) + " dB (cur = " + String(myState.output_dacGain_dB,1) + " dB)");
+  Serial.println("   r/s: SD : Start/Stop recording");
   #if defined(USE_MTPDISK) || defined(USB_MTPDISK_SERIAL)  //detect whether "MTP Disk" or "Serial + MTP Disk" were selected in the Arduino IDEA
     Serial.println("   >  : SD   : Start MTP mode to read SD from PC");
   #endif
@@ -72,6 +75,7 @@ void SerialManager::printHelp(void) {
   SerialManagerBase::printHelp();  ////in here, it automatically loops over the different UI elements issuing printHelp()
   
   Serial.println();
+  Serial.println("Overall Tone+DAC Loudness is Currently = " + String(overallTonePlusDacLoudness(),1) + " dBFS");
 }
 
 
@@ -142,13 +146,21 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       incrementToneFrequency(powf(2.0,-1.0/3.0));  //third octave step decrease
       Serial.println("Decreased tone frequency to " + String(myState.tone_Hz,1) + " Hz");
       break;
+    case 'b':
+      incrementDacOutputGain(bigLoudnessIncrement_dB);  // bigger increase
+      Serial.println("Increased DAC gain to " + String(myState.output_dacGain_dB,1) + " dB so that Tone+DAC yields = " + String(overallTonePlusDacLoudness(),1) + " dBFS");
+      break;
+    case 'B':
+      incrementDacOutputGain(-bigLoudnessIncrement_dB);  // bigger decrease
+      Serial.println("Decreased DAC gain to " + String(myState.output_dacGain_dB,1) + " dB so that Tone+DAC yields = " + String(overallTonePlusDacLoudness(),1) + " dBFS");
+      break;
     case 'g':
-      incrementAmplifierGain(1.0);  // 1 dB increase
-      Serial.println("Increased amplifier gain to " + String(myState.output_gain_dB,1) + " dB");
+      incrementDacOutputGain(smallLoudnessIncrement_dB);  // smaller increase
+      Serial.println("Increased DAC gain to " + String(myState.output_dacGain_dB,1) + " dB so that Tone+DAC yields = " + String(overallTonePlusDacLoudness(),1) + " dBFS");
       break;
     case 'G':
-      incrementAmplifierGain(-1.0);  // 1 dB decrease
-      Serial.println("Decreased amplifier gain to " + String(myState.output_gain_dB,1) + " dB");
+      incrementDacOutputGain(-smallLoudnessIncrement_dB);  // smaller decrease
+      Serial.println("Decreased DAC gain to " + String(myState.output_dacGain_dB,1) + " dB so that Tone+DAC yields = " + String(overallTonePlusDacLoudness(),1) + " dBFS");
       break;
     case 'r':
       audioSDWriter.startRecording();

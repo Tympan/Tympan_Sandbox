@@ -28,7 +28,7 @@ AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 // /////////// Define audio objects
 
 // define classes to control the Tympan and the Earpiece shield
-Tympan                        myTympan(TympanRev::E);      //do TympanRev::D or TympanRev::E
+Tympan                        myTympan(TympanRev::D);      //do TympanRev::D or TympanRev::E
 
 //create audio library objects for handling the audio
 AudioInputI2S_F32          i2s_in(audio_settings);         //Bring audio in
@@ -76,6 +76,7 @@ void setupSerialManager(void) {
   serialManager.add_UI_element(&audioSDWriter);
 }
 
+
 // ///////////////// Main setup() and loop() as required for all Arduino programs
 
 // define the setup() function, the function that is called once when the device is booting
@@ -95,7 +96,7 @@ void setup() {
   setInputConfiguration(myState.input_source);  //the initial value is set in State.h
   
   //Select the gain for the output amplifiers
-  myTympan.volume_dB(myState.output_gain_dB);
+  setDacOutputGain(myState.output_dacGain_dB);
 
   //initialize the tone
   audioMixer.mute();  //mute everything (will be set correctly by activateTone())
@@ -143,8 +144,10 @@ void loop() {
   } else { //do everything else!
 
     //service the BLE advertising state
-    ble.updateAdvertising(millis(),5000); //check every 5000 msec to ensure it is advertising (if not connected)
-   
+    if (audioSDWriter.getState() != AudioSDWriter::STATE::RECORDING) {
+      ble.updateAdvertising(millis(),5000); //check every 5000 msec to ensure it is advertising (if not connected)
+    }
+
     //service the LEDs...blink slow normally, blink fast if recording
     myTympan.serviceLEDs(millis(),audioSDWriter.getState() == AudioSDWriter::STATE::RECORDING); 
   
@@ -196,20 +199,19 @@ float incrementToneFrequency(float incr_fac) {
   return setToneFrequency(myState.tone_Hz*incr_fac);
 }
 
+// helper function
+float32_t overallTonePlusDacLoudness(void) { return myState.tone_dBFS + myState.output_dacGain_dB; }
+
 //set the amplifier gain
-float setAmplifierGain(float gain_dB) {
-  static const float min_output_gain_dB = -6.0;
-  static const float max_output_gain_dB = 14.0;
-  myState.output_gain_dB = max(min_output_gain_dB,min(max_output_gain_dB, gain_dB));
-  myTympan.volume_dB(myState.output_gain_dB);
-  return myState.output_gain_dB;
+float setDacOutputGain(float gain_dB) {
+  float new_gain = min(-3.0, myState.tone_dBFS + gain_dB) - myState.tone_dBFS; //limit the gain to prevent clipping
+  return myState.output_dacGain_dB = myTympan.volume_dB(new_gain); //yes, this sets the DAC gain, not the headphone volume
 }
 
 //increment the amplifier gain
-float incrementAmplifierGain(float incr_dB) {
-  return setAmplifierGain(myState.output_gain_dB + incr_dB);
+float incrementDacOutputGain(float incr_dB) {
+  return setDacOutputGain(myState.output_dacGain_dB + incr_dB);
 }
-
 
 //mute the tone
 bool activateTone(bool enable) {
