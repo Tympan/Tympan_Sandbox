@@ -13,7 +13,35 @@
 
 extern BLE_nRF52 tympanBle;
 extern TympanState tympanState;
+extern BLE_nRF52 tympanBle;
 extern void updateLEDs(void);
+extern void printBleName(void);
+extern void setBleName(const String &s);
+
+// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// functions that would normally run on the Tympan to respond to commands coming from the phone (via BLE through this SerialManager)
+void printBleName(void) {
+  String name;
+  int ret_val = tympanBle.getBleName(name);
+  Serial.println("(tympan main *.ino) printBleName: ret_val = " + String(ret_val) + ", name = " + name);
+}
+
+void setBleName(const String &name) {
+  int ret_val = tympanBle.setBleName(name);
+  Serial.println("(tympan main *.ino) setBleName: ret_val = " + String(ret_val) + " for name = " + name);
+}
+
+void getBleFirmwareVersion(void) {
+  bool printResponse = true;
+  int ret_val = tympanBle.version(printResponse);
+}
+
+//for this demo, have the system activate the LEDs that the user wants
+void updateLEDs(void) {
+  digitalWrite(tympanState.LED1_pin, (tympanState.is_active_LED1) ? HIGH : LOW);
+  digitalWrite(tympanState.LED2_pin, (tympanState.is_active_LED2) ? HIGH : LOW);
+}
+
 
 class TympanSerialManager {
   public:
@@ -38,6 +66,9 @@ void TympanSerialManager::printHelp(void) {
   Serial.println("   1:   Turn on LED 1");
   Serial.println("   2:   Turn on LED 2");
   Serial.println("   0:   Turn of all LEDs");
+  Serial.println("   g:   Get the BLE name");
+  Serial.println("   n:   Set the BLE name to Tympan-NEW");
+  Serial.println("   v:   Get the BLE unit's firmware version");
   Serial.println("   j:   Send JOSN string for TympanRemote GUI");
   Serial.println();
 }
@@ -62,6 +93,20 @@ void TympanSerialManager::respondToByte(char c) {
       Serial.println("TympanSerialManager: activate LED2...");
       tympanState.is_active_LED2 = true;
       updateLEDs(); updateLEDbuttons();
+      break;
+    case 'g':
+      Serial.println("TympanSerialManager: getting nRF's BLE name...");
+      printBleName();
+      break;
+    case 'n':
+      Serial.println("TympanSerialManager: setting nRF's BLE name to Tympan-NEW...");
+      setBleName("Tympan-NEW");
+      Serial.println("TympanSerialManager: getting nRF's new BLE name...");
+      printBleName();
+      break;
+    case 'v':
+      Serial.println("TympanSerialManager: getting nRF's firmware version...");
+      getBleFirmwareVersion();
       break;
     case 'j': case 'J':
       Serial.println("TympanSerialManager: sending JSON string for TympanApp GUI...");

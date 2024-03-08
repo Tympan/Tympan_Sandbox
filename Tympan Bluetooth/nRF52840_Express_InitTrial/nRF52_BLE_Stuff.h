@@ -43,8 +43,8 @@ BLEDfu          bledfu;  // Adafruit's built-in OTA DFU service
 BLEDis          bledis;  // Adafruit's built-in device information service
 BLEUart         bleService_adafruitUART;  //Adafruit's built-in UART service
 BLEUart_Tympan  bleService_tympanUART;    //Tympan extension of the Adafruit UART service that allows us to change the Service and Characteristic UUIDs
-nRF52_AT_API    AT_interpreter(&bleService_tympanUART);  //interpreter for the AT command set that we're inventing
-
+//nRF52_AT_API    AT_interpreter(&bleService_tympanUART, &Serial1);  //interpreter for the AT command set that we're inventing
+extern nRF52_AT_API AT_interpreter;
 
 // callback invoked when central connects
 void connect_callback(uint16_t conn_handle)

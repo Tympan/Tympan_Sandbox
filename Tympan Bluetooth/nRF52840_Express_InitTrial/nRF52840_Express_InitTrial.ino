@@ -34,12 +34,10 @@
 #include "TympanState.h"            //only needed because we're faking that there is a Tympan
 #include "TympanSerialManager.h"    //only needed because we're faking that there is a Tympan
 
-
 //#define SERIAL_TO_TYMPAN Serial1                 //use this when physically wired to a Tympan. Assumes that the nRF is connected via Serial1 pins
 //#define SERIAL_FROM_TYMPAN Serial1               //use this when physically wired to a Tympan. Assumes that the nRF is connected via Serial1 pins
 #define SERIAL_TO_TYMPAN (serial_BLE_to_Tympan)    //Use when also simulating the connection to the Tympan.
 #define SERIAL_FROM_TYMPAN (serial_Tympan_to_BLE)  //Use when also simulating the connection to the Tympan.
-
 
 // /////////////////////// This brick of code is just for when we want to pretend that this firmware is also a Tympan
 //Simulate the Serial link that should be between the Tympan and the BLE module
@@ -47,11 +45,16 @@ Serial_Simulator serial_Tympan_to_BLE;  //have the simulated serial link talk to
 Serial_Simulator serial_BLE_to_Tympan;  //have the simulated serial link talk to/from the BLE UART object
 
 //Create BLE class that'll format messages for the Tympan Remote App
-BLE_nRF52           tympanBle(&serial_Tympan_to_BLE, &serial_BLE_to_Tympan);
+BLE_nRF52           tympanBle(&SERIAL_FROM_TYMPAN, &SERIAL_TO_TYMPAN);
 
 //Instantiate the classes that would be running on the Tympan itself
 TympanSerialManager tympanSerialManager;
 TympanState         tympanState;
+
+// /////////////////////////  Last piece of firmware nRF firmware
+//Here is a firmware class that we need, but had to wait to instantiate until SERIAL_TO_TYMPAN was defined...normally, this would just be Serial1, which means it could be earlier
+nRF52_AT_API    AT_interpreter(&bleService_tympanUART, &SERIAL_TO_TYMPAN);  //interpreter for the AT command set that we're inventing
+
 
 // /////////////////////////////////////////////////// Main Arduino Setup() Functions
 
@@ -98,12 +101,17 @@ void setup() {
   // setup() items for the nRF firmware
   setup_nRF52();
 
-  // setup() items for this demonsstration, including the simulated Tympan
+  // setup() items for this demonstration, including the simulated Tympan
   setup_for_Demo_and_Simulated_Tympan();
+
 
 }
 
 // /////////////////////////////////////////////////// Main Arduino Loop() Functions
+
+void bleUnitServiceSerial(void) {
+  serialEvent(&SERIAL_FROM_TYMPAN);  //for the nRF firmware, service any messages coming in the serial port from the Tympan
+}
 
 bool loop_nRF52(void) {
   // Here are the loop items for the nR52 firmware
@@ -111,7 +119,8 @@ bool loop_nRF52(void) {
   bool did_we_do_anything = false;
 
   //Respond to incoming serial messages
-  serialEvent(&SERIAL_FROM_TYMPAN);  //for the nRF firmware, service any messages coming in the serial port from the Tympan
+  //serialEvent(&SERIAL_FROM_TYMPAN);  //for the nRF firmware, service any messages coming in the serial port from the Tympan
+  bleUnitServiceSerial();
   if (bleConnected) { 
     //for the nRF firmware, service any messages coming in from BLE wireless link
     //BLEevent(&bleService_adafruitUART, &SERIAL_TO_TYMPAN);
@@ -158,8 +167,4 @@ void loop() {
 
 // ///////////////////////////////////// Functions to reposnd to Serial Commands
 
-//for this demo, have the system activate the LEDs that the user wants
-void updateLEDs(void) {
-  digitalWrite(tympanState.LED1_pin, (tympanState.is_active_LED1) ? HIGH : LOW);
-  digitalWrite(tympanState.LED2_pin, (tympanState.is_active_LED2) ? HIGH : LOW);
-}
+
