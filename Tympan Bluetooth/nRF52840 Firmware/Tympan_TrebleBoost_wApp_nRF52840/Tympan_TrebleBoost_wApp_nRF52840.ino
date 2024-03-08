@@ -1,8 +1,9 @@
 /*
-*   TrebleBoost_wApp_Alt
+*   Tympan_TrebleBoost_wApp_nRF52840
 *
 *   Created: Chip Audette, OpenAudio, August 2021
 *   Purpose: Process audio by applying a high-pass filter followed by gain.  Includes App interaction.
+*            Uses the nRF52840 BLE module (ie, Tympan RevF)
 *
 *   TympanRemote App: https://play.google.com/store/apps/details?id=com.creare.tympanRemote
 *
@@ -42,7 +43,7 @@ const int audio_block_samples = 32;     //do not make bigger than AUDIO_BLOCK_SA
 AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 
 //create audio library objects for handling the audio
-Tympan                    myTympan(TympanRev::E,audio_settings);     //do TympanRev::D or TympanRev::E
+Tympan                    myTympan(TympanRev::E,audio_settings);     //do TympanRev::D or TympanRev::E (or TympanRev::F once added to Tympan_Library)
 AudioInputI2S_F32         i2s_in(audio_settings);     //Digital audio in *from* the Teensy Audio Board ADC.
 AudioFilterBiquad_F32     hp_filt1(audio_settings);   //IIR filter doing a highpass filter.  Left.
 AudioFilterBiquad_F32     hp_filt2(audio_settings);   //IIR filter doing a highpass filter.  Right.
