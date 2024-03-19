@@ -17,7 +17,9 @@ extern void setConfiguration(int);
 extern float incrementInputGain(float);
 extern float incrementChirpLoudness(float);
 extern float incrementChirpDuration(float);
-extern void startChirpWithDelay(float);
+extern void startSignalWithDelay(float);
+extern float incrementOutputGain_dB(float increment_dB);
+extern void forceStopSDPlay(void);
 
 
 //externals for MTP
@@ -26,7 +28,8 @@ extern void start_MTP(void);
 
 class SerialManager : public SerialManagerBase  {  // see Tympan_Library for SerialManagerBase for more functions!
   public:
-    SerialManager(BLE *_ble) : SerialManagerBase(_ble) {};
+    //SerialManager(BLE *_ble) : SerialManagerBase(_ble) {};
+    SerialManager() : SerialManagerBase() {};
 
     void printHelp(void);
     void createTympanRemoteLayout(void); 
@@ -47,18 +50,19 @@ class SerialManager : public SerialManagerBase  {  // see Tympan_Library for Ser
 void SerialManager::printHelp(void) {  
   Serial.println("SerialManager Help: Available Commands:");
   Serial.println(" General: No Prefix");
-  Serial.println("   h  : Print this help");
-  Serial.println("   w  : INPUT: Switch to the PCB Mics");
-  //Serial.println("   W  : INPUT: Switch to the pink jacks (with mic bias)");
-  Serial.println("   e  : INPUT: Switch to the pink jacks (as line input)");
-  Serial.println("   E  : INPUT: Switch to the digital mics");
-  Serial.println("   k/K: CHIRP: Incr/decrease loudness of chirp (cur = " + String(myState.chirp_amp_dBFS,1) + " dBFS)");
-  Serial.println("   d/D: CHIRP: Incr/decrease duration of chirp (cur = " + String(myState.chirp_dur_sec,1) + " sec)");
-  Serial.println("   n  : CHIRP: Start the chirp");
-  Serial.println("   b  : CHIRP+SD: Start chirp and SD recording together");
-  Serial.println("   r/s: SD   : Start/Stop recording");
+  Serial.println("   h    : Print this help");
+  Serial.println("   w/e/E: INPUT  : Switch to the PCB Mics, pink jacks, or digital mics");
+  Serial.println("   k/K  : CHIRP  : Incr/decrease loudness of chirp (cur = " + String(myState.chirp_amp_dBFS,1) + " dBFS)");
+  Serial.println("   d/D  : CHIRP  : Incr/decrease duration of chirp (cur = " + String(myState.chirp_dur_sec,1) + " sec)");
+  Serial.println("   n    : CHIRP  : Start the chirp");
+  Serial.println("   1-3  : SDPlay : Play files 1-3 from SD Card");
+  Serial.println("   q    : SDPlay : Stop any currnetly plying SD files");
+  Serial.println("   b    : AutoWrite : Start chirp and SD recording together");
+  Serial.println("   4-6  : AutoWrite : Start files 1-3 from SD Card and SD recording together");
+  Serial.println("   g/G  : OUTPUT : Incr/decrease DAC loudness (cur = " + String(myState.output_gain_dB,1) + " dB)");
+  Serial.println("   r/s  : SDWrite: Manually Start/Stop recording");
   #if defined(USE_MTPDISK) || defined(USB_MTPDISK_SERIAL)  //detect whether "MTP Disk" or "Serial + MTP Disk" were selected in the Arduino IDEA
-    Serial.println("   >  : SD   : Start MTP mode to read SD from PC");
+    Serial.println("   >    : SDUtil : Start MTP mode to read SD from PC");
   #endif
   
   //Add in the printHelp() that is built-into the other UI-enabled system components.
@@ -125,16 +129,38 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       break;
     case 'n':
       Serial.println("Starting chirp...");
-      startChirpWithDelay(0.0);  //no delay, start right away
+      startSignalWithDelay(0.0);  //no delay, start right away
       break;
     case 'b':
       Serial.println("Received: start combination of chirp and SD recording...");
-      audioSDWriter.startRecording();
-      //Serial.println("    Starting recording to SD file " + audioSDWriter.getCurrentFilename());
-      { float delay_sec = myState.auto_SD_start_stop_delay_sec;
-        Serial.println("Starting chirp in " + String(delay_sec*1000,0) + " msec");
-        startChirpWithDelay(delay_sec);
-        myState.auto_chirpsd_state = State::WAIT_START_CHIRP;
+      if (myState.auto_sd_state != State::DISABLED) {
+        Serial.println("   : ERROR : Already doing an auto-triggered SD recording.");
+        Serial.println("           : Ignoring the last command.");
+      } else {
+        audioSDWriter.startRecording();
+        myState.autoPlay_signal_type = State::PLAY_CHIRP;
+        startSignalWithDelay(myState.auto_SD_start_stop_delay_sec);
+        myState.auto_sd_state = State::WAIT_START_SIGNAL;
+      }
+      break; 
+    case '1': case '2': case '3':
+      myState.autoPlay_signal_type = c - ((int)'1') + State::PLAY_CHIRP + 1;  //This is me *computing* my way into the enum instead of a switch block.  Not recommended, but whatever.
+      startSignalWithDelay(0.0); //play immediately
+      break; 
+    case 'q':
+      Serial.println("Received: force stop the playing of any SD files...");
+      forceStopSDPlay();
+      break;
+    case '4': case '5': case '6':
+      Serial.println("Received: start combination SD Playing and SD recording...");
+      if (myState.auto_sd_state != State::DISABLED) {
+        Serial.println("   : ERROR : Already doing an auto-triggered SD recording.");
+        Serial.println("           : Ignoring the last command.");
+      } else {
+        audioSDWriter.startRecording();
+        myState.autoPlay_signal_type = c - ((int)'4') + State::PLAY_CHIRP + 1;  //This is me *computing* my way into the enum instead of a switch block.  Not recommended, but whatever.
+        startSignalWithDelay(myState.auto_SD_start_stop_delay_sec);
+        myState.auto_sd_state = State::WAIT_START_SIGNAL;
       }
       break; 
     case 'r':
@@ -144,6 +170,14 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
     case 's':
       Serial.println("Stopping recording to SD file " + audioSDWriter.getCurrentFilename());
       audioSDWriter.stopRecording();
+      break;
+    case 'g':
+      incrementOutputGain_dB(3.0);
+      Serial.println("Increased DAC loudness to " + String(myState.output_gain_dB,1) + " dBFS");
+      break;
+    case 'G':
+      incrementOutputGain_dB(-3.0);
+      Serial.println("Decreased DAC loudness to " + String(myState.output_gain_dB,1) + " dBFS");
       break;
     case '>':
       Serial.println("Starting MTP service to access SD card (everything else will stop)");
@@ -196,7 +230,7 @@ void SerialManager::printTympanRemoteLayout(void) {
     if (myGUI.get_nPages() < 1) createTympanRemoteLayout();  //create the GUI, if it hasn't already been created
     String s = myGUI.asString();
     Serial.println(s);
-    ble->sendMessage(s); //ble is held by SerialManagerBase
+    if (ble != NULL) ble->sendMessage(s); //ble is held by SerialManagerBase
     setFullGUIState();
 }
 

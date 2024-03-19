@@ -4,7 +4,9 @@
    Created: Chip Audette, OpenHearing, Feb 2024
    Purpose: Enable MPU to test the initial earprobe prototype using 4 PDM mics
       * Typmpan with Earpiece Shield
-      * Generate a logarithmic sweep
+      * Play test signals:
+          * Option 1: Generate a logarithmic sweep
+          * Opiton 2: Play back an arbitrary signal from the SD card
       * Record audio from all four digital mics to SD card
       * Access SD card via "MTP Disk" mode
 
@@ -27,37 +29,46 @@ AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 // /////////// Define audio objects...they are configured later
 
 // define classes to control the Tympan and the Earpiece shield
-Tympan                        myTympan(TympanRev::E);   //do TympanRev::D or TympanRev::E
+Tympan           myTympan(TympanRev::E);                         //do TympanRev::D or TympanRev::E
 EarpieceShield   earpieceShield(TympanRev::E, AICShieldRev::A);  //Note that EarpieceShield is defined in the Tympan_Libarary in AICShield.h 
+SdFs             sd;                                             //because we're doing both a player and recorder, explicitly create the signal SD resource
 
 //create audio library objects for handling the audio
 AudioInputI2SQuad_F32      i2s_in(audio_settings);         //Bring audio in
-//AudioSynthWaveform_F32    sineWave(audio_settings);   //from the Tympan_Library (synth_waveform_f32.h>
-AudioSynthToneSweepExp_F32 chirp(audio_settings);       //from the Tympan_Library (synth_tonesweep_F32.h)
-AudioSynthWaveform_F32     sineWave(audio_settings);     //from the Tympan_Library
+AudioSynthToneSweepExp_F32 chirp(audio_settings);          //from the Tympan_Library (synth_tonesweep_F32.h)
+AudioSDPlayer_F32          sdPlayer(&sd, audio_settings);  //from the Tympan_Library
+AudioMixer4_F32            audioMixerL(audio_settings);    //from the Tympan_Library
+AudioMixer4_F32            audioMixerR(audio_settings);    //from the Tympan_Library
 AudioOutputI2SQuad_F32     i2s_out(audio_settings);        //Send audio out
-AudioSDWriter_F32_UI       audioSDWriter(audio_settings);  //Write audio to the SD card (if activated)
+AudioSDWriter_F32_UI       audioSDWriter(&sd, audio_settings);  //Write audio to the SD card (if activated)
 
-//Connect inputs to outputs...let's just connect the first two mics to the Tympan's black headphone jack
-AudioConnection_F32           patchcord1(i2s_in, 1, i2s_out, 0);    //Left input to left output
-AudioConnection_F32           patchcord2(i2s_in, 0, i2s_out, 1);    //Right input to right output
+//Connect the signal sources to the audio mixer
+AudioConnection_F32           patchcord1(chirp,    0, audioMixerL, 0);   //chirp is mono, so simply send to left channel mixer
+AudioConnection_F32           patchcord2(sdPlayer, 0, audioMixerL, 1);   //left channel of SD to left channel mixer
+AudioConnection_F32           patchcord3(chirp,    0, audioMixerR, 0);   //chirp is mono, so simply send it to right channel mixer too
+AudioConnection_F32           patchcord4(sdPlayer, 1, audioMixerR, 1);   //right channel of SD to right channel mixer
 
-//Connect chirp to the earpieces and to the black jack on the Earpiece shield
-AudioConnection_F32           patchcord11(chirp, 0, i2s_out, 2);  //connect chirp to left output on earpiece shield
-AudioConnection_F32           patchcord12(chirp, 0, i2s_out, 3);  //connect chirp to riht output on earpiece shield
+//Connect inputs to outputs...let's just connect the first two mics to the black jack on the Tympan
+AudioConnection_F32           patchcord11(i2s_in, 1, i2s_out, 0);    //Left input to left output
+AudioConnection_F32           patchcord12(i2s_in, 0, i2s_out, 1);    //Right input to right output
+
+//Connect audio mixer to the earpieces and to the black jack on the Earpiece shield
+AudioConnection_F32           patchcord21(audioMixerL, 0, i2s_out, 2);  //connect chirp to left output on earpiece shield
+AudioConnection_F32           patchcord22(audioMixerR, 0, i2s_out, 3);  //connect chirp to right output on earpiece shield
 
 //Connect all four mics to SD logging
-AudioConnection_F32           patchcord21(i2s_in, 1, audioSDWriter, 0);   //connect Raw audio to left channel of SD writer
-AudioConnection_F32           patchcord22(i2s_in, 0, audioSDWriter, 1);   //connect Raw audio to right channel of SD writer
-AudioConnection_F32           patchcord23(i2s_in, 3, audioSDWriter, 2);   //connect Raw audio to left channel of SD writer
-AudioConnection_F32           patchcord24(i2s_in, 2, audioSDWriter, 3);   //connect Raw audio to right channel of SD writer
-
+#define NUM_SD_CHAN 4
+AudioConnection_F32           patchcord31(i2s_in, 1, audioSDWriter, 0);   //connect Raw audio to left channel of SD writer
+AudioConnection_F32           patchcord32(i2s_in, 0, audioSDWriter, 1);   //connect Raw audio to right channel of SD writer
+AudioConnection_F32           patchcord33(i2s_in, 3, audioSDWriter, 2);   //connect Raw audio to left channel of SD writer
+AudioConnection_F32           patchcord34(i2s_in, 2, audioSDWriter, 3);   //connect Raw audio to right channel of SD writer
 
 // /////////// Create classes for controlling the system, espcially via USB Serial and via the App
 #include      "SerialManager.h"
 #include      "State.h"                
-BLE_UI        ble(&myTympan);           //create bluetooth BLE class
-SerialManager serialManager(&ble);     //create the serial manager for real-time control (via USB or App)
+//BLE_UI        ble(&myTympan);           //create bluetooth BLE class
+//SerialManager serialManager(&ble);     //create the serial manager for real-time control (via USB or App)
+SerialManager serialManager;     //create the serial manager for real-time control (via USB or App)
 State         myState(&audio_settings, &myTympan, &serialManager); //keeping one's state is useful for the App's GUI
 
 /* Create the MTP servicing stuff so that one can access the SD card via USB */
@@ -129,7 +140,8 @@ void setConfiguration(int config) {
 
 // define the setup() function, the function that is called once when the device is booting
 void setup() {
-  myTympan.beginBothSerial(); delay(1500);
+  //myTympan.beginBothSerial(); //only needed if using bluetooth
+  delay(500);
   Serial.println("DigMicProbeTest: setup():...");
   Serial.println("Sample Rate (Hz): " + String(audio_settings.sample_rate_Hz));
   Serial.println("Audio Block Size (samples): " + String(audio_settings.audio_block_samples));
@@ -143,19 +155,42 @@ void setup() {
   //Select the input that we will use 
   setConfiguration(myState.input_source);  //the initial value is set in State.h
   
-  //Select the gain for the output amplifiers
-  myTympan.volume_dB(myState.output_gain_dB);
-  earpieceShield.volume_dB(myState.output_gain_dB);
+  //Configure the mixer for the audio sources
+  audioMixerL.mute(); audioMixerR.mute();  //set all channels to zero (I think that this is defualt, but let's do this just to be sure!)
+  audioMixerL.gain(0,1.0);  audioMixerL.gain(1,1.0);  //mix together the chirp and SD player (though prob only one will be playing at a time)
+  audioMixerR.gain(0,1.0);  audioMixerR.gain(1,1.0);  //mix together the chirp and SD player (though prob only one will be playing at a time)
+
+  //debug my software zeroing signals going to right channel
+  if (0) {
+    Serial.println("Zeroing mixer gains for right channel...");
+    audioMixerR.gain(0,0.0);  audioMixerR.gain(1,0.0);  //mix together the chirp and SD player (though prob only one will be playing at a time)
+  }
+
+  //Select the gain for the output DAC
+  setOutputGain_dB(myState.output_gain_dB);
+
+  //debug by muting one side of the DAC to test for audio leakage
+  if (0) {
+    Serial.println("Muting Right DAC...");
+    myTympan.muteDAC(RIGHT_CHAN); earpieceShield.muteDAC(RIGHT_CHAN);
+  }
+
+  //debug by muting one side of the Headphone Driver to test for audio leakage
+  if (0) {
+    delay(1000); //let stuff settle
+    Serial.println("Muting Right Headphone Driver...");
+    myTympan.muteHeadphone(RIGHT_CHAN); earpieceShield.muteHeadphone(RIGHT_CHAN);
+  }
 
   //setup BLE
-  delay(500); ble.setupBLE(myTympan.getBTFirmwareRev()); delay(500); //Assumes the default Bluetooth firmware. You can override!
+  //delay(500); ble.setupBLE(myTympan.getBTFirmwareRev()); delay(500); //Assumes the default Bluetooth firmware. You can override!
   
   //setup the serial manager
   setupSerialManager();
 
   //prepare the SD writer for the format that we want and any error statements
   audioSDWriter.setSerial(&myTympan);
-  audioSDWriter.setNumWriteChannels(4);             //four channels for this quad recorder, but you could set it to 2
+  audioSDWriter.setNumWriteChannels(NUM_SD_CHAN);             //four channels for this quad recorder, but you could set it to 2
   Serial.println("SD configured for " + String(audioSDWriter.getNumWriteChannels()) + " channels.");
 
   //Set the state of the LEDs
@@ -184,8 +219,8 @@ void loop() {
   //service the SD recording
   audioSDWriter.serviceSD_withWarnings(i2s_in); //For the warnings, it asks the i2s_in class for some info
 
-  //service the chirp
-  serviceChirpSdStartStop();
+  //service the automatic SD starting and stopping based on the playing of the chirp / SD
+  serviceAutoSdStartStop();
  
   // Did the user activate MTP mode?  If so, service the MTP and nothing else
   if (use_MTP) {   //service MTP (ie, the SD card appearing as a drive on your PC/Mac
@@ -195,12 +230,15 @@ void loop() {
   } else { //do everything else!
 
     #if 0
-    //service the BLE advertising state
-    ble.updateAdvertising(millis(),5000); //check every 5000 msec to ensure it is advertising (if not connected)
+      //service the BLE advertising state
+      ble.updateAdvertising(millis(),5000); //check every 5000 msec to ensure it is advertising (if not connected)
     #endif 
      
     //service the LEDs...blink slow normally, blink fast if recording
     myTympan.serviceLEDs(millis(),audioSDWriter.getState() == AudioSDWriter::STATE::RECORDING); 
+
+    //service the SD player to refill the play buffer
+    sdPlayer.serviceSD();
   
   }
  
@@ -212,59 +250,99 @@ void loop() {
 } //end loop()
 
 // //////////////////////////////////// Servicing routines not otherwise embedded in other classes
-void serviceChirpSdStartStop(void) {
+
+int playChirp(void) {
+  chirp.play( sqrtf(powf(10.0f, 0.1f*myState.chirp_amp_dBFS)),
+              myState.chirp_start_Hz,
+              myState.chirp_end_Hz,
+              myState.chirp_dur_sec
+            );
+  return 0;
+}
+
+int playSD(int file_ind) {
+  //check the inputs
+  if (file_ind < 0) {
+    Serial.println("playSD: *** ERROR ***: file_ind is " + String(file_ind) + ", which cannot be negative.");
+    Serial.println("    : ignoring and returning.");
+    return -1;
+  }
+
+  //compose the filename
+  String fname = "PLAY";
+  fname += String(file_ind);
+  fname += ".WAV";
+
+  //confirm that it exists
+  // if (!sd.exists(fname)) {
+  //   Serial.println("playSD: *** ERROR ***: file " + fname + " does not exist on SD.");
+  //   Serial.println("    : ignoring and returning...");
+  //   return -1;
+  // }
+
+  //play the file
+  sdPlayer.play(fname);
+  return 0;
+}
+
+void serviceAutoSdStartStop(void) {
   static unsigned long nextUpdate_millis = 0UL;
   static unsigned long updatePeriod_millis = 1000UL;
-  static bool has_chirp_been_playing = false;
+
   
-  // Is it time to start a chirp?
-  if ((myState.chirp_start_armed==true) || (myState.auto_chirpsd_state == State::WAIT_START_CHIRP)) {
-    if (millis() >= myState.start_chirp_at_millis) {
-      Serial.println("serviceChirpStartStop: Starting chirp...");
-      chirp.play( sqrtf(powf(10.0f, 0.1f*myState.chirp_amp_dBFS)),
-                  myState.chirp_start_Hz,
-                  myState.chirp_end_Hz,
-                  myState.chirp_dur_sec
-                );
-      myState.chirp_start_armed = false;
-      if (myState.auto_chirpsd_state == State::WAIT_START_CHIRP) {
-        myState.auto_chirpsd_state = State::WAIT_END_CHIRP;
+  // Is it time to start a signal?
+  if ((myState.signal_start_armed==true) || (myState.auto_sd_state == State::WAIT_START_SIGNAL)) {
+    if (millis() >= myState.start_signal_at_millis) {
+      int signal_type = myState.autoPlay_signal_type;
+      switch(signal_type) {
+        case State::PLAY_CHIRP:
+          Serial.println("serviceAudioSdStartStop: Starting chirp...");
+          playChirp();
+          break;
+        default:
+          Serial.println("serviceAudioSdStartStop: Starting SD " + String(signal_type) + " playback...");
+          playSD(signal_type);
+          break;
       }
-      has_chirp_been_playing = true;     //set this flag
+
+      //regardless of which signal type, finish off the actions
+      myState.signal_start_armed = false;
+      if (myState.auto_sd_state == State::WAIT_START_SIGNAL)  myState.auto_sd_state = State::WAIT_END_SIGNAL;
+      myState.has_signal_been_playing = true;     //set this flag
       nextUpdate_millis = millis()+updatePeriod_millis; //set this static to enable future timed messages
     }
   }
 
-  //Is the chirp playing
-  if (chirp.isPlaying()){
-    
+  //Is the signal playing
+  if (chirp.isPlaying() || sdPlayer.isPlaying()) {
+
     //is it time to print a status message to the serial monitor?
     if (millis() >= nextUpdate_millis) {
-      Serial.println("serviceChirpStartStop: Chirp is still playing...");
+      Serial.println("serviceChirpStartStop: Chirp or SD is still playing...");
       nextUpdate_millis += updatePeriod_millis;
     }
-    
+
   } else { //or has the chirp stopped
     //chirp is not playing
-    if (has_chirp_been_playing == true) {
-      //chirp just stopped playing
-      Serial.println("serviceChirpStartStop: Chirp has finished.");
+    if (myState.has_signal_been_playing == true) {
+      //signal just stopped playing
+      Serial.println("serviceChirpStartStop: Chirp or SD has finished.");
 
-      if (myState.auto_chirpsd_state == State::WAIT_END_CHIRP) {
-        myState.auto_chirpsd_state = State::WAIT_STOP_SD;
+      if (myState.auto_sd_state == State::WAIT_END_SIGNAL) {
+        myState.auto_sd_state = State::WAIT_STOP_SD;
         Serial.println("Auto-stopping SD in " + String(1000*myState.auto_SD_start_stop_delay_sec,0) + " msec");
         myState.stop_SD_at_millis = millis()+ (unsigned int)round(max(0.0,1000.0*myState.auto_SD_start_stop_delay_sec));
       }
     }
-    has_chirp_been_playing = false; //clear this flag
+    myState.has_signal_been_playing = false; //clear this flag
   }
 
   //is it time to stop the SD?
-  if (myState.auto_chirpsd_state == State::WAIT_STOP_SD) {
+  if (myState.auto_sd_state == State::WAIT_STOP_SD) {
     if (millis() >= myState.stop_SD_at_millis) {
       Serial.println("Auto-stopping SD recording of " + audioSDWriter.getCurrentFilename());
       audioSDWriter.stopRecording();
-      myState.auto_chirpsd_state = State::DISABLED;
+      myState.auto_sd_state = State::DISABLED;
     }
   }
 }
@@ -275,6 +353,12 @@ void serviceChirpSdStartStop(void) {
 float incrementInputGain(float increment_dB) {
   return setInputGain_dB(myState.input_gain_dB + increment_dB);
 }
+float incrementOutputGain_dB(float increment_dB) {
+  return setOutputGain_dB(myState.output_gain_dB + increment_dB);
+}
+float setOutputGain_dB(float gain_dB) {
+  return myState.output_gain_dB = earpieceShield.volume_dB(myTympan.volume_dB(gain_dB));
+}
 
 float incrementChirpLoudness(float incr_dB) {
   return myState.chirp_amp_dBFS = min(0.0, myState.chirp_amp_dBFS+incr_dB);
@@ -282,7 +366,14 @@ float incrementChirpLoudness(float incr_dB) {
 float incrementChirpDuration(float incr_sec) {
   return myState.chirp_dur_sec = max(1.0, myState.chirp_dur_sec+incr_sec);
 }
-void startChirpWithDelay(float delay_sec) {
-  myState.chirp_start_armed = true;
-  myState.start_chirp_at_millis = millis()+ (unsigned int)round(max(0.0,1000.0*delay_sec));
+// void startChirpWithDelay(float delay_sec) {
+//   myState.autoPlay_signal_type = State::PLAY_CHIRP;
+//   startSignalWithDelay(delay_sec);
+// }
+void startSignalWithDelay(float delay_sec) {
+  myState.signal_start_armed = true;
+  myState.start_signal_at_millis = millis()+ (unsigned int)round(max(0.0,1000.0*delay_sec));
+}
+void forceStopSDPlay(void) {
+  sdPlayer.stop();
 }

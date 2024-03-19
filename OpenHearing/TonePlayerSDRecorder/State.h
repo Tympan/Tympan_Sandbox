@@ -3,7 +3,6 @@
 #ifndef State_h
 #define State_h
 
-extern const int N_CHAN;
 
 // The purpose of this class is to be a central place to hold important information
 // about the algorithm parameters or the operation of the system.  This is mainly to
