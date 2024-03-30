@@ -1,6 +1,15 @@
 
 
 #define BLE_SERIAL Serial7
+#define MESSAGE_LENGTH 256
+#define GREEN_LED 15
+#define RED_LED 16
+
+unsigned char from_nRF[MESSAGE_LENGTH];
+size_t from_nRFbyteCounter;
+bool ledState = false;
+unsigned long toggleTime = 600;
+unsigned long lastToggle;
 
 void printHelp(void) {
   Serial.println("Tympan Help:");
@@ -9,7 +18,10 @@ void printHelp(void) {
 }
 
 void setup() {
-  // put your setup code here, to run once:
+  pinMode(RED_LED,OUTPUT); digitalWrite(RED_LED,ledState);
+  pinMode(GREEN_LED,OUTPUT); digitalWrite(GREEN_LED,!ledState);
+  lastToggle = millis();
+  
   BLE_SERIAL.begin(115200/2);delay(1000);
   Serial.println("Serial Echo: starting...");
   printHelp();
@@ -22,23 +34,32 @@ void loop() {
     char c = Serial.read();
     if (c == 'h') printHelp();
     Serial.println("Tympan sending to nRF: " + String(c));
-    BLE_SERIAL.print(c);
+    BLE_SERIAL.write(c);  // print(c);
   }
 
   //echo characters from Serial1 to the USB serial
-  //(include some waiting to ensure we get the whole message before printing the end-of-line)
-  bool flag_serviceSerial1 = BLE_SERIAL.available();
-  if (flag_serviceSerial1) {
-    Serial.print("Received from nRF: ");
-    while (flag_serviceSerial1) {
-      while (BLE_SERIAL.available()) {
-        char c = BLE_SERIAL.read();
-        Serial.write(c);
-      }
-      delay(10);
-      flag_serviceSerial1 = BLE_SERIAL.available();
+  // bool flag_serviceSerial1 = BLE_SERIAL.available();
+  if (BLE_SERIAL.available()) {
+    from_nRFbyteCounter = BLE_SERIAL.readBytesUntil('\n', from_nRF, MESSAGE_LENGTH-1);
+    Serial.print("Received "); Serial.print(from_nRFbyteCounter); Serial.println(" bytes from nRF:");
+    for(int i=0; i<from_nRFbyteCounter; i++){
+      Serial.write(from_nRF[i]);
     }
     Serial.println();
   }
 
+  toggleLEDs(millis());
+
 }
+
+void toggleLEDs(unsigned long m){
+  if(m > lastToggle+toggleTime){
+    lastToggle = m;
+    ledState = !ledState;
+    digitalWrite(GREEN_LED,ledState);
+    digitalWrite(RED_LED, !ledState);
+  }
+}
+
+
+

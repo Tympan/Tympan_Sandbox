@@ -23,14 +23,12 @@
           LEDsOff();
           ledToFade = green;
           fadeValue = FADE_MIN;
-          
           break;
        case 'b':
           Serial.println("Fade blue LED 2");
           LEDsOff();
           ledToFade = blue;
           fadeValue = FADE_MIN;
-
           break;
         case '?':
           printHelp();
