@@ -30,12 +30,12 @@ class State : public TympanStateBase_UI { // look in TympanStateBase or TympanSt
     
     //Put different gain settings (except those in the compressors) here to ease the updating of the GUI
     float input_gain_dB = 0.0;   //gain of the hardware PGA in the AIC
-    float output_dacGain_dB = -15.0;  //gain of the hardware headphone amplifier in the AIC.  Leave at 0.0 unlesl you have a good reason.
+    float output_dacGain_dB = 0.0;  //gain of the hardware headphone amplifier in the AIC.  Leave at 0.0 unless you have a good reason...set to -15 dB to lower harmonic distortion (which also lowers max SPL)
 
     //tone parameters
-    float tone_Hz = 1000.0;         //freuqency of tone.  any value less than Nyquist
-    float tone_dBFS = -1*3.0;        //loudness of tone.  any value less than 0.0 dB
-    bool is_tone_active = false;    //the code will flip this to true whenever we want to hear the tone
+    float tone_Hz = 1000.0;        //freuqency of tone.  any value less than Nyquist
+    float tone_dBFS = -3.0;        //loudness of tone.  any value less than 0.0 dB.  Unclear what the max value should be to avoid distortion.  0dB?  -3dB?  Other?
+    bool is_tone_active = false;   //the code will flip this to true whenever we want to hear the tone
     
 };
 
