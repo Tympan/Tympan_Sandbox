@@ -56,7 +56,6 @@ BLEUart bleuart; // uart over ble
 uint8_t uartOutBuffer[UART_MESSAGE_LENGTH];
 uint8_t dummyChar;
 int uartOutBufferCounter = 0;
-// size_t outBytesSent;
 
 void setup() {
 
@@ -72,11 +71,6 @@ void setup() {
     uartOutBuffer[uartOutBufferCounter] = dummyChar; // prepare the dummy array
     uartOutBufferCounter++;
   }
-  // for (uint8_t b=48; b<=122; b++) {
-  //   uartOutBuffer[uartOutBufferCounter] = b; // prepare the dummy array
-  //   uartOutBufferCounter++;
-  // }
-  // uartOutBuffer[uartOutBufferCounter] = 0x00; // terminate the dummy with null
 
   unsigned long t = millis();
   unsigned long timeOut = 5000L; // 1 second time out before we bail on a serial connection
@@ -90,24 +84,12 @@ void setup() {
   delay(1000);
   setupBLE(); // establish nane and start services
   startAdv(); // start advertising
-  // if(usingSerial){
-  //   Serial.println(versionString);
-  //   Serial.print("advertising as "); Serial.println(deviceName);
-  //   Serial.println("connect and send '?' for options");
-  // }
   for(int i=0; i<3; i++){
     pinMode(ledPin[i],OUTPUT);
   }
   ledToFade = blue; // initialize this as you like
   // fadeDelay = FADE_DELAY_FAST;
   fadeDelay = FADE_DELAY_SLOW;
-
-    // for(int i=0; i<UART_MESSAGE_LENGTH; i++){
-    //   Serial.write(uartOutBuffer[i]);
-    // }
-    // Serial.println();
-    // Serial.println(uartOutBufferCounter);
-
   lastShowTime = millis();
 }
 
@@ -115,10 +97,10 @@ void setup() {
 
 void loop() {
 
-    if(!printedHelp){ printHelp(); }
-    if(!printedBLEhelp){ printBLEhelp(); }
-    
-    if(ledToFade > 0){ showRGB_LED(millis()); }
+  if(!printedHelp){ printHelp(); }
+  if(!printedBLEhelp){ printBLEhelp(); }
+  
+  if(ledToFade > 0){ showRGB_LED(millis()); }
 
   if(usingSerial){ serialEvent(); }
   if(bleConnected){ BLEevent(); }

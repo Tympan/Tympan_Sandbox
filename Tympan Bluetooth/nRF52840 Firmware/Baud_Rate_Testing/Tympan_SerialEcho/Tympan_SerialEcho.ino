@@ -16,19 +16,17 @@
 
 */
 
-#define BLE_SERIAL Serial7 // tx  rx 
-#define MESSAGE_LENGTH 256
+#define UART_MESSAGE_LENGTH 256
 #define GREEN_LED 15
 #define RED_LED 16
 // change these here for tidy
 #define nRF_UART_BAUD 230400
 #define USB_UART_BAUD 1000000
 
-uint8_t uartOutBuffer[MESSAGE_LENGTH];
+uint8_t uartOutBuffer[UART_MESSAGE_LENGTH];
 int uartOutBufferCounter = 0;
-// size_t outBytesSent;
 
-char from_nRF[MESSAGE_LENGTH];
+char from_nRF[UART_MESSAGE_LENGTH];
 size_t from_nRFbyteCounter;
 bool countIncommingBytes = true;
 bool ledState = false;
@@ -50,10 +48,6 @@ void setup() {
   delay(2000);
   Serial.println("Tympan Serial Echo: starting...");
   uartOutBufferCounter = 0;
-  // for (uint8_t b=48; b<=122; b++) {
-  //   uartOutBuffer[uartOutBufferCounter] = b; // prepare the dummy array
-  //   uartOutBufferCounter++;
-  // }
   printHelp();
   lastToggle = millis();
 }
