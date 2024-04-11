@@ -18,6 +18,24 @@
  
     Made by Joel Murphy, Flywheel Lab, for Creare February 2024
     Updated by Joel Murphy to benchmark UART
+
+    Target: nRF52840 radio module with Adafruit Express bootloader
+    This code is the nRF52 side of a menchmarking tool
+    See Tympan_SerialEcho.ino for the other half of the tool
+
+    Originally made by Chip Audette for Creare
+    Modified by Joel Murphy, Flywheel Lab, for Creare
+
+    This code establishes a serial connection on Serial1 to com with the Tympan Teensy 4.1
+    The serial port is set up to read in bytes until it encounters a '\n' char
+    The terminating char could be different, for example any of the ASCII control chars, or 0x00
+    
+    The test buffer is sent when a 't' control char is recieved from the Tympan
+
+    Use this and the other half to benchmark the UART
+    Make sure that this nRF_UART_BAUD is the same as the other side
+    Make sure that the USB_UART_BAUD is well above the nRF_UART_BAUD to keep it from interfering??
+
  */
 
 #include <Arduino.h>
@@ -26,31 +44,42 @@
 #include <InternalFileSystem.h>
 #include "TympanBLE.h"
 
+// change these here for tidy
+#define nRF_UART_BAUD 230400
+#define USB_UART_BAUD 1000000
+
 BLEDfu  bledfu;  // OTA DFU service
 BLEDis  bledis;  // device information
 BLEUart bleuart; // uart over ble
 
-#define MESSAGE_LENGTH 256
-uint8_t outBuffer[MESSAGE_LENGTH];
-int outBufferCounter = 0;
-size_t outBytesSent;
+#define UART_MESSAGE_LENGTH 256
+uint8_t uartOutBuffer[UART_MESSAGE_LENGTH];
+uint8_t dummyChar;
+int uartOutBufferCounter = 0;
+// size_t outBytesSent;
 
 void setup() {
 
-  Serial.begin(115200);   //USB Serial to the PC
+  Serial.begin(USB_UART_BAUD);   //1M baud USB Serial to the PC
 
   Serial1.setPins(0,1);   //our nRF wiring uses Pin0 for RX and Pin1 for TX
-  Serial1.begin(115200/2);  //Hardware UART serial to the Tympan
+  Serial1.begin(nRF_UART_BAUD);  //Hardware UART serial to the Tympan
 
-  outBufferCounter = 0;
-  for (uint8_t b=48; b<=122; b++) {
-    outBuffer[outBufferCounter] = b; // prepare the dummy array
-    outBufferCounter++;
+  uartOutBufferCounter = 0;
+  
+  for (int i=0; i<UART_MESSAGE_LENGTH; i++) {
+    dummyChar = ('0' + (i%8)) & 0xFF;
+    uartOutBuffer[uartOutBufferCounter] = dummyChar; // prepare the dummy array
+    uartOutBufferCounter++;
   }
-  outBuffer[outBufferCounter] = 0x00; // terminate the dummy with null
+  // for (uint8_t b=48; b<=122; b++) {
+  //   uartOutBuffer[uartOutBufferCounter] = b; // prepare the dummy array
+  //   uartOutBufferCounter++;
+  // }
+  // uartOutBuffer[uartOutBufferCounter] = 0x00; // terminate the dummy with null
 
   unsigned long t = millis();
-  int timeOut = 1000; // 1 second time out before we bail on a serial connection
+  unsigned long timeOut = 5000L; // 1 second time out before we bail on a serial connection
   while (!Serial) { // use this to allow for serial to time out
     if(millis() - t > timeOut){
       usingSerial = false;
@@ -61,16 +90,24 @@ void setup() {
   delay(1000);
   setupBLE(); // establish nane and start services
   startAdv(); // start advertising
-  if(usingSerial){
-    Serial.println("advertising as "); Serial.println(versionString);
-    Serial.println("connect and send '?' for options");
-  }
+  // if(usingSerial){
+  //   Serial.println(versionString);
+  //   Serial.print("advertising as "); Serial.println(deviceName);
+  //   Serial.println("connect and send '?' for options");
+  // }
   for(int i=0; i<3; i++){
     pinMode(ledPin[i],OUTPUT);
   }
   ledToFade = blue; // initialize this as you like
   // fadeDelay = FADE_DELAY_FAST;
   fadeDelay = FADE_DELAY_SLOW;
+
+    // for(int i=0; i<UART_MESSAGE_LENGTH; i++){
+    //   Serial.write(uartOutBuffer[i]);
+    // }
+    // Serial.println();
+    // Serial.println(uartOutBufferCounter);
+
   lastShowTime = millis();
 }
 
@@ -89,39 +126,44 @@ void loop() {
   if (Serial1.available()) {
     while (Serial1.available()) {
       char c = Serial1.read();
+      Serial.print("i got "); Serial.println(c);
       if ((c != '\r') && (c != '\n')) {
-        Serial1.print("nRF52840 Serial1: Received from Typman: ");
+        Serial1.print("nRF52840 Serial1 Received: ");
         Serial1.println(c);
         if ((c == 'h') || (c == '?')) {
-          printHelp(&Serial1);
+          Serial.println("sending help");
+          // printHelp(&Serial1);
+          printTympanHelp();
         } else if (c == 'a') {
           LEDsOff();
+          Serial1.println("LEDs off");
           ledToFade = -1;
           break;
         } else if (c == 'r') {
-          strcpy(outString,"Fade Red"); // BLEwrite();
           LEDsOff();
           ledToFade = red;
           fadeValue = FADE_MIN;
+          Serial1.println("fade red");
         } else if (c == 'b') {
-          strcpy(outString,"Fade Blue"); // BLEwrite();
           LEDsOff();
           ledToFade = blue;
           fadeValue = FADE_MIN;
+          Serial1.println("fade blue");
         } else if (c == 'g') {
-          strcpy(outString,"Fade Green"); // BLEwrite();
           LEDsOff();
           ledToFade = green;
           fadeValue = FADE_MIN;
+          Serial1.println("fade green");
         } else if (c == 't') {
-          for(int i=0; i<outBufferCounter; i++){
-            Serial1.write(outBuffer[i]); 
+          Serial.println("send buffer");
+          for(int i=0; i<uartOutBufferCounter; i++){
+            Serial1.write(uartOutBuffer[i]); 
           }
           Serial1.println();
-          Serial1.print("buffer counter: "); Serial.println(outBufferCounter);
+          Serial1.print("nRF52840 uartOutBufferCounter: "); Serial1.println(uartOutBufferCounter);
         }
       }
-    }
+    } 
   }
 }
 
