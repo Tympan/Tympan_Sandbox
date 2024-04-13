@@ -67,7 +67,7 @@ void setup() {
   uartOutBufferCounter = 0;
   
   for (int i=0; i<UART_MESSAGE_LENGTH; i++) {
-    dummyChar = ('0' + (i%8)) & 0xFF;
+    dummyChar = ('0' + (i%8)) & 0xFF; // count from 0 to 9 over and over
     uartOutBuffer[uartOutBufferCounter] = dummyChar; // prepare the dummy array
     uartOutBufferCounter++;
   }

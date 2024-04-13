@@ -66,17 +66,17 @@ void loop() {
   if (Serial7.available()) {
     from_nRF[from_nRFbyteCounter] = Serial7.read();
     if(from_nRF[from_nRFbyteCounter] == '\n'){
-      from_nRFbyteCounter--; // remove the '\n' so we only save the data
+      from_nRFbyteCounter--; // remove the '\n' so we only save the data. Could set to NULL for string compatability?
       Serial.print("Tympan Received ");
-      Serial.print(from_nRFbyteCounter); // the returned byte counter includes the '\n' but doesn't add it to the buffer
+      Serial.print(from_nRFbyteCounter); // This is the number of data bytes that we received.
       Serial.println(" bytes from nRF");
       for(size_t s=0; s<from_nRFbyteCounter; s++){
         Serial.print(from_nRF[s]);
       }
-      Serial.println(); // replace the `\n` char
-      from_nRFbyteCounter = 0;
+      Serial.println(); // break the line
+      from_nRFbyteCounter = 0;  // reset the counter
     } else {
-      from_nRFbyteCounter++;
+      from_nRFbyteCounter++;  // increment through the buffer
     }
   }
 
