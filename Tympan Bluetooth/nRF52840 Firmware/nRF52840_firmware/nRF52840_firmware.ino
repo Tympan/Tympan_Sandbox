@@ -17,7 +17,7 @@
     Extended for Tympan Remote App by Chip Audette, Benchtop Engineering, for Creare LLC, February 2024
  */
 
-#define DEBUG_VIA_USB true
+#define DEBUG_VIA_USB false
 
 #define SERIAL_TO_TYMPAN Serial1                 //use this when physically wired to a Tympan. Assumes that the nRF is connected via Serial1 pins
 #define SERIAL_FROM_TYMPAN Serial1               //use this when physically wired to a Tympan. Assumes that the nRF is connected via Serial1 pins
@@ -29,8 +29,11 @@
 #include <InternalFileSystem.h>
 #include "nRF52_BLEuart_Tympan.h"
 #include "nRF52_BLE_Stuff.h"
-#include "nRF52_AT_API.h"
+#include "LED_controller.h"
+#include "nRF52_AT_API.h"  //must already have included LED_control.h
 
+
+LED_controller led_control;
 
 void printHelpToUSB(void) {
   Serial.println("nRF52840 Firmware: Help:");
@@ -39,6 +42,7 @@ void printHelpToUSB(void) {
   Serial.println("   : Send 'h' via USB to get this help");
   Serial.println("   : Send 'J' via USB to send 'J' to the Tympan");
 }
+
 
 void setup(void) {
 
@@ -58,10 +62,14 @@ void setup(void) {
   }
 
   //start the nRF's UART serial port that is physically connected to a Tympan or other microcrontroller (if used)
+  Serial1.setPins(0,1);   //our nRF wiring uses Pin0 for RX and Pin1 for TX
   Serial1.begin(115200);  
-  //delay(500);
+  delay(500);
   while (Serial1.available()) Serial1.read();  //clear UART buffer
 
+  //initialize the LED display
+  led_control.setLedColor(led_control.red);
+  
   //setup BLE and begin
   setupBLE();  
   startAdv();  // start advertising
@@ -98,5 +106,25 @@ void loop(void) {
     //BLEevent(&bleService_adafruitUART, &SERIAL_TO_TYMPAN);
     BLEevent(&bleService_tympanUART, &SERIAL_TO_TYMPAN);  
   }
+
+  //service the LEDs
+  serviceLEDs(millis());
 }
-      
+
+// ///////////////////////////////// Service Routines
+void serviceLEDs(unsigned long curTime_millis) {
+  static unsigned long lastUpdate_millis = 0;
+
+  if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0;  //handle time wrap-around
+  if ((curTime_millis - lastUpdate_millis) > 100UL) {
+    //if (Bluefruit.connected()) {
+    if (bleConnected) {
+      if ((led_control.ledToFade > 0) && (led_control.ledToFade != led_control.green)) led_control.setLedColor(led_control.green);
+    } else {
+      if ((led_control.ledToFade > 0) && (led_control.ledToFade != led_control.blue)) led_control.setLedColor(led_control.blue);
+    }
+    if(led_control.ledToFade > 0) led_control.showRGB_LED(curTime_millis);
+    lastUpdate_millis = curTime_millis;
+  }
+} 
+
