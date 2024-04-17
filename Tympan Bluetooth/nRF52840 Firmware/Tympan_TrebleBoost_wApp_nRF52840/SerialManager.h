@@ -74,15 +74,17 @@ class SerialManager  {  // see Tympan_Library for SerialManagerBase for more fun
 void SerialManager::printHelp(void) {  
   Serial.println("SerialManager Help: Available Commands:");
   Serial.println(" h: Print this help");
-  Serial.println(" k/K: Incr/Decrease Digital Gain");
-  Serial.println(" t/T: Incr/Decrease Cutoff of Highpass Filter");
-  Serial.println(" c/C: Enable/Disable printing of CPU and Memory usage");
-  Serial.println(" v:   Get firmware info from BLE module");
+  Serial.println(" k/K: AUDIO: Incr/Decrease Digital Gain");
+  Serial.println(" t/T: AUDIO: Incr/Decrease Cutoff of Highpass Filter");
+  Serial.println(" c/C: SYSTEM: Enable/Disable printing of CPU and Memory usage");
+  Serial.println(" v:   BLE: Get firmware info from BLE module");
+  Serial.println(" n:   BLE: Get BLE name of the BLE module");
   Serial.println(" J:   Send JSON for the GUI for the Tympan Remote App");
   Serial.println();
 }
 
 bool SerialManager::respondToByte(char c) {
+  //Serial.println("SerialManager: respondToByte " + String(c));
   return processCharacter(c);
 }
 
@@ -99,8 +101,16 @@ bool SerialManager::processCharacter(char c) {  //this is called by SerialManage
       break;
     case 'v':
       {
-        bool printVersionToUSB=true;
-        ble.version(printVersionToUSB);
+        String version;
+        int ret_val = ble.version(version);
+        Serial.println("serialManager: BLE module firmware: " + version);
+      }
+      break;
+    case 'n':
+      {
+        String name = String("");
+        int err_code = ble.getBleName(name);
+        Serial.println("serialManager: BLE module name: " + name);
       }
       break;
     case 'k':

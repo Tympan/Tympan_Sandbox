@@ -197,7 +197,3 @@ void setBleName(const String &name) {
   Serial.println("setBleName: ret_val = " + String(ret_val) + " for name = " + name);
 }
 
-void getBleFirmwareVersion(void) {
-  bool printResponse = true;
-  int ret_val = ble.version(printResponse);
-}
