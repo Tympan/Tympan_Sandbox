@@ -41,9 +41,10 @@ char bleInChar;  // incoming BLE char
 //Create the nRF52 BLE elements (the firmware on the nRF BLE Hardware itself)
 BLEDfu          bledfu;  // Adafruit's built-in OTA DFU service
 BLEDis          bledis;  // Adafruit's built-in device information service
-//BLEUart         bleService_adafruitUART;  //Adafruit's built-in UART service
 BLEUart_Tympan  bleService_tympanUART;    //Tympan extension of the Adafruit UART service that allows us to change the Service and Characteristic UUIDs
-nRF52_AT_API    AT_interpreter(&bleService_tympanUART, &SERIAL_TO_TYMPAN);  //interpreter for the AT command set that we're inventing
+BLEUart         bleService_adafruitUART;  //Adafruit's built-in UART service
+//nRF52_AT_API    AT_interpreter(&bleService_tympanUART, &SERIAL_TO_TYMPAN);  //interpreter for the AT command set that we're inventing
+nRF52_AT_API    AT_interpreter(&bleService_tympanUART, &bleService_adafruitUART, &SERIAL_TO_TYMPAN);  //interpreter for the AT command set that we're inventing
 
 // callback invoked when central connects
 void connect_callback(uint16_t conn_handle)
@@ -172,7 +173,7 @@ void setupBLE(){
   bledis.begin();
 
   // Configure the standard Adafruit UART service
-  //bleService_adafruitUART.begin();
+  bleService_adafruitUART.begin();
 
   // Configure and Start our custom tympan-specific BLE Uart Service
   bleService_tympanUART.setUuid(serviceUUID);

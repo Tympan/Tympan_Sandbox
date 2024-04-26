@@ -22,14 +22,16 @@ extern const char versionString[];
 #define nRF52_AT_API_N_BUFFER 512
 class nRF52_AT_API {
   public:
-    nRF52_AT_API(BLEUart_Tympan *_bleuart, HardwareSerial *_ser_ptr) : ble_ptr(_bleuart) , serial_ptr(_ser_ptr) {}
+    nRF52_AT_API(BLEUart_Tympan *_bleuart1, HardwareSerial *_ser_ptr) : ble_ptr1(_bleuart1) , serial_ptr(_ser_ptr) {}
+    nRF52_AT_API(BLEUart_Tympan *_bleuart1, BLEUart *_bleuart2, HardwareSerial *_ser_ptr) : ble_ptr1(_bleuart1), ble_ptr2(_bleuart2), serial_ptr(_ser_ptr) {}
     
     virtual int processSerialCharacter(char c);  //here's the main entry point to the AT message parsing
     virtual int lengthSerialMessage(void);
     virtual int processSerialMessage(void);
 
   protected:
-    BLEUart_Tympan *ble_ptr = NULL;
+    BLEUart_Tympan *ble_ptr1 = NULL;
+    BLEUart *ble_ptr2 = NULL;
     HardwareSerial *serial_ptr = &Serial1;
     char EOC = '\r'; //all commands (including "SEND") from the Tympan must end in this character
 
@@ -443,7 +445,8 @@ int nRF52_AT_API::bleWriteFromSerialBuff(void) {
 
   //if BLE is connected, fire off the message
   if (bleConnected) {
-    ble_ptr->write( BLEmessage, counter );
+    if (ble_ptr1) ble_ptr1->write( BLEmessage, counter );
+    if (ble_ptr2) ble_ptr2->write( BLEmessage, counter );
     return counter;
   }
   return NO_BLE_CONNECTION;

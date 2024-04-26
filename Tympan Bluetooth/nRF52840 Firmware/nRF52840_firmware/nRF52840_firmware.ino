@@ -105,6 +105,8 @@ void loop(void) {
     //for the nRF firmware, service any messages coming in from BLE wireless link
     //BLEevent(&bleService_adafruitUART, &SERIAL_TO_TYMPAN);
     BLEevent(&bleService_tympanUART, &SERIAL_TO_TYMPAN);  
+    BLEevent(&bleService_adafruitUART, &SERIAL_TO_TYMPAN);  
+    
   }
 
   //service the LEDs
