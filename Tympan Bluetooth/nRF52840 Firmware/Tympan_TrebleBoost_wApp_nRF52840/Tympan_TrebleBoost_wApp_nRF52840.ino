@@ -116,15 +116,8 @@ void loop() {
 
   //respond to BLE
   if (ble.available() > 0) {
-    //String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
-    //for (int i=0; i < msgLen; i++) serialManager.respondToByte(msgFromBle[i]);
     serialManager.respondToByte((char)ble.read()); //for the Tympan simulation, service any messages received form the BLE module
   }
-  // if ((myTympan.BT_Serial)->available()) {
-  //   char c = (myTympan.BT_Serial)->read();
-  //   Serial.print("Loop: received from BT Serial: " + String(c));
-  //   serialManager.respondToByte(c);
-  // }
 
   //periodically print the CPU and Memory Usage
   if (myState.printCPUtoGUI) {
