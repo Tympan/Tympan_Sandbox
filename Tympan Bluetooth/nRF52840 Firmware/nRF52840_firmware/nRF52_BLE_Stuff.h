@@ -19,7 +19,7 @@ uint8_t characteristicUUID[] = {  0x3C, 0xD9, 0xF7, 0x89, 0x37, 0x37, 0xAA, 0x8F
 BLECharacteristic myBleChar = BLECharacteristic(characteristicUUID, BLENotify | BLEWrite); //from #include <bluefruit.h>
 
 //   vvvvv  VERSION INDICATION  vvvvv
-const char versionString[] = "TympanBLE v0.2.1, nRF52840";
+const char versionString[] = "TympanBLE v0.2.2, nRF52840";
 char deviceName[] = "Tympan-TACO"; // gets modified with part of the uniqueID
 const char manufacturerName[] = "Flywheel Lab";
 
@@ -212,6 +212,10 @@ void startAdv(void)
   Bluefruit.Advertising.setInterval(32, 244);    // in unit of 0.625 ms
   Bluefruit.Advertising.setFastTimeout(30);      // number of seconds in fast mode
   Bluefruit.Advertising.start(0);                // 0 = Don't stop advertising after n seconds
+}
+
+void stopAdv(void) {
+  Bluefruit.Advertising.stop();
 }
 
 

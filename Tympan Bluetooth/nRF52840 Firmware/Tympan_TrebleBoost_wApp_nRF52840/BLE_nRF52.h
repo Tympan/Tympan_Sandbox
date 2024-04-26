@@ -68,9 +68,11 @@ class BLE_nRF52 {
     int setBleName(const String &s);
     int getBleName(String &reply);
     int version(String &reply);
-    int getLedMode(void);
     int isConnected(void);
     int isAdvertising(void);
+    int enableAdvertising(bool);
+    int setLedMode(int val);
+    int getLedMode(void);
 
     unsigned long rx_timeout_millis = 2000UL;
     //bool simulated_Serial_to_nRF = true;
@@ -315,6 +317,32 @@ int BLE_nRF52::isAdvertising(void) {
   return -1; //error
 }
 
+int BLE_nRF52::enableAdvertising(bool enable) {
+  if (enable) {
+    sendCommand("SET ADVERTISING=","ON");
+  } else {
+    sendCommand("SET ADVERTISING=","OFF");
+  }
+  String reply;
+  recvReply(reply); //look for "OK MY_NAME"
+  Serial.println("BLE_nRF52: enableAdvertising: received raw reply = " + reply);
+  if (doesStartWithOK(reply)) {
+    return 0;
+  }
+  return -1; //error
+}
+
+int BLE_nRF52::setLedMode(int value) {
+  sendCommand("SET LEDMODE=",String(value));
+
+  String reply;
+  recvReply(reply); //look for "OK""
+  //Serial.println("BLE_nRF52: version: received raw reply = " + reply);
+  if (doesStartWithOK(reply)) {
+    return 0;
+  }
+  return -1; //error
+}
 
 int BLE_nRF52::version(String &replyToReturn) {
   sendCommand("GET VERSION",String(""));

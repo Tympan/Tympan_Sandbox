@@ -16,6 +16,7 @@ extern LED_controller led_control;
 extern bool bleConnected;
 extern char BLEmessage[];
 extern void startAdv(void);
+extern void stopAdv(void);
 extern const char versionString[];
 
 //running on the nRF52, this interprets commands coming from the hardware serial and send replies out to the BLE
@@ -44,6 +45,7 @@ class nRF52_AT_API {
     int processSetMessageInSerialBuff(void);  
     int processGetMessageInSerialBuff(void);
     int setBleNameFromSerialBuff(void);
+    int setAdvertisingFromSerialBuff(void);
     int setLedModeFromSerialBuff(void);
     int bleWriteFromSerialBuff(void);
     void debugPrintMsgFromSerialBuff(void);
@@ -219,11 +221,12 @@ int nRF52_AT_API::processSetMessageInSerialBuff(void) {
   test_n_char = 11+1; //length of "ADVERTISING="
   if (compareStringInSerialBuff("ADVERTISING=",test_n_char)) {
     serial_read_ind += test_n_char; //increment the reader index for the serial buffer
-
-    //replace this placeholder with useful code
-    ret_val = NOT_IMPLEMENTED_YET;
-    sendSerialFailMessage("SET ADVERTISING not implemented yet");
-
+    ret_val = setAdvertisingFromSerialBuff();
+    if (ret_val == 0) {
+      sendSerialOkMessage();
+    } else {
+      sendSerialFailMessage("SET ADVERTISING failed");
+    }
     serial_read_ind = serial_write_ind;  //remove the message
   }
 
@@ -231,11 +234,12 @@ int nRF52_AT_API::processSetMessageInSerialBuff(void) {
   test_n_char = 7+1; //length of "LEDMODE="
   if (compareStringInSerialBuff("LEDMODE=",test_n_char)) {
     serial_read_ind += test_n_char; //increment the reader index for the serial buffer
-
-    //replace this placeholder with useful code
-    ret_val = NOT_IMPLEMENTED_YET;
-    sendSerialFailMessage("SET LEDMODE not implemented yet");
-
+    ret_val = setLedModeFromSerialBuff();
+    if (ret_val == 0) {
+      sendSerialOkMessage();
+    } else {
+      sendSerialFailMessage("SET LEDMODE failed");
+    }
     serial_read_ind = serial_write_ind;  //remove the message
   }
 
@@ -415,30 +419,39 @@ int nRF52_AT_API::setBleNameFromSerialBuff(void) {
   return OPERATION_FAILED;
 }
 
-int nRF52_AT_API::setLedModeFromSerialBuff(void) {
+int nRF52_AT_API::setAdvertisingFromSerialBuff(void) {
   int ret_val = OPERATION_FAILED;
-  int end_ind = serial_read_ind;
-  while ((end_ind < serial_write_ind) && (serial_buff[end_ind] != EOC)) end_ind++; //see if there is an end-of-command character
-  if (end_ind != serial_write_ind) { //are there any characters to interpret?
-    char c = serial_buff[serial_read_ind];
-    switch (c) {
-      case 0:
-        //turn off the LED fading
-        led_control.disableLEDs();
-        sendSerialOkMessage("LEDMODE 0");
-        ret_val = 0;  //good!
-        break;
-      case 1:
-        //automatic control (set to any color and the system will update it in the loop())
-        led_control.setLedColor(led_control.red);
-        sendSerialOkMessage("LEDMODE 1");
-        ret_val = 0;  //good!
-        break;
+  int read_ind = serial_read_ind;
+  if ((lengthSerialMessage() > 0) && (serial_buff[read_ind]==' ')) read_ind++; //remove leading whitespace
+  if (lengthSerialMessage() >= 2) {
+    if ((serial_buff[read_ind]=='O') && (serial_buff[read_ind+1]=='N')) {
+      startAdv();
+      ret_val = 0;
+    } else if ((serial_buff[read_ind]=='O') && (serial_buff[read_ind+1]=='F')) {
+      stopAdv();
+      ret_val = 0;
     }
   }
-  sendSerialFailMessage("LEDMODE failed");
-  return OPERATION_FAILED;
+  return ret_val;
 }
+
+
+int nRF52_AT_API::setLedModeFromSerialBuff(void) {
+  int ret_val = OPERATION_FAILED;
+  int read_ind = serial_read_ind;
+  if ((lengthSerialMessage() > 0) && (serial_buff[read_ind]==' ')) read_ind++; //remove leading whitespace
+  if (lengthSerialMessage() >= 1) {
+    if (serial_buff[read_ind]=='0') {
+      led_control.disableLEDs();
+      ret_val = 0;
+    } else if (serial_buff[read_ind]=='1') {
+      led_control.setLedColor(led_control.red);
+      ret_val = 0;
+    }
+  }
+  return ret_val;
+}
+
 
 int nRF52_AT_API::bleWriteFromSerialBuff(void) {
   //copy the message from the circular buffer to the straight buffer

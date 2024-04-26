@@ -123,9 +123,14 @@ void serviceLEDs(unsigned long curTime_millis) {
     if (bleConnected) {
       if ((led_control.ledToFade > 0) && (led_control.ledToFade != led_control.green)) led_control.setLedColor(led_control.green);
     } else {
-      if ((led_control.ledToFade > 0) && (led_control.ledToFade != led_control.blue)) led_control.setLedColor(led_control.blue);
+      if (Bluefruit.Advertising.isRunning()) {
+        if ((led_control.ledToFade > 0) && (led_control.ledToFade != led_control.blue)) led_control.setLedColor(led_control.blue);
+      } else {
+        if ((led_control.ledToFade > 0) && (led_control.ledToFade != led_control.red))led_control.setLedColor(led_control.red);
+      }
     }
     if(led_control.ledToFade > 0) led_control.showRGB_LED(curTime_millis);
+    if (led_control.ledToFade==0) led_control.LEDsOff();
     lastUpdate_millis = curTime_millis;
   }
 } 
