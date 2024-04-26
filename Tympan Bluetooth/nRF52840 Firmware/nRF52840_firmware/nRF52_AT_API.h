@@ -313,9 +313,8 @@ int nRF52_AT_API::processGetMessageInSerialBuff(void) {
   test_n_char = 11; //length of "ADVERTISING"
   if (compareStringInSerialBuff("ADVERTISING",test_n_char)) {
     if ((serial_read_ind+test_n_char==serial_write_ind) || (serial_buff[serial_read_ind + test_n_char] == EOC)) {
-      ret_val = NOT_IMPLEMENTED_YET;
-      sendSerialFailMessage("GET ADVERTISING not implemented yet");
-
+      ret_val = 0;
+      sendSerialOkMessage((Bluefruit.Advertising.isRunning()) ? "TRUE" : "FALSE");
     } else {
       ret_val = FORMAT_PROBLEM;
       sendSerialFailMessage("GET ADVERTISING had formatting problem");
@@ -342,9 +341,8 @@ int nRF52_AT_API::processGetMessageInSerialBuff(void) {
   test_n_char = 9; //length of "CONNECTED"
   if (compareStringInSerialBuff("CONNECTED",test_n_char)) {
     if ((serial_read_ind+test_n_char==serial_write_ind) || (serial_buff[serial_read_ind + test_n_char] == EOC)) {
-      ret_val = NOT_IMPLEMENTED_YET;
-      sendSerialFailMessage("GET CONNECTED not implemented yet");
-
+      ret_val = 0;
+      sendSerialOkMessage((Bluefruit.connected()) ? "TRUE" : "FALSE");
     } else {
       ret_val = FORMAT_PROBLEM;
       sendSerialFailMessage("GET CONNECTED had formatting problem");

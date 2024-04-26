@@ -80,6 +80,9 @@ void SerialManager::printHelp(void) {
   Serial.println(" v:   BLE: Get firmware info from BLE module");
   Serial.println(" n:   BLE: Get BLE name of the BLE module");
   Serial.println(" N:   BLE: Set BLE name of the BLE module to TYMP-TYMP");
+  Serial.println(" g:   BLE: Get BLE status of Advertising");
+  Serial.println(" G:   BLE: Get BLE status of Connected");
+  Serial.println(" m:   BLE: Get BLE status of LedMode");
   Serial.println(" J:   Send JSON for the GUI for the Tympan Remote App");
   Serial.println();
 }
@@ -120,11 +123,15 @@ bool SerialManager::processCharacter(char c) {  //this is called by SerialManage
         Serial.println("serialManager: setting BLE module name: " + name);
         int err_code = ble.setBleName(name);
       }
-      //{
-      //  String name = String("");
-      //  int err_code = ble.getBleName(name);
-      //  Serial.println("serialManager: retrieving BLE module name.  name = " + name);
-      //}
+      break;
+    case 'g':
+      Serial.println("serialManager: BLE: isAdvertising = " + String(ble.isAdvertising()));
+      break;
+    case 'G':
+      Serial.println("serialManager: BLE: isConnected = " + String(ble.isConnected()));
+      break;
+    case 'm':
+      Serial.println("serialManager: BLE: getLedMode = " + String(ble.getLedMode()));
       break;
     case 'k':
       changeGain(gainIncrement_dB);   //raise

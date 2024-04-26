@@ -68,6 +68,9 @@ class BLE_nRF52 {
     int setBleName(const String &s);
     int getBleName(String &reply);
     int version(String &reply);
+    int getLedMode(void);
+    int isConnected(void);
+    int isAdvertising(void);
 
     unsigned long rx_timeout_millis = 2000UL;
     //bool simulated_Serial_to_nRF = true;
@@ -256,6 +259,62 @@ int BLE_nRF52::getBleName(String &reply) {
   }
   return -1;
 }
+
+
+int BLE_nRF52::getLedMode(void) {
+  sendCommand("GET LEDMODE",String(""));
+  //if (simulated_Serial_to_nRF) bleUnitServiceSerial();  //for the nRF firmware, service any messages coming in the serial port from the Tympan
+  
+  String reply;
+  recvReply(reply); //look for "OK MY_NAME"
+  //Serial.println("BLE_nRF52: version: received raw reply = " + reply);
+  if (doesStartWithOK(reply)) {
+    reply.remove(0,2);  //remove the leading "OK"
+    reply.trim(); //remove leading or trailing whitespace
+    return int(reply.toInt());
+  } 
+  return -1; //error
+}
+
+
+int BLE_nRF52::isConnected(void) {
+  sendCommand("GET CONNECTED",String(""));
+  //if (simulated_Serial_to_nRF) bleUnitServiceSerial();  //for the nRF firmware, service any messages coming in the serial port from the Tympan
+  
+  String reply;
+  recvReply(reply); //look for "OK MY_NAME"
+  //Serial.println("BLE_nRF52: version: received raw reply = " + reply);
+  if (doesStartWithOK(reply)) {
+    reply.remove(0,2);  //remove the leading "OK"
+    reply.trim(); //remove leading or trailing whitespace
+    if (reply == "TRUE") {
+      return 1;
+    } else {
+      return 0;
+    }
+  } 
+  return -1; //error
+}
+
+int BLE_nRF52::isAdvertising(void) {
+  sendCommand("GET ADVERTISING",String(""));
+  //if (simulated_Serial_to_nRF) bleUnitServiceSerial();  //for the nRF firmware, service any messages coming in the serial port from the Tympan
+  
+  String reply;
+  recvReply(reply); //look for "OK MY_NAME"
+  //Serial.println("BLE_nRF52: version: received raw reply = " + reply);
+  if (doesStartWithOK(reply)) {
+    reply.remove(0,2);  //remove the leading "OK"
+    reply.trim(); //remove leading or trailing whitespace
+    if (reply == "TRUE") {
+      return 1;
+    } else {
+      return 0;
+    }
+  } 
+  return -1; //error
+}
+
 
 int BLE_nRF52::version(String &replyToReturn) {
   sendCommand("GET VERSION",String(""));
