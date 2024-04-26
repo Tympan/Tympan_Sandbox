@@ -79,6 +79,7 @@ void SerialManager::printHelp(void) {
   Serial.println(" c/C: SYSTEM: Enable/Disable printing of CPU and Memory usage");
   Serial.println(" v:   BLE: Get firmware info from BLE module");
   Serial.println(" n:   BLE: Get BLE name of the BLE module");
+  Serial.println(" N:   BLE: Set BLE name of the BLE module to TYMP-TYMP");
   Serial.println(" J:   Send JSON for the GUI for the Tympan Remote App");
   Serial.println();
 }
@@ -110,8 +111,20 @@ bool SerialManager::processCharacter(char c) {  //this is called by SerialManage
       {
         String name = String("");
         int err_code = ble.getBleName(name);
-        Serial.println("serialManager: BLE module name: " + name);
+        Serial.println("serialManager: retrieving BLE module name.  name = " + name);
       }
+      break;
+    case 'N':
+      {
+        String name = String("TympTymp");
+        Serial.println("serialManager: setting BLE module name: " + name);
+        int err_code = ble.setBleName(name);
+      }
+      //{
+      //  String name = String("");
+      //  int err_code = ble.getBleName(name);
+      //  Serial.println("serialManager: retrieving BLE module name.  name = " + name);
+      //}
       break;
     case 'k':
       changeGain(gainIncrement_dB);   //raise

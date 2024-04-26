@@ -65,6 +65,7 @@ class nRF52_AT_API {
 int nRF52_AT_API::processSerialCharacter(char c) {
   //look for carriage return
   if (c == EOC) {  //look for the end-of-command character
+    //the EOC character is NOT added to the serial_buff.  Just go ahead and interpret the serial_buff
     processSerialMessage();
   } else {
     serial_buff[serial_write_ind] = c;
@@ -105,7 +106,7 @@ int nRF52_AT_API::processSerialMessage(void) {
   if (len >= test_n_char) {  //is the current message long enough for this test?
     if (compareStringInSerialBuff("SEND ",test_n_char)) {  //does the current message start this way
       serial_read_ind += test_n_char; //increment the reader index for the serial buffer
-      Serial.print("nRF52_AT_API: recvd: SEND "); debugPrintMsgFromSerialBuff(); Serial.println();
+      if (DEBUG_VIA_USB) { Serial.print("nRF52_AT_API: recvd: SEND "); debugPrintMsgFromSerialBuff(); Serial.println();}
       bleWriteFromSerialBuff();
       ret_val = 0; 
     }
@@ -116,7 +117,7 @@ int nRF52_AT_API::processSerialMessage(void) {
   if (len >= test_n_char) {
     if (compareStringInSerialBuff("SET ",test_n_char)) {  //does the current message start this way
       serial_read_ind += test_n_char; //increment the reader index for the serial buffer
-      Serial.print("nRF52_AT_API: recvd: SET "); debugPrintMsgFromSerialBuff(); Serial.println();
+      if (DEBUG_VIA_USB) { Serial.print("nRF52_AT_API: recvd: SET "); debugPrintMsgFromSerialBuff(); Serial.println(); }
       processSetMessageInSerialBuff();
       ret_val = 0;
     }
@@ -127,7 +128,7 @@ int nRF52_AT_API::processSerialMessage(void) {
   if (len >= test_n_char) {
     if (compareStringInSerialBuff("GET ",test_n_char)) {  //does the current message start this way
       serial_read_ind += test_n_char; //increment the reader index for the serial buffer
-      Serial.print("nRF52_AT_API: recvd: GET "); debugPrintMsgFromSerialBuff(); Serial.println();
+      if (DEBUG_VIA_USB) { Serial.print("nRF52_AT_API: recvd: GET "); debugPrintMsgFromSerialBuff(); Serial.println(); } 
       ret_val = processGetMessageInSerialBuff();
     }
   } 
@@ -147,7 +148,7 @@ int nRF52_AT_API::processSerialMessage(void) {
   // give error message if message isn't known
   if (ret_val != 0) {
     if (DEBUG_VIA_USB) {
-      Serial.print("nRF52_AT_API: *** WARNING ***: msg not understood: ");
+      if (DEBUG_VIA_USB) { Serial.print("nRF52_AT_API: *** WARNING ***: msg not understood: "); }
       debugPrintMsgFromSerialBuff();
       Serial.println();
     }
@@ -187,9 +188,14 @@ int nRF52_AT_API::processSetMessageInSerialBuff(void) {
       Serial.println();
     }
     
-    #if 0
+    #if 1
       ret_val = setBleNameFromSerialBuff();
       sendSerialOkMessage();
+      delay(5);
+      //clear out the UART buffers
+      for (int i=0; i<24; i++) {
+        if (serial_ptr) serial_ptr->print(EOC);
+      }
     #else
       ret_val = NOT_IMPLEMENTED_YET;
       sendSerialFailMessage("SET NAME not implemented yet");
@@ -378,7 +384,7 @@ int nRF52_AT_API::processGetMessageInSerialBuff(void) {
 int nRF52_AT_API::setBleNameFromSerialBuff(void) {
   int end_ind = serial_read_ind;
   while ((end_ind < serial_write_ind) && (serial_buff[end_ind] != EOC)) end_ind++; //see if there is an end-of-command character
-  if (end_ind != serial_write_ind) {
+  //if (end_ind != serial_write_ind) {
     static const int max_len_name = 16;  //16 character max?? 
     char new_name[max_len_name+1]; //11 characters plus the null termination
     int given_len_name = end_ind - serial_read_ind;
@@ -386,25 +392,28 @@ int nRF52_AT_API::setBleNameFromSerialBuff(void) {
     if (new_len > 0) {
       //copy the name to a null-terminated buffer
       for (int i=0;i < new_len; i++) new_name[i] = serial_buff[serial_read_ind + i]; //copy from the serial buffer
-      new_name[new_len] = '\0'; //add the null termination
+      for (int i=new_len; i < max_len_name+1; i++ ) new_name[new_len] = '\0';  //add the null termination
       if (DEBUG_VIA_USB) Serial.println("nRF52_AT_API: setBleNameFromSerialBuff: new_name = " + String(new_name));
 
       //stop any advertising
-      //Bluefruit.Advertising.stop();
+      Bluefruit.Advertising.stop();
+      Bluefruit.Advertising.clearData();
+      Bluefruit.ScanResponse.clearData(); // add this
 
       //send the new name to the module
       Bluefruit.setName(new_name);
 
       //restart advertising
-      //startAdv();
+      startAdv();
 
       return 0;  //return OK
     } else {
       //length of new name was zero.  So assume this was a fail?
     }
-  } else {
-    //didn't find an EOC character.  This shouldn't happen.
-  }
+  //} else {
+  //  //didn't find an EOC character.  This shouldn't happen.
+  //  led_control.setLedColor(led_control.green);
+  //}
   return OPERATION_FAILED;
 }
 
