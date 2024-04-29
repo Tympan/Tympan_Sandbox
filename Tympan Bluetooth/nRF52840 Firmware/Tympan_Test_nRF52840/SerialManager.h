@@ -72,14 +72,14 @@ void SerialManager::printHelp(void) {
   Serial.println(" h: Print this help");
   Serial.println(" k/K: AUDIO: Incr/Decrease Digital Gain");
   Serial.println(" c/C: SYSTEM: Enable/Disable printing of CPU and Memory usage");
+  Serial.println(" v:   BLE: Get 'Version of firmware from module");
   Serial.println(" n:   BLE: Get 'Name' from module");
   Serial.println(" N:   BLE: Set 'Name' of module to 'TYMP-TYMP'");
   Serial.println(" t:   BLE: Get 'Advertising' status via software");
   Serial.println(" f/F: BLE: Set 'Advertising' to ON (f) or OFF (F)");
+  Serial.println(" g/G: BLE: Get 'Connected' status via software (g) or GPIO (G)");
   Serial.println(" m:   BLE: Get 'LED Mode' setting (0=OFF, 1=AUTO)");
   Serial.println(" b/B: BLE: Set 'LED Mode' to AUTO (b) or OFF (B)");
-  Serial.println(" g/G: BLE: Get 'Connected' status via software (g) or GPIO (G)");
-  Serial.println(" v:   BLE: Get 'Version of firmware from module");
   Serial.println(" J:   Send JSON for the GUI for the Tympan Remote App");
   Serial.println();
 }
@@ -93,6 +93,7 @@ bool SerialManager::respondToByte(char c) {
 bool SerialManager::processCharacter(char c) {  //this is called by SerialManagerBase.respondToByte(char c)
   bool ret_val = true;
   int val = 0;
+  int err_code = 0;
 
   switch (c) {
     case 'h':
@@ -138,47 +139,91 @@ bool SerialManager::processCharacter(char c) {  //this is called by SerialManage
     case 't':
       val = ble.isAdvertising();
       Serial.println("serialManager: BLE: Get 'Advertising' = " + String(val));
-      setButtonText("isAdvertising", String(val ? "ON" : "OFF"));
+      setButtonText("isAdvert", String(val ? "ON" : "OFF"));
       break;
     case 'f':
       Serial.println("serialManager: BLE: Set 'Advertising' to ON...");
-      ble.enableAdvertising(true);
+      err_code = ble.enableAdvertising(true);
+      if (err_code) Serial.println("SerialManager: ble.enableAdvertising returned err_code = " + String(err_code));
       break;
     case 'F':
       Serial.println("serialManager: BLE: Set 'Advertising' to OFF...");
-      ble.enableAdvertising(false);
+      err_code = ble.enableAdvertising(false);
+      if (err_code) Serial.println("SerialManager: ble.enableAdvertising returned err_code = " + String(err_code));
       break;
     case 'm':
       val = ble.getLedMode();
-      Serial.println("serialManager: BLE: Get 'LED Mode' = " + String(val) + " (1=AUTO, 0=OFF)");
-      setButtonText("ledMode", String(val ? "AUTO" : "OFF"));
+      if (val < 0) {
+        Serial.println("SerialManager: ble.getLedMode returned err_code = " + String(val));
+      } else {
+        Serial.println("serialManager: BLE: Get 'LED Mode' = " + String(val) + " (1=AUTO, 0=OFF)");
+        setButtonText("ledMode", String(val ? "AUTO" : "OFF"));
+      }
       break;
     case 'b':
       Serial.println("serialManager: BLE: Set 'LED Mode' to 1 (AUTO)");
-      ble.setLedMode(1);
+      err_code = ble.setLedMode(1);
+      if (err_code < 0) {
+        Serial.println("SerialManager: ble.setLedMode returned err_code = " + String(err_code));
+      } else {
+        delay(5); 
+        Serial.println("serialManager: following up by issuing ble.getLedMode()...");
+        val = ble.getLedMode();  
+        if (val < 0) {
+          Serial.println("serialManager: ble.getLedMode returned err_code = " + String(val));  
+        } else {
+          Serial.println("serialManager: BLE: Get 'LED Mode' = " + String(val) + " (1=AUTO, 0=OFF)");
+          setButtonText("ledMode", String(val ? "AUTO" : "OFF"));
+        }
+      }
       break;
     case 'B':
       Serial.println("serialManager: BLE: Set 'LED Mode' to 0 (OFF)");
-      ble.setLedMode(0);
-      break;    
+      err_code = ble.setLedMode(0);
+      if (err_code < 0) {
+        Serial.println("SerialManager: ble.setLedMode returned err_code = " + String(err_code));
+      } else {
+        delay(5); 
+        Serial.println("serialManager: following up by issuing ble.getLedMode()...");
+        val = ble.getLedMode();  
+        if (val < 0) {
+          Serial.println("SerialManager: ble.getLedMode returned err_code = " + String(val));  
+        } else {
+          Serial.println("serialManager: BLE: Get 'LED Mode' = " + String(val) + " (1=AUTO, 0=OFF)");
+          setButtonText("ledMode", String(val ? "AUTO" : "OFF"));
+        }
+      }  
+      break; 
     case 'g':
       val = ble.isConnected(BLE_nRF52::GET_VIA_SOFTWARE);
-      Serial.println("serialManager: BLE: Get 'Connected' via software = " + String(val));
-      setButtonText("isConn_soft", String(val ? "YES" : "NO"));
-      setButtonText("isConn_firm", String(""));
+      if (val < 0) {
+        Serial.println("SerialManager: ble.isConnected(Software) returned err_code = " + String(val));
+      } else {
+        Serial.println("serialManager: BLE: Get 'Connected' via software = " + String(val));
+        setButtonText("isConn_s", String(val ? "YES" : "NO"));
+        setButtonText("isConn_g", String(""));
+      }
       break;
     case 'G':
       val = ble.isConnected(BLE_nRF52::GET_VIA_GPIO);
-      Serial.println("serialMananger: BLE: Get 'Connected' via GPIO pin = " + String(val));
-      setButtonText("isConn_gpio", String(val ? "YES" : "NO"));
-      setButtonText("isConn_soft", String(""));
+      if (val < 0) {
+        Serial.println("SerialManager: ble.isConnected(GPIO) returned err_code = " + String(val));
+      } else {
+        Serial.println("serialManager: BLE: Get 'Connected' via GPIO = " + String(val));
+        setButtonText("isConn_g", String(val ? "YES" : "NO"));
+        setButtonText("isConn_s", String(""));
+      }
       break;
     case 'v':
       {
         String version;
-        ble.version(version);
-        Serial.println("serialManager: BLE module firmware: " + version);
-        setButtonText("version",version);
+        err_code = ble.version(version);
+        if (err_code < 0) {
+          Serial.println("serialManager: BLE: version returned err_code " + String(err_code));
+        } else {
+          Serial.println("serialManager: BLE module firmware: " + version);
+          setButtonText("version",version);
+        }
       }
       break; 
     case 'J': case 'j':           //The TympanRemote app sends a 'J' to the Tympan when it connects
@@ -193,70 +238,119 @@ bool SerialManager::processCharacter(char c) {  //this is called by SerialManage
 
 // //////////////////////////////////  Methods for defining and transmitting the GUI to the App
 
-//define the GUI for the App
+// //define the GUI for the App
+// void SerialManager::createTympanRemoteLayout(void) {
+  
+//   // Create some temporary variables
+//   TR_Page *page_h;  //dummy handle for a page
+//   TR_Card *card_h;  //dummy handle for a card
+
+//   Serial.println(" g/G: BLE: Get 'Connected' status via software (g) or GPIO (G)");
+//   Serial.println(" v:   BLE: Get 'Version of firmware from module");
+//   Serial.println(" J:   Send JSON for the GUI for the Tympan Remote App");
+
+//   //Add first page to GUI  (the indentation doesn't matter; it is only to help us see it better)
+//   page_h = myGUI.addPage("nRF52840 Testing");
+//     //Add a card under the first page
+//     card_h = page_h->addCard("BLE Name");
+//         //Add a "-" digital gain button with the Label("-"); Command("K"); Internal ID ("minusButton"); and width (4)
+//         card_h->addButton("Get", "n",   "",    12);  //displayed string, command, button ID, button width (out of 12)
+
+//         //Add an indicator that's a button with no command:  Label (value of the digital gain); Command (""); Internal ID ("gain indicator"); width (4).
+//         card_h->addButton("", "",     "bleName", 12);  //displayed string (blank for now), command (blank), button ID, button width (out of 12)
+
+//     // card_h = page_h->addCard("Advertising");
+//     //     card_h->addButton("Get",    "t", "",             6);
+//     //     card_h->addButton("",       "" , "isAdvert",     6);
+//     //     card_h->addButton("Set ON",  "f",  "",           6); //set the "f" to set the value, then "t" to get the value
+//     //     card_h->addButton("Set OFF", "F",  "",           6); //set the "F" to set the value, then "t" to get the value
+
+//     // card_h = page_h->addCard("LED Mode");
+//     //     card_h->addButton("Get",      "m", "",           6);
+//     //     card_h->addButton("",         "" , "ledMode",    6);
+//     //     card_h->addButton("Set AUTO", "b",  "",          6); //set the "b" to set the value, then "m" to get the value
+//     //     card_h->addButton("Set OFF",  "B",  "",          6); //set the "B" to set the value, then "m" to get the value
+
+//     //  card_h = page_h->addCard("Connected");
+//     //     card_h->addButton("Get (Soft)", "g", "",               6);
+//     //     card_h->addButton("",                 "" , "isConn_s", 6);
+//     //     card_h->addButton("Get (GPIO)", "G", "",               6);
+//     //     card_h->addButton("",                 "" , "isConn_g", 6);
+       
+//     // card_h = page_h->addCard("Version");
+//     //     card_h->addButton("Get",    "v", "",              12);
+//     //     card_h->addButton("",       "" , "version",       12);
+
+
+//   //page_h = myGUI.addPage("Audio Settings");
+//     //Add a card under the first page
+//     card_h = page_h->addCard("Audio Gain (dB)");
+//         //Add a "-" digital gain button with the Label("-"); Command("K"); Internal ID ("minusButton"); and width (4)
+//         card_h->addButton("-","K","",           4);  //displayed string, command, button ID, button width (out of 12)
+
+//         //Add an indicator that's a button with no command:  Label (value of the digital gain); Command (""); Internal ID ("gain indicator"); width (4).
+//         card_h->addButton("","","gainIndicator",4);  //displayed string (blank for now), command (blank), button ID, button width (out of 12)
+
+//         //Add a "+" digital gain button with the Label("+"); Command("K"); Internal ID ("minusButton"); and width (4)
+//         card_h->addButton("+","k","",           4);   //displayed string, command, button ID, button width (out of 12)
+
+
+
+//   //Add a second page to the GUI
+//   //page_h = myGUI.addPage("Globals");
+
+//     //Add an example card that just displays a value...no interactive elements
+//     card_h = page_h->addCard(String("Analog Input Gain (dB)"));
+//       card_h->addButton("",      "", "inpGain",   12); //label, command, id, width (out of 12)...THIS ISFULL WIDTH!
+
+//     //Add an example card where one of the buttons will indicate "on" or "off"
+// //    card_h = page_h->addCard(String("CPU Usage (%)"));
+// //      card_h->addButton("Start", "c", "cpuStart", 4);  //label, command, id, width...we'll light this one up if we're showing CPU usage
+// //      card_h->addButton(""     , "",  "cpuValue", 4);  //label, command, id, width...this one will display the actual CPU value
+// //      card_h->addButton("Stop",  "C", "",         4);  //label, command, id, width...this one will turn off the CPU display
+        
+//   //add some pre-defined pages to the GUI (pages that are built-into the App)
+//   myGUI.addPredefinedPage("serialMonitor");
+//   //myGUI.addPredefinedPage("serialPlotter");
+// }
+
 void SerialManager::createTympanRemoteLayout(void) {
   
   // Create some temporary variables
   TR_Page *page_h;  //dummy handle for a page
   TR_Card *card_h;  //dummy handle for a card
 
-  Serial.println(" g/G: BLE: Get 'Connected' status via software (g) or GPIO (G)");
-  Serial.println(" v:   BLE: Get 'Version of firmware from module");
-  Serial.println(" J:   Send JSON for the GUI for the Tympan Remote App");
-
   //Add first page to GUI  (the indentation doesn't matter; it is only to help us see it better)
-  page_h = myGUI.addPage("nRF52840 Testing");
-    //Add a card under the first page
-    card_h = page_h->addCard("BLE Name");
-        //Add a "-" digital gain button with the Label("-"); Command("K"); Internal ID ("minusButton"); and width (4)
-        card_h->addButton("Get", "n",   "",    4);  //displayed string, command, button ID, button width (out of 12)
+  page_h = myGUI.addPage("nRF52840 BLE Testing");
+      //Add a card to this page
+      card_h = page_h->addCard("BLE Name");
+          card_h->addButton("Get Name","n",""     , 12);
+          card_h->addButton("", "", "bleName", 12);  //displayed string (blank for now), command (blank), button ID, button width (out of 12)
 
-        //Add an indicator that's a button with no command:  Label (value of the digital gain); Command (""); Internal ID ("gain indicator"); width (4).
-        card_h->addButton("", "",     "bleName", 8);  //displayed string (blank for now), command (blank), button ID, button width (out of 12)
+      //Add a card to this page
+      card_h = page_h->addCard("BLE Firmware");
+          card_h->addButton("Get Version","v","", 12);
+          card_h->addButton("",  "", "version",   12);  //displayed string (blank for now), command (blank), button ID, button width (out of 12)
 
-    card_h = page_h->addCard("Advertising");
-        card_h->addButton("Get",    "t", "",              4);
-        card_h->addButton("",       "" , "isAdvertising", 8);
-        card_h->addButton("Set ON",  "ft",  "",           6); //set the "f" to set the value, then "t" to get the value
-        card_h->addButton("Set OFF", "Ft",  "",           6); //set the "F" to set the value, then "t" to get the value
-
-    card_h = page_h->addCard("LED Mode");
-        card_h->addButton("Get",      "m", "",            4);
-        card_h->addButton("",         "" , "ledMode",     8);
-        card_h->addButton("Set AUTO", "bm",  "",          6); //set the "b" to set the value, then "m" to get the value
-        card_h->addButton("Set OFF",  "Bm",  "",          6); //set the "B" to set the value, then "m" to get the value
-
-     card_h = page_h->addCard("Connected");
-        card_h->addButton("Get Via Software", "g", "",            8);
-        card_h->addButton("",                 "" , "isConn_soft", 4);
-        card_h->addButton("Get Via GPIO", "g", "",                8);
-        card_h->addButton("",                 "" , "isConn_gpio", 4);
-       
-    card_h = page_h->addCard("Version");
-        card_h->addButton("Get",    "v", "",              4);
-        card_h->addButton("",       "" , "version", 8);
-
-
-  page_h = myGUI.addPage("Audio Settings");
-    //Add a card under the first page
-    card_h = page_h->addCard("Audio Gain (dB)");
-        //Add a "-" digital gain button with the Label("-"); Command("K"); Internal ID ("minusButton"); and width (4)
-        card_h->addButton("-","K","",           4);  //displayed string, command, button ID, button width (out of 12)
-
-        //Add an indicator that's a button with no command:  Label (value of the digital gain); Command (""); Internal ID ("gain indicator"); width (4).
-        card_h->addButton("","","gainIndicator",4);  //displayed string (blank for now), command (blank), button ID, button width (out of 12)
-
-        //Add a "+" digital gain button with the Label("+"); Command("K"); Internal ID ("minusButton"); and width (4)
-        card_h->addButton("+","k","",           4);   //displayed string, command, button ID, button width (out of 12)
-
-
-
+      //Add a card to this page
+      card_h = page_h->addCard("Bluetooth LED");
+          card_h->addButton("Get Mode","m",""     , 6);
+          card_h->addButton("", "", "ledMode", 6);  //displayed string (blank for now), command (blank), button ID, button width (out of 12)
+          card_h->addButton("AUTO On","b","",     6);  //displayed string, command, button ID, button width (out of 12)
+          card_h->addButton("AUTO Off","B","",      6);  //displayed string, command, button ID, button width (out of 12)
+          
   //Add a second page to the GUI
-  page_h = myGUI.addPage("Globals");
+  page_h = myGUI.addPage("Audio");
 
     //Add an example card that just displays a value...no interactive elements
     card_h = page_h->addCard(String("Analog Input Gain (dB)"));
       card_h->addButton("",      "", "inpGain",   12); //label, command, id, width (out of 12)...THIS ISFULL WIDTH!
+
+    card_h = page_h->addCard("Digital Gain (dB)");
+        card_h->addButton("-","K","",           4);  //displayed string, command, button ID, button width (out of 12)
+        card_h->addButton("","","gainIndicator",4);  //displayed string (blank for now), command (blank), button ID, button width (out of 12)
+        card_h->addButton("+","k","",           4);   //displayed string, command, button ID, button width (out of 12)
+
 
     //Add an example card where one of the buttons will indicate "on" or "off"
 //    card_h = page_h->addCard(String("CPU Usage (%)"));

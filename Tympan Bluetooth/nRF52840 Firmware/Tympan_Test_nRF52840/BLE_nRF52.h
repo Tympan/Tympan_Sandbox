@@ -93,17 +93,14 @@ size_t BLE_nRF52::send(const String &str) {
 
   //Serial.println("BLE_local: send(string): ...);
   //printString(str);
-  
-  //Use AT Command set to send the string
-  //BLE_TX_ptr->print("AT+GATTCHAR=");
-  //BLE_TX_ptr->print(ble_char_id);
-  //BLE_TX_ptr->print(",");
-  //BLE_TX_ptr->println(str);
-  serialToBLE->write("SEND ",5);  //out AT command set assumes that each transmission starts with "SEND "
-  serialToBLE->write(str.c_str(), str.length() );
-  serialToBLE->write(EOC.c_str(),EOC.length());  // our AT command set on the nRF52 assumes that each command ends in a '\r'
+
+  int n_sent = 0;
+  n_sent += serialToBLE->write("SEND ",5);  //out AT command set assumes that each transmission starts with "SEND "
+  n_sent += serialToBLE->write(str.c_str(), str.length());
+  n_sent += serialToBLE->write(EOC.c_str(), EOC.length());  // our AT command set on the nRF52 assumes that each command ends in a '\r'
   serialToBLE->flush();
-  delay(20);
+//  Serial.println("BLE_nRF52: send: sent " + String(n_sent) + " bytes");
+  delay(20); //This is to slow down the transmission to ensure we don't flood the bufers.  Can we get rid of this? 
 
   //BLE_TX_ptr->update(0); //added WEA DEC 30, 2023
   //if (! BLE_TX_ptr->waitForOK() ) {
@@ -129,6 +126,7 @@ size_t BLE_nRF52::sendMessage(const String &orig_s) {
   size_t sentBytes = 0;
 
   //Serial.println("BLE_nRF52: sendMessage: commanded to send: " + orig_s);
+  //send("");  send(""); //send some blanks to clear
 
   //begin forming the fully-formatted string for sending to Tympan Remote App
   String header;
@@ -219,16 +217,40 @@ size_t BLE_nRF52::sendCommand(const String &cmd,const String &data) {
 size_t BLE_nRF52::recvReply(String &reply, unsigned long timeout_millis) {
   unsigned long max_millis = millis() + timeout_millis;
   bool waiting_for_EOC = true;
+  bool waiting_for_O_or_F = true;
   while ((millis() < max_millis) && (waiting_for_EOC)) {
     while (serialFromBLE->available()) {
       char c = serialFromBLE->read();
-      if (c == EOC[0]) { //this is a cheat!  someone, someday might want a two-character EOC (such as "\n\r"), at which point this will fail
-        waiting_for_EOC = false;
+      if (waiting_for_O_or_F) {
+        if ((c=='O') || (c=='F')) {
+          waiting_for_O_or_F = false;
+        }
+        if (c != EOC[0]) reply.concat(c);
       } else {
-        reply.concat(c);
+        if (c == EOC[0]) { //this is a cheat!  someone, someday might want a two-character EOC (such as "\n\r"), at which point this will fail
+          waiting_for_EOC = false;
+        } else {
+          reply.concat(c);
+        }
       }
     }
   }
+
+  //clear out additional trailing whitespace from the stream
+  while (serialFromBLE->available()) {
+    int n_removed = 0;
+    char c = serialFromBLE->peek();
+    if ((c==(char)0x0D) || (c==(char)0x0A) || (c==' ') || (c=='\t')) {
+      //remove it from the stream
+      c = serialFromBLE->read();
+      n_removed++;
+    }
+    //Serial.println("BLE_nRF52: removed additional " + String(n_removed) + " whitespace characters from serial stream.");
+  }
+
+  //remove leading or trailing white space from the reply itself
+  reply = reply.trim();
+
   //Serial.println("BLE_nRF52: recvReply: reply: " + reply);
   return reply.length();
 }
@@ -286,6 +308,7 @@ int BLE_nRF52::getLedMode(void) {
 
 
 int BLE_nRF52::isConnected(int getMethod) {
+  //Serial.println("BLE_nRF52: isConnected via method " + String(getMethod));
   if ((getMethod == GET_AUTO) || (getMethod == GET_VIA_SOFTWARE)) {
     return isConnected_getViaSoftware();
   } else {
@@ -348,7 +371,7 @@ int BLE_nRF52::enableAdvertising(bool enable) {
   }
   String reply;
   recvReply(reply); //look for "OK MY_NAME"
-  Serial.println("BLE_nRF52: enableAdvertising: received raw reply = " + reply);
+  //Serial.println("BLE_nRF52: enableAdvertising: received raw reply = " + reply);
   if (doesStartWithOK(reply)) {
     return 0;
   }

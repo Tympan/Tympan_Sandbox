@@ -46,7 +46,7 @@ State         myState; //keeping one's state is useful for the App's GUI
 void setup() {
   //begin the serial comms (for debugging)
   //myTympan.beginBothSerial(); delay(1000);
-  Serial.begin(115200);  //USB Serial.  This begin() isn't really needed on Teensy. 
+  //Serial.begin(115200);  //USB Serial.  This begin() isn't really needed on Teensy. 
   (myTympan.BT_Serial)->begin(115200); //UART to BLE module.  For the nRF52840, we're having the nRF assume 115200.
   //Serial1.begin(115200);
   delay(1000);
@@ -85,7 +85,25 @@ void loop() {
 
   //respond to BLE
   if (ble.available() > 0) {
-    serialManager.respondToByte((char)ble.read()); //for the Tympan simulation, service any messages received form the BLE module
+    delay(2);
+    int n = ble.available();
+    char foo[128];
+    int ind = 0;
+    while (ble.available() && (ind < 128)) {
+      char c = (char)ble.read();
+      if ((c != (char)0x0A) && (c != (char)0x0D)) foo[ind++] = c;
+    }
+    if ((ind==1) && (foo[0] == ' ')) {
+      //ignore
+    } else {
+      for (int i = 0; i < ind; i++) {
+        char c = foo[i];
+        Serial.print("Received from BLE: char = " + String(c) + ", which is HEX = " );Serial.println(c,HEX);
+        //if ((c == 'j') || (c == 'J')) {
+          serialManager.respondToByte(c); //for the Tympan simulation, service any messages received form the BLE module
+        //}
+      }
+    }
   }
 
   //periodically print the CPU and Memory Usage
