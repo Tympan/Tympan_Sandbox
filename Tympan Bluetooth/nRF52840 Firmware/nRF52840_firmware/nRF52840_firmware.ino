@@ -32,6 +32,7 @@
 #include "LED_controller.h"
 #include "nRF52_AT_API.h"  //must already have included LED_control.h
 
+#define GPIO_for_isConnected 25  //what nRF pin is connected to "MISO1" net name
 
 LED_controller led_control;
 
@@ -43,6 +44,10 @@ void printHelpToUSB(void) {
   Serial.println("   : Send 'J' via USB to send 'J' to the Tympan");
 }
 
+void setupGPIO(void) {
+  pinMode(GPIO_for_isConnected, OUTPUT);
+  digitalWrite(GPIO_for_isConnected, LOW);
+}
 
 void setup(void) {
 
@@ -66,6 +71,9 @@ void setup(void) {
   Serial1.begin(115200);  
   delay(500);
   while (Serial1.available()) Serial1.read();  //clear UART buffer
+
+  //setup the GPIO pins
+  setupGPIO();
 
   //initialize the LED display
   led_control.setLedColor(led_control.red);
@@ -111,6 +119,9 @@ void loop(void) {
 
   //service the LEDs
   serviceLEDs(millis());
+
+  //service the GPIO pins
+  serviceGPIO(millis());
 }
 
 // ///////////////////////////////// Service Routines
@@ -118,7 +129,7 @@ void serviceLEDs(unsigned long curTime_millis) {
   static unsigned long lastUpdate_millis = 0;
 
   if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0;  //handle time wrap-around
-  if ((curTime_millis - lastUpdate_millis) > 100UL) {
+  if ((curTime_millis - lastUpdate_millis) > 100UL) {  // how often to update
     //if (Bluefruit.connected()) {
     if (bleConnected) {
       if ((led_control.ledToFade > 0) && (led_control.ledToFade != led_control.green)) led_control.setLedColor(led_control.green);
@@ -131,6 +142,21 @@ void serviceLEDs(unsigned long curTime_millis) {
     }
     if(led_control.ledToFade > 0) led_control.showRGB_LED(curTime_millis);
     if (led_control.ledToFade==0) led_control.LEDsOff();
+    lastUpdate_millis = curTime_millis;
+  }
+} 
+
+void serviceGPIO(unsigned long curTime_millis) {
+  static unsigned long lastUpdate_millis = 0;
+
+  if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0;  //handle time wrap-around
+  if ((curTime_millis - lastUpdate_millis) > 100UL) {  // how often to update
+    //if (Bluefruit.connected()) {
+    if (bleConnected) {
+      digitalWrite(GPIO_for_isConnected, HIGH);
+    } else {
+      digitalWrite(GPIO_for_isConnected, LOW);
+    }
     lastUpdate_millis = curTime_millis;
   }
 } 
