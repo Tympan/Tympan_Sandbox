@@ -17,7 +17,8 @@ extern void setInputConfiguration(int);
 extern float incrementInputGain(float);
 extern bool activateTone(bool);
 extern float incrementToneLoudness(float);
-extern float incrementToneFrequency(float);
+//extern float incrementToneFrequency(float);
+extern float incrementToneFrequency(int);
 extern float incrementDacOutputGain(float incr_dB);
 extern float testSineAccuracy(float32_t freq_Hz);
 extern float overallTonePlusDacLoudness(void);
@@ -139,11 +140,13 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       Serial.println("Decreased tone loudness to " + String(myState.tone_dBFS,1) + " dBFS");
       break;
     case 'f':
-      incrementToneFrequency(powf(2.0,1.0/3.0));  //third octave step increase
+      //incrementToneFrequency(powf(2.0,1.0/3.0));  //third octave step increase
+      incrementToneFrequency(1);  //step up in table
       Serial.println("Increased tone frequency to " + String(myState.tone_Hz,1) + " Hz");
       break;
     case 'F':
-      incrementToneFrequency(powf(2.0,-1.0/3.0));  //third octave step decrease
+      //incrementToneFrequency(powf(2.0,-1.0/3.0));  //third octave step decrease
+      incrementToneFrequency(-1);  //step down in table
       Serial.println("Decreased tone frequency to " + String(myState.tone_Hz,1) + " Hz");
       break;
     case 'b':

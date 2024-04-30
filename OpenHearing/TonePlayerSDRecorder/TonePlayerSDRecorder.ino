@@ -101,7 +101,8 @@ void setup() {
   //initialize the tone
   audioMixer.mute();  //mute everything (will be set correctly by activateTone())
   setToneLoudness(myState.tone_dBFS);
-  setToneFrequency(myState.tone_Hz);
+  //setToneFrequency(myState.tone_Hz);
+  incrementToneFrequency(0);  //set to current index
   activateTone(myState.is_tone_active);
 
   //setup BLE
@@ -195,8 +196,14 @@ float setToneFrequency(float targ_freq_Hz) {
 }
 
 //increment the frequency of the tone
-float incrementToneFrequency(float incr_fac) {
-  return setToneFrequency(myState.tone_Hz*incr_fac);
+//float incrementToneFrequency(float incr_fac) {
+//  return setToneFrequency(myState.tone_Hz*incr_fac);
+//}
+float incrementToneFrequency(int ind) {
+  int tone_table_ind = myState.cur_tone_table_ind+ind;
+  tone_table_ind =  min(myState.n_tone_table-1, max(0, tone_table_ind));
+  myState.cur_tone_table_ind = tone_table_ind;
+  return setToneFrequency(myState.tone_table_Hz[myState.cur_tone_table_ind]);
 }
 
 // helper function
@@ -204,7 +211,7 @@ float32_t overallTonePlusDacLoudness(void) { return myState.tone_dBFS + myState.
 
 //set the amplifier gain
 float setDacOutputGain(float gain_dB) {
-  float new_gain = min(-3.0, myState.tone_dBFS + gain_dB) - myState.tone_dBFS; //limit the gain to prevent clipping
+  float new_gain = min(6.0, myState.tone_dBFS + gain_dB) - myState.tone_dBFS; //limit the gain to prevent excessive clipping (will allow some clipping...starts at -3dBFS)
   return myState.output_dacGain_dB = myTympan.volume_dB(new_gain); //yes, this sets the DAC gain, not the headphone volume
 }
 

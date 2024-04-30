@@ -19,6 +19,7 @@
 // make it easier to implement that future capability to save and recal presets
 
 // define a class for tracking the state of system (primarily to help our implementation of the GUI)
+#define N_TONE_TABLE 18
 class State : public TympanStateBase_UI { // look in TympanStateBase or TympanStateBase_UI for more state variables and helpful methods!!
   public:
     State(AudioSettings_F32 *given_settings, Print *given_serial, SerialManagerBase *given_sm) : TympanStateBase_UI(given_settings, given_serial, given_sm) {}
@@ -33,8 +34,11 @@ class State : public TympanStateBase_UI { // look in TympanStateBase or TympanSt
     float output_dacGain_dB = 0.0;  //gain of the hardware headphone amplifier in the AIC.  Leave at 0.0 unless you have a good reason...set to -15 dB to lower harmonic distortion (which also lowers max SPL)
 
     //tone parameters
+    const int n_tone_table = N_TONE_TABLE;
+    float tone_table_Hz[N_TONE_TABLE] = {125., 250., 500., 750., 1000., 1500., 2000., 3000., 4000., 5000., 6000., 8000., 9000., 10000., 11200., 12500., 140000., 16000.};
+    int cur_tone_table_ind = 4;
     float tone_Hz = 1000.0;        //freuqency of tone.  any value less than Nyquist
-    float tone_dBFS = -3.0;        //loudness of tone.  any value less than 0.0 dB.  Unclear what the max value should be to avoid distortion.  0dB?  -3dB?  Other?
+    float tone_dBFS = 0.0;        //loudness of tone.  any value less than 0.0 dB.  Unclear what the max value should be to avoid distortion.  0dB?  -3dB?  Other?
     bool is_tone_active = false;   //the code will flip this to true whenever we want to hear the tone
     
 };
