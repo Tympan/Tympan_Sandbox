@@ -52,4 +52,3 @@ void configOctaveBandProcessing(const int n_filter_bands, const int filter_order
 }
 
 #endif
-

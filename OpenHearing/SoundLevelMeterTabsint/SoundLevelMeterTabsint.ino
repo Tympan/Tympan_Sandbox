@@ -16,7 +16,6 @@
 //here are the libraries that we need
 #include <Tympan_Library.h>  //include the Tympan Library
 #include "SerialManager.h"
-
 //set the sample rate and block size
 const float sample_rate_Hz = 44100.0f ; //24000 or 44117 (or other frequencies in the table in AudioOutputI2S_F32)
 const int audio_block_samples = 128;     //do not make bigger than AUDIO_BLOCK_SAMPLES from AudioStream.h (which is 128)
@@ -39,13 +38,8 @@ float32_t mic_cal_dBFS_at94dBSPL_at_0dB_gain = -47.4f + 9.2175;  //PCB Mic basel
 
 //control display and serial interaction
 bool enable_printCPUandMemory = false;
-bool enablePrintMemoryAndCPU(bool _enable) { return enable_printCPUandMemory = _enable; }
-bool enablePrintLoudnessLevels(bool _enable) { return myState.enable_printTextToUSB = _enable; };
-bool enablePrintingToBLE(bool _enable = true) {return myState.enable_printTextToBLE = _enable; };
-bool enablePrintingToBLEplotter(bool _enable = true) { return myState.enable_printPlotToBLE = _enable; };
-bool enablePrintOctaveLevels(bool _enable) { return myState.enable_printOctaveToUSB = _enable; };
-bool enablePrintOctaveToBLE(bool _enable = true) {return myState.enable_printOctaveToBLE = _enable; };
-bool enablePrintOctaveToBLEplotter(bool _enable = true) { return myState.enable_printOctaveToBLEplot = _enable; };
+bool enablePrintMemoryAndCPU(bool _enable = false) { return enable_printCPUandMemory = _enable; }
+bool enablePrintingToBLE(bool _enable = false) {return myState.enable_printTextToBLE = _enable; };
 
 // define the setup() function, the function that is called once when the device is booting
 const float input_gain_dB = 15.0f; //gain on the microphone
@@ -111,8 +105,9 @@ void loop() {
   ble.updateAdvertising(millis(),5000); //check every 5000 msec to ensure it is advertising (if not connected)
   
   //printing of sound level
-  if (myState.enable_printTextToUSB) printLoudnessLevels(millis(),1000);  //print a value every 1000 msec
-  if (myState.enable_printOctaveToUSB) printOctaveLoudnessLevels(millis(),1000);  //print a value every 1000 msec
+  if (myState.enable_printTextToBLE) {
+    printLoudnessLevels(millis(),1000);  //print a value every 1000 msec
+  }
 
   //check to see whether to print the CPU and Memory Usage
   if (enable_printCPUandMemory) myTympan.printCPUandMemory(millis(),3000); //print every 3000 msec
@@ -138,57 +133,17 @@ void printLoudnessLevels(unsigned long curTime_millis, unsigned long updatePerio
     float32_t cal_factor_dB = -mic_cal_dBFS_at94dBSPL_at_0dB_gain + 94.0f - input_gain_dB;
     float32_t cur_SPL_dB = calcLevel1.getCurrentLevel_dB() + cal_factor_dB;
     float32_t max_SPL_dB = calcLevel1.getMaxLevel_dB() + cal_factor_dB;
-    String msg = String(cur_SPL_dB,2) + " " + String(max_SPL_dB,2);
+    String msg = "TL=" + String(cur_SPL_dB,2) + " " + String(max_SPL_dB,2);
     
-    //print the text string to the Serial
-    myTympan.println(msg);
-
-    //if allowed, send it over BLE with the special prefix to allow it to be printed by the SerialPlotter
-    //https://github.com/Tympan/Docs/wiki/Making-a-GUI-in-the-TympanRemote-App
-    if (myState.enable_printPlotToBLE) ble.sendMessage(String("P ") + msg); //prepend "P " for the serial plotter 
-    if (myState.enable_printTextToBLE) {
-      ble.sendMessage("TEXT=" + msg); // This is the line required for Tabsint
-      //serialManager.setButtonText("now",String(cur_SPL_dB,1));
-      //serialManager.setButtonText("max",String(max_SPL_dB,1));
-    }
-
-    lastUpdate_millis = curTime_millis; //we will use this value the next time around.
-  }
-}
-
-//This routine prints the current SPL per octave band
-void printOctaveLoudnessLevels(unsigned long curTime_millis, unsigned long updatePeriod_millis) {
-  static bool firstTime = true;
-  static unsigned long lastUpdate_millis = 0;
-
-  //has enough time passed to update everything?
-  if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0; //handle wrap-around of the clock
-  if ((curTime_millis - lastUpdate_millis) > updatePeriod_millis) { //is it time to update the user interface?
-    if (firstTime) {
-      myTympan.println("Printing: current SPL (dB) per octave-band");
-      firstTime = false;
-    }
-    
-    float32_t cal_factor_dB = -mic_cal_dBFS_at94dBSPL_at_0dB_gain + 94.0f - input_gain_dB;
-    String msg = String("");
+    msg.append(String("TO="));
     for (int i=1; i < (N_FILTER_BANDS-1);i++) {  //skip the first and last filter because they're shelving and not octave-band
       float32_t cur_SPL_dB = calcLevelPerOct[i].getCurrentLevel_dB() + cal_factor_dB;
       msg.append(String(cur_SPL_dB,2));
       if (i < (N_FILTER_BANDS-1-1)) msg.append(", ");
-      //if (myState.enable_printOctaveToBLE) serialManager.setButtonText(String("lvl")+String(i),String(cur_SPL_dB,1));
     }
     
-    //print the text string to the Serial
-    myTympan.println(msg);
-
-    //if allowed, send it over BLE with the special prefix to allow it to be printed by the SerialPlotter
-    //https://github.com/Tympan/Docs/wiki/Making-a-GUI-in-the-TympanRemote-App
-    if (myState.enable_printOctaveToBLEplot) ble.sendMessage(String("P ") + msg); //prepend "P " for the serial plotter 
-    if (myState.enable_printOctaveToBLE) {
-      ble.sendMessage("TEXT=" + msg); // This is the line required for Tabsint
-      //serialManager.setButtonText("now",String(cur_SPL_dB,1));
-      //serialManager.setButtonText("max",String(max_SPL_dB,1));
-    }
+    myTympan.println(msg); // print to USB
+    ble.sendMessage(msg); // This is the line required for Tabsint
 
     lastUpdate_millis = curTime_millis; //we will use this value the next time around.
   }
