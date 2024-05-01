@@ -67,15 +67,19 @@ class BLE_nRF52 {
 
     int setBleName(const String &s);
     int getBleName(String &reply);
-
-    int version(bool printResult);
+    int version(String &reply);
+    int isConnected(void);
+    int isAdvertising(void);
+    int enableAdvertising(bool);
+    int setLedMode(int val);
+    int getLedMode(void);
 
     unsigned long rx_timeout_millis = 2000UL;
     //bool simulated_Serial_to_nRF = true;
   protected:
     const String EOC = String('\r');
-    HardwareSerial *serialToBLE = &Serial1;    //Tympan design uses Teensy's Serial1 to connect to BLE
-    HardwareSerial *serialFromBLE = &Serial1;  //Tympan design uses Teensy's Serial1 to connect from BLE
+    HardwareSerial *serialToBLE = &Serial7;    //Tympan design uses Teensy's Serial1 to connect to BLE
+    HardwareSerial *serialFromBLE = &Serial7;  //Tympan design uses Teensy's Serial1 to connect from BLE
 
     static bool doesStartWithOK(const String &s);
 };
@@ -118,7 +122,7 @@ size_t BLE_nRF52::sendMessage(const String &orig_s) {
   const int payloadLen = 18; //was 19
   size_t sentBytes = 0;
 
-  Serial.println("BLE_nRF52: sendMessage: commanded to send: " + orig_s);
+  //Serial.println("BLE_nRF52: sendMessage: commanded to send: " + orig_s);
 
   //begin forming the fully-formatted string for sending to Tympan Remote App
   String header;
@@ -200,7 +204,7 @@ size_t BLE_nRF52::sendCommand(const String &cmd,const String &data) {
   //or something like cmd="GET NAME" with data =''
   String total_message = cmd + data;
   len += serialToBLE->write(total_message.c_str(), total_message.length() );   
-  Serial.println("BLE_nRF52:sendCommand: sent " + total_message);
+  //Serial.println("BLE_nRF52:sendCommand: sent " + total_message);
   serialToBLE->write(EOC.c_str(),EOC.length());  // our AT command set on the nRF52 assumes that each command ends in a '\r'
   return len;
 }
@@ -219,6 +223,7 @@ size_t BLE_nRF52::recvReply(String &reply, unsigned long timeout_millis) {
       }
     }
   }
+  //Serial.println("BLE_nRF52: recvReply: reply: " + reply);
   return reply.length();
 }
 
@@ -257,8 +262,9 @@ int BLE_nRF52::getBleName(String &reply) {
   return -1;
 }
 
-int BLE_nRF52::version(bool printResult) {
-  sendCommand("VERSION", String(""));
+
+int BLE_nRF52::getLedMode(void) {
+  sendCommand("GET LEDMODE",String(""));
   //if (simulated_Serial_to_nRF) bleUnitServiceSerial();  //for the nRF firmware, service any messages coming in the serial port from the Tympan
   
   String reply;
@@ -267,9 +273,92 @@ int BLE_nRF52::version(bool printResult) {
   if (doesStartWithOK(reply)) {
     reply.remove(0,2);  //remove the leading "OK"
     reply.trim(); //remove leading or trailing whitespace
-    if (printResult) {
-      Serial.println("BLE_nR52: version: nRF52 module replied as '" + reply + "'");
+    return int(reply.toInt());
+  } 
+  return -1; //error
+}
+
+
+int BLE_nRF52::isConnected(void) {
+  sendCommand("GET CONNECTED",String(""));
+  //if (simulated_Serial_to_nRF) bleUnitServiceSerial();  //for the nRF firmware, service any messages coming in the serial port from the Tympan
+  
+  String reply;
+  recvReply(reply); //look for "OK MY_NAME"
+  //Serial.println("BLE_nRF52: version: received raw reply = " + reply);
+  if (doesStartWithOK(reply)) {
+    reply.remove(0,2);  //remove the leading "OK"
+    reply.trim(); //remove leading or trailing whitespace
+    if (reply == "TRUE") {
+      return 1;
+    } else {
+      return 0;
     }
+  } 
+  return -1; //error
+}
+
+int BLE_nRF52::isAdvertising(void) {
+  sendCommand("GET ADVERTISING",String(""));
+  //if (simulated_Serial_to_nRF) bleUnitServiceSerial();  //for the nRF firmware, service any messages coming in the serial port from the Tympan
+  
+  String reply;
+  recvReply(reply); //look for "OK MY_NAME"
+  //Serial.println("BLE_nRF52: version: received raw reply = " + reply);
+  if (doesStartWithOK(reply)) {
+    reply.remove(0,2);  //remove the leading "OK"
+    reply.trim(); //remove leading or trailing whitespace
+    if (reply == "TRUE") {
+      return 1;
+    } else {
+      return 0;
+    }
+  } 
+  return -1; //error
+}
+
+int BLE_nRF52::enableAdvertising(bool enable) {
+  if (enable) {
+    sendCommand("SET ADVERTISING=","ON");
+  } else {
+    sendCommand("SET ADVERTISING=","OFF");
+  }
+  String reply;
+  recvReply(reply); //look for "OK MY_NAME"
+  Serial.println("BLE_nRF52: enableAdvertising: received raw reply = " + reply);
+  if (doesStartWithOK(reply)) {
+    return 0;
+  }
+  return -1; //error
+}
+
+int BLE_nRF52::setLedMode(int value) {
+  sendCommand("SET LEDMODE=",String(value));
+
+  String reply;
+  recvReply(reply); //look for "OK""
+  //Serial.println("BLE_nRF52: version: received raw reply = " + reply);
+  if (doesStartWithOK(reply)) {
+    return 0;
+  }
+  return -1; //error
+}
+
+int BLE_nRF52::version(String &replyToReturn) {
+  sendCommand("GET VERSION",String(""));
+  //if (simulated_Serial_to_nRF) bleUnitServiceSerial();  //for the nRF firmware, service any messages coming in the serial port from the Tympan
+  
+  String reply;
+  recvReply(reply); //look for "OK MY_NAME"
+  //Serial.println("BLE_nRF52: version: received raw reply = " + reply);
+  if (doesStartWithOK(reply)) {
+    reply.remove(0,2);  //remove the leading "OK"
+    reply.trim(); //remove leading or trailing whitespace
+    //if (printResult) {
+    //  Serial.println("BLE_nR52: version: nRF52 module replied as '" + reply + "'");
+    //}
+    replyToReturn.remove(0,replyToReturn.length());
+    replyToReturn += reply;
     return 0;
   } else {
     Serial.println("BLE_nRF52: version: failed to get the BLE firmware version.  Reply = " + reply);

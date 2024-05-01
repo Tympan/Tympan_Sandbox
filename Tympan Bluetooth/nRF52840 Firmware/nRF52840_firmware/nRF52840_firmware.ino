@@ -17,7 +17,7 @@
     Extended for Tympan Remote App by Chip Audette, Benchtop Engineering, for Creare LLC, February 2024
  */
 
-#define DEBUG_VIA_USB true
+#define DEBUG_VIA_USB false
 
 #define SERIAL_TO_TYMPAN Serial1                 //use this when physically wired to a Tympan. Assumes that the nRF is connected via Serial1 pins
 #define SERIAL_FROM_TYMPAN Serial1               //use this when physically wired to a Tympan. Assumes that the nRF is connected via Serial1 pins
@@ -29,8 +29,12 @@
 #include <InternalFileSystem.h>
 #include "nRF52_BLEuart_Tympan.h"
 #include "nRF52_BLE_Stuff.h"
-#include "nRF52_AT_API.h"
+#include "LED_controller.h"
+#include "nRF52_AT_API.h"  //must already have included LED_control.h
 
+#define GPIO_for_isConnected 25  //what nRF pin is connected to "MISO1" net name
+
+LED_controller led_control;
 
 void printHelpToUSB(void) {
   Serial.println("nRF52840 Firmware: Help:");
@@ -38,6 +42,11 @@ void printHelpToUSB(void) {
   Serial.print("   : bleConnected: "); Serial.println(bleConnected);
   Serial.println("   : Send 'h' via USB to get this help");
   Serial.println("   : Send 'J' via USB to send 'J' to the Tympan");
+}
+
+void setupGPIO(void) {
+  pinMode(GPIO_for_isConnected, OUTPUT);
+  digitalWrite(GPIO_for_isConnected, LOW);
 }
 
 void setup(void) {
@@ -58,10 +67,17 @@ void setup(void) {
   }
 
   //start the nRF's UART serial port that is physically connected to a Tympan or other microcrontroller (if used)
+  Serial1.setPins(0,1);   //our nRF wiring uses Pin0 for RX and Pin1 for TX
   Serial1.begin(115200);  
-  //delay(500);
+  delay(500);
   while (Serial1.available()) Serial1.read();  //clear UART buffer
 
+  //setup the GPIO pins
+  setupGPIO();
+
+  //initialize the LED display
+  led_control.setLedColor(led_control.red);
+  
   //setup BLE and begin
   setupBLE();  
   startAdv();  // start advertising
@@ -97,6 +113,51 @@ void loop(void) {
     //for the nRF firmware, service any messages coming in from BLE wireless link
     //BLEevent(&bleService_adafruitUART, &SERIAL_TO_TYMPAN);
     BLEevent(&bleService_tympanUART, &SERIAL_TO_TYMPAN);  
+    BLEevent(&bleService_adafruitUART, &SERIAL_TO_TYMPAN);  
+    
   }
+
+  //service the LEDs
+  serviceLEDs(millis());
+
+  //service the GPIO pins
+  serviceGPIO(millis());
 }
-      
+
+// ///////////////////////////////// Service Routines
+void serviceLEDs(unsigned long curTime_millis) {
+  static unsigned long lastUpdate_millis = 0;
+
+  if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0;  //handle time wrap-around
+  if ((curTime_millis - lastUpdate_millis) > 100UL) {  // how often to update
+    //if (Bluefruit.connected()) {
+    if (bleConnected) {
+      if ((led_control.ledToFade > 0) && (led_control.ledToFade != led_control.green)) led_control.setLedColor(led_control.green);
+    } else {
+      if (Bluefruit.Advertising.isRunning()) {
+        if ((led_control.ledToFade > 0) && (led_control.ledToFade != led_control.blue)) led_control.setLedColor(led_control.blue);
+      } else {
+        if ((led_control.ledToFade > 0) && (led_control.ledToFade != led_control.red))led_control.setLedColor(led_control.red);
+      }
+    }
+    if(led_control.ledToFade > 0) led_control.showRGB_LED(curTime_millis);
+    if (led_control.ledToFade==0) led_control.LEDsOff();
+    lastUpdate_millis = curTime_millis;
+  }
+} 
+
+void serviceGPIO(unsigned long curTime_millis) {
+  static unsigned long lastUpdate_millis = 0;
+
+  if (curTime_millis < lastUpdate_millis) lastUpdate_millis = 0;  //handle time wrap-around
+  if ((curTime_millis - lastUpdate_millis) > 100UL) {  // how often to update
+    //if (Bluefruit.connected()) {
+    if (bleConnected) {
+      digitalWrite(GPIO_for_isConnected, HIGH);
+    } else {
+      digitalWrite(GPIO_for_isConnected, LOW);
+    }
+    lastUpdate_millis = curTime_millis;
+  }
+} 
+

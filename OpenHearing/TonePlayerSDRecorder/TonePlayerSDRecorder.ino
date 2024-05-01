@@ -28,7 +28,7 @@ AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 // /////////// Define audio objects
 
 // define classes to control the Tympan and the Earpiece shield
-Tympan                        myTympan(TympanRev::D);      //do TympanRev::D or TympanRev::E
+Tympan                     myTympan(TympanRev::D);      //do TympanRev::D or TympanRev::E
 
 //create audio library objects for handling the audio
 AudioInputI2S_F32          i2s_in(audio_settings);         //Bring audio in
@@ -101,11 +101,12 @@ void setup() {
   //initialize the tone
   audioMixer.mute();  //mute everything (will be set correctly by activateTone())
   setToneLoudness(myState.tone_dBFS);
-  setToneFrequency(myState.tone_Hz);
+  //setToneFrequency(myState.tone_Hz);
+  incrementToneFrequency(0);  //set to current index
   activateTone(myState.is_tone_active);
 
   //setup BLE
-  delay(250); ble.setupBLE(myTympan.getBTFirmwareRev()); delay(250); //Assumes the default Bluetooth firmware. You can override!
+  //delay(250); ble.setupBLE(myTympan.getBTFirmwareRev()); delay(250); //Assumes the default Bluetooth firmware. You can override!
   
   //setup the serial manager
   setupSerialManager();
@@ -127,11 +128,11 @@ void loop() {
   //respond to Serial commands
   if (Serial.available()) serialManager.respondToByte((char)Serial.read());   //USB Serial
 
-  //respond to BLE
-  if (ble.available() > 0) {
-    String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
-    for (int i=0; i < msgLen; i++) serialManager.respondToByte(msgFromBle[i]);
-  }
+  // //respond to BLE
+  // if (ble.available() > 0) {
+  //   String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
+  //   for (int i=0; i < msgLen; i++) serialManager.respondToByte(msgFromBle[i]);
+  // }
 
   //service the SD recording
   audioSDWriter.serviceSD_withWarnings(i2s_in); //For the warnings, it asks the i2s_in class for some info
@@ -145,7 +146,7 @@ void loop() {
 
     //service the BLE advertising state
     if (audioSDWriter.getState() != AudioSDWriter::STATE::RECORDING) {
-      ble.updateAdvertising(millis(),5000); //check every 5000 msec to ensure it is advertising (if not connected)
+      //ble.updateAdvertising(millis(),5000); //check every 5000 msec to ensure it is advertising (if not connected)
     }
 
     //service the LEDs...blink slow normally, blink fast if recording
@@ -195,8 +196,14 @@ float setToneFrequency(float targ_freq_Hz) {
 }
 
 //increment the frequency of the tone
-float incrementToneFrequency(float incr_fac) {
-  return setToneFrequency(myState.tone_Hz*incr_fac);
+//float incrementToneFrequency(float incr_fac) {
+//  return setToneFrequency(myState.tone_Hz*incr_fac);
+//}
+float incrementToneFrequency(int ind) {
+  int tone_table_ind = myState.cur_tone_table_ind+ind;
+  tone_table_ind =  min(myState.n_tone_table-1, max(0, tone_table_ind));
+  myState.cur_tone_table_ind = tone_table_ind;
+  return setToneFrequency(myState.tone_table_Hz[myState.cur_tone_table_ind]);
 }
 
 // helper function
@@ -204,7 +211,7 @@ float32_t overallTonePlusDacLoudness(void) { return myState.tone_dBFS + myState.
 
 //set the amplifier gain
 float setDacOutputGain(float gain_dB) {
-  float new_gain = min(-3.0, myState.tone_dBFS + gain_dB) - myState.tone_dBFS; //limit the gain to prevent clipping
+  float new_gain = min(6.0, myState.tone_dBFS + gain_dB) - myState.tone_dBFS; //limit the gain to prevent excessive clipping (will allow some clipping...starts at -3dBFS)
   return myState.output_dacGain_dB = myTympan.volume_dB(new_gain); //yes, this sets the DAC gain, not the headphone volume
 }
 

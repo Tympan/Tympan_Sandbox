@@ -9,25 +9,30 @@
 #define nRF52_AT_API_H
 
 #include <bluefruit.h>  //gives us the global "Bluefruit" class instance
+#include "LED_controller.h"
+extern LED_controller led_control;
 
 //declared in BLE_Stuff.h or TympanBLE.h.  Should we move them inside here?  
 extern bool bleConnected;
 extern char BLEmessage[];
 extern void startAdv(void);
+extern void stopAdv(void);
 extern const char versionString[];
 
 //running on the nRF52, this interprets commands coming from the hardware serial and send replies out to the BLE
 #define nRF52_AT_API_N_BUFFER 512
 class nRF52_AT_API {
   public:
-    nRF52_AT_API(BLEUart_Tympan *_bleuart, HardwareSerial *_ser_ptr) : ble_ptr(_bleuart) , serial_ptr(_ser_ptr) {}
+    nRF52_AT_API(BLEUart_Tympan *_bleuart1, HardwareSerial *_ser_ptr) : ble_ptr1(_bleuart1) , serial_ptr(_ser_ptr) {}
+    nRF52_AT_API(BLEUart_Tympan *_bleuart1, BLEUart *_bleuart2, HardwareSerial *_ser_ptr) : ble_ptr1(_bleuart1), ble_ptr2(_bleuart2), serial_ptr(_ser_ptr) {}
     
     virtual int processSerialCharacter(char c);  //here's the main entry point to the AT message parsing
     virtual int lengthSerialMessage(void);
     virtual int processSerialMessage(void);
 
   protected:
-    BLEUart_Tympan *ble_ptr = NULL;
+    BLEUart_Tympan *ble_ptr1 = NULL;
+    BLEUart *ble_ptr2 = NULL;
     HardwareSerial *serial_ptr = &Serial1;
     char EOC = '\r'; //all commands (including "SEND") from the Tympan must end in this character
 
@@ -40,11 +45,21 @@ class nRF52_AT_API {
     int processSetMessageInSerialBuff(void);  
     int processGetMessageInSerialBuff(void);
     int setBleNameFromSerialBuff(void);
+    int setAdvertisingFromSerialBuff(void);
+    int setLedModeFromSerialBuff(void);
     int bleWriteFromSerialBuff(void);
     void debugPrintMsgFromSerialBuff(void);
     void debugPrintMsgFromSerialBuff(int, int);
     void sendSerialOkMessage(void);
     void sendSerialOkMessage(const char* reply_str);
+    void sendSerialFailMessage(const char* reply_str);
+
+    const int VERB_NOT_KNOWN = 1;
+    const int PARAMETER_NOT_KNOWN = 2;
+    const int FORMAT_PROBLEM = 3;
+    const int OPERATION_FAILED = 4;
+    const int NOT_IMPLEMENTED_YET = 5;
+    const int NO_BLE_CONNECTION = 99;
 };
 
 
@@ -52,6 +67,7 @@ class nRF52_AT_API {
 int nRF52_AT_API::processSerialCharacter(char c) {
   //look for carriage return
   if (c == EOC) {  //look for the end-of-command character
+    //the EOC character is NOT added to the serial_buff.  Just go ahead and interpret the serial_buff
     processSerialMessage();
   } else {
     serial_buff[serial_write_ind] = c;
@@ -82,46 +98,48 @@ bool nRF52_AT_API::compareStringInSerialBuff(const char* test_str, int n) {
 }
 
 int nRF52_AT_API::processSerialMessage(void) {
-  int ret_val = -1;
+  int ret_val = VERB_NOT_KNOWN;
   int len = lengthSerialMessage();     // how long is the message that was received
 
   //Serial.println("nRF52_AT_API::processSerialMessage: starting...");
 
-  //test for the command "SEND "
+  //test for the verb "SEND"
   int test_n_char = 5;   //how long is "SEND "
   if (len >= test_n_char) {  //is the current message long enough for this test?
     if (compareStringInSerialBuff("SEND ",test_n_char)) {  //does the current message start this way
-      serial_read_ind += test_n_char; //increment the reader index for the serial buffer
-      Serial.print("nRF52_AT_API: recvd: SEND "); debugPrintMsgFromSerialBuff(); Serial.println();
+      serial_read_ind = (serial_read_ind + test_n_char) % nRF52_AT_API_N_BUFFER; //increment the reader index for the serial buffer
+      if (DEBUG_VIA_USB) { Serial.print("nRF52_AT_API: recvd: SEND "); debugPrintMsgFromSerialBuff(); Serial.println();}
       bleWriteFromSerialBuff();
       ret_val = 0; 
     }
   }
 
+  //test for the verb "SET"
   test_n_char = 4; //how long is "SET "
   if (len >= test_n_char) {
     if (compareStringInSerialBuff("SET ",test_n_char)) {  //does the current message start this way
-      serial_read_ind += test_n_char; //increment the reader index for the serial buffer
-      Serial.print("nRF52_AT_API: recvd: SET "); debugPrintMsgFromSerialBuff(); Serial.println();
+      serial_read_ind = (serial_read_ind+test_n_char) % nRF52_AT_API_N_BUFFER; //increment the reader index for the serial buffer
+      if (DEBUG_VIA_USB) { Serial.print("nRF52_AT_API: recvd: SET "); debugPrintMsgFromSerialBuff(); Serial.println(); }
       processSetMessageInSerialBuff();
       ret_val = 0;
     }
   }
 
+  //test for the verb "GET"
   test_n_char = 4; //how long is "GET "
   if (len >= test_n_char) {
     if (compareStringInSerialBuff("GET ",test_n_char)) {  //does the current message start this way
-      serial_read_ind += test_n_char; //increment the reader index for the serial buffer
-      Serial.print("nRF52_AT_API: recvd: GET "); debugPrintMsgFromSerialBuff(); Serial.println();
+      serial_read_ind = (serial_read_ind + test_n_char) % nRF52_AT_API_N_BUFFER; //increment the reader index for the serial buffer
+      if (DEBUG_VIA_USB) { Serial.print("nRF52_AT_API: recvd: GET "); debugPrintMsgFromSerialBuff(); Serial.println(); } 
       ret_val = processGetMessageInSerialBuff();
     }
   } 
 
+  //test for the verb "VERSION"
   test_n_char = 7; //how long is "VERSION"
   if (len >= test_n_char) {
     if (compareStringInSerialBuff("VERSION",test_n_char)) {  //does the current message start this way
-      serial_read_ind += test_n_char; //increment the reader index for the serial buffer
-      Serial.println("nRF52_AT_API: recvd: VERSION"); Serial.print("nRF52_AT_API: returning: "); Serial.println(versionString);
+      serial_read_ind = (serial_read_ind + test_n_char) % nRF52_AT_API_N_BUFFER; //increment the reader index for the serial buffer
       sendSerialOkMessage(versionString);
       ret_val = 0;
     }
@@ -132,12 +150,14 @@ int nRF52_AT_API::processSerialMessage(void) {
   // give error message if message isn't known
   if (ret_val != 0) {
     if (DEBUG_VIA_USB) {
-      Serial.print("nRF52_AT_API: *** WARNING ***: msg not understood: ");
+      if (DEBUG_VIA_USB) { Serial.print("nRF52_AT_API: *** WARNING ***: msg not understood: "); }
       debugPrintMsgFromSerialBuff();
       Serial.println();
     }
-    serial_read_ind = serial_write_ind;  //remove the message
   }
+
+  //send FAIL response, if none yet sent
+  if (ret_val == VERB_NOT_KNOWN) sendSerialFailMessage("VERB not known");
 
   //return
   serial_read_ind = serial_write_ind;  //remove any remaining message
@@ -146,19 +166,81 @@ int nRF52_AT_API::processSerialMessage(void) {
 
 int nRF52_AT_API::processSetMessageInSerialBuff(void) {
   int test_n_char;
-  int ret_val = -1;
+  int ret_val = PARAMETER_NOT_KNOWN;
   
-  test_n_char = 5; //length of "NAME="
+  //look for parameter value of BAUDRATE
+  test_n_char = 8+1; //length of "BAUDRATE="
+  if (compareStringInSerialBuff("BAUDRATE=",test_n_char)) {
+    serial_read_ind = (serial_read_ind + test_n_char) % nRF52_AT_API_N_BUFFER; //increment the reader index for the serial buffer
+
+    //replace this placeholder with useful code
+    ret_val = NOT_IMPLEMENTED_YET;
+    sendSerialFailMessage("SET BAUDRATE not implemented yet");
+
+    serial_read_ind = serial_write_ind;  //remove the message
+  }
+
+  //look for parameter value of NAME
+  test_n_char = 4+1; //length of "NAME="
   if (compareStringInSerialBuff("NAME=",test_n_char)) {
-    serial_read_ind += test_n_char; //increment the reader index for the serial buffer
+    serial_read_ind = (serial_read_ind + test_n_char) % nRF52_AT_API_N_BUFFER; //increment the reader index for the serial buffer
     if (DEBUG_VIA_USB) {
       Serial.print("nRF52_AT_API: processSetMessageInSerialBuff: setting NAME to ");
       debugPrintMsgFromSerialBuff();
       Serial.println();
     }
-    ret_val = setBleNameFromSerialBuff();
+    
+    #if 1
+      ret_val = setBleNameFromSerialBuff();
+      sendSerialOkMessage();
+      delay(5);
+      //clear out the UART buffers
+      for (int i=0; i<24; i++) {
+        if (serial_ptr) serial_ptr->print(EOC);
+      }
+    #else
+      ret_val = NOT_IMPLEMENTED_YET;
+      sendSerialFailMessage("SET NAME not implemented yet");
+    #endif
     serial_read_ind = serial_write_ind;  //remove the message
-    sendSerialOkMessage();
+  }
+
+  //look for parameter value of RFSTATE
+  test_n_char = 7+1; //length of "RFSTATE="
+  if (compareStringInSerialBuff("RFSTATE=",test_n_char)) {
+    serial_read_ind = (serial_read_ind + test_n_char) % nRF52_AT_API_N_BUFFER; //increment the reader index for the serial buffer
+
+    //replace this placeholder with useful code
+    ret_val = NOT_IMPLEMENTED_YET;
+    sendSerialFailMessage("SET RFSTATE not implemented yet");
+
+    serial_read_ind = serial_write_ind;  //remove the message
+  }
+
+  //look for parameter value of ADVERTISING
+  test_n_char = 11+1; //length of "ADVERTISING="
+  if (compareStringInSerialBuff("ADVERTISING=",test_n_char)) {
+    serial_read_ind = (serial_read_ind + test_n_char) % nRF52_AT_API_N_BUFFER; //increment the reader index for the serial buffer
+    ret_val = setAdvertisingFromSerialBuff();
+    if (ret_val == 0) {
+      sendSerialOkMessage();
+    } else {
+      sendSerialFailMessage("SET ADVERTISING failed");
+    }
+    serial_read_ind = serial_write_ind;  //remove the message
+  }
+
+  //look for parameter value of LEDMODE
+  test_n_char = 7+1; //length of "LEDMODE="
+  if (compareStringInSerialBuff("LEDMODE=",test_n_char)) {
+    serial_read_ind = (serial_read_ind + test_n_char) % nRF52_AT_API_N_BUFFER; //increment the reader index for the serial buffer
+    ret_val = setLedModeFromSerialBuff();
+    if (ret_val == 0) {
+      sendSerialOkMessage();
+    } else {
+      sendSerialFailMessage("SET LEDMODE failed");
+    }
+    serial_read_ind = serial_write_ind;  //remove the message
   }
 
   // serach for another command
@@ -170,52 +252,139 @@ int nRF52_AT_API::processSetMessageInSerialBuff(void) {
       Serial.print("nRF52_AT_API: *** WARNING ***: SET msg not understood: ");
       debugPrintMsgFromSerialBuff();
     }
-    serial_read_ind = serial_write_ind;  //remove the message
   }
+
+  //send a FAIL message if none has been sent yet
+  if (ret_val == PARAMETER_NOT_KNOWN) sendSerialFailMessage("SET parameter not known");
+
+  serial_read_ind = serial_write_ind;  //remove the message
   return ret_val;
 }
 
 int nRF52_AT_API::processGetMessageInSerialBuff(void) {
   int test_n_char;
-  int ret_val = -1;
+  int ret_val = PARAMETER_NOT_KNOWN;
   
   //Serial.print("nRF52_AT_API::processGetMessageInSerialBuff: interpreting ");  debugPrintMsgFromSerialBuff(); Serial.println();
   //Serial.println("nRF52_AT_API::processGetMessageInSerialBuff: compareStringInSerialBuff('NAME',test_n_char) = " + String(compareStringInSerialBuff("NAME",test_n_char)));
 
+  test_n_char = 8; //length of "BAUDRATE"
+  if (compareStringInSerialBuff("BAUDRATE",test_n_char)) {
+    int foo_ind = serial_read_ind+test_n_char;
+    while (foo_ind >= nRF52_AT_API_N_BUFFER) foo_ind -= nRF52_AT_API_N_BUFFER;
+    if ((foo_ind==serial_write_ind) || (serial_buff[foo_ind] == EOC)) {
+      ret_val = NOT_IMPLEMENTED_YET;
+      sendSerialFailMessage("GET BAUDRATE not implemented yet");
+    } else {
+      ret_val = FORMAT_PROBLEM;
+      sendSerialFailMessage("GET BAUDRATE had formatting problem");
+    }     
+    serial_read_ind = serial_write_ind;  //remove the message
+  }
+
   test_n_char = 4; //length of "NAME"
   if (compareStringInSerialBuff("NAME",test_n_char)) {
-    if ((serial_read_ind+test_n_char==serial_write_ind) || (serial_buff[serial_read_ind + test_n_char] == EOC)) {
+    int foo_ind = serial_read_ind+test_n_char;
+    while (foo_ind >= nRF52_AT_API_N_BUFFER) foo_ind -= nRF52_AT_API_N_BUFFER;
+    if ((foo_ind==serial_write_ind) || (serial_buff[foo_ind] == EOC)) {
         //get the current BLE name 
         static const uint16_t n_len = 64;
         char name[n_len];
         uint32_t act_len = Bluefruit.getName(name, n_len);
         name[act_len]='\0';  //the BLE module does not appear to null terminate, so let's do it ourselves
-        //if (foo_ret_val == NRF_SUCCESS) {
         if ((act_len > 0) || (act_len < n_len)) {
-          //Serial.println("nRF52_AT_API: DEBUG: processGetMessageInSerialBuff: Good!  name = " + String(name));
           ret_val = 0;  //it's good!
+          sendSerialOkMessage(name); //send via the BLE link
         } else {
-          //Serial.println("nRF52_AT_API: DEBUG: processGetMessageInSerialBuff: Bad!  ret_val = " + String(ret_val) + ", name = " + String(name));
+          ret_val = 3;
+          sendSerialFailMessage("GET NAME Could not get NAME from nRF module");
         }
-
-        //send the name back via the serial link
-        //serial_ptr->println(name);
-        sendSerialOkMessage(name);
-        Serial.print("nRF52_AT_API: recvd: SET NAME "); Serial.println(name);
+    } else {
+      ret_val = 2;
+      sendSerialFailMessage("GET NAME had formatting problem");
+      serial_read_ind = serial_write_ind;  //remove the message
     }
+  } 
+
+  test_n_char = 7; //length of "RFSTATE"
+  if (compareStringInSerialBuff("RFSTATE",test_n_char)) {
+    int foo_ind = serial_read_ind+test_n_char;
+    while (foo_ind >= nRF52_AT_API_N_BUFFER) foo_ind -= nRF52_AT_API_N_BUFFER;
+    if ((foo_ind==serial_write_ind) || (serial_buff[foo_ind] == EOC)) {
+      ret_val = NOT_IMPLEMENTED_YET;
+      sendSerialFailMessage("GET RFSTATE not implemented yet");
+    } else {
+      ret_val = FORMAT_PROBLEM;
+      sendSerialFailMessage("GET RFSTATE had formatting problem");
+    }     
+    serial_read_ind = serial_write_ind;  //remove the message
+  }  
+
+  test_n_char = 11; //length of "ADVERTISING"
+  if (compareStringInSerialBuff("ADVERTISING",test_n_char)) {
+    int foo_ind = serial_read_ind+test_n_char;
+    while (foo_ind >= nRF52_AT_API_N_BUFFER) foo_ind -= nRF52_AT_API_N_BUFFER;
+    if ((foo_ind==serial_write_ind) || (serial_buff[foo_ind] == EOC)) {
+      ret_val = 0;
+      sendSerialOkMessage((Bluefruit.Advertising.isRunning()) ? "TRUE" : "FALSE");
+    } else {
+      ret_val = FORMAT_PROBLEM;
+      sendSerialFailMessage("GET ADVERTISING had formatting problem");
+    }     
+    serial_read_ind = serial_write_ind;  //remove the message
+  } 
+
+  test_n_char = 7; //length of "LEDMODE"
+  if (compareStringInSerialBuff("LEDMODE",test_n_char)) {
+    int foo_ind = serial_read_ind+test_n_char;
+    while (foo_ind >= nRF52_AT_API_N_BUFFER) foo_ind -= nRF52_AT_API_N_BUFFER;
+    if ((foo_ind==serial_write_ind) || (serial_buff[foo_ind] == EOC)) {
+      ret_val = 0;
+      if (led_control.ledToFade==0) {
+        sendSerialOkMessage("0");
+      } else {
+        sendSerialOkMessage("1");
+      }
+    } else {
+      ret_val = FORMAT_PROBLEM;
+      sendSerialFailMessage("GET LEDMODE had formatting problem");
+    }     
+    serial_read_ind = serial_write_ind;  //remove the message
+  }  
+
+  test_n_char = 9; //length of "CONNECTED"
+  if (compareStringInSerialBuff("CONNECTED",test_n_char)) {
+    int foo_ind = serial_read_ind+test_n_char;
+    while (foo_ind >= nRF52_AT_API_N_BUFFER) foo_ind -= nRF52_AT_API_N_BUFFER;
+    if ((foo_ind==serial_write_ind) || (serial_buff[foo_ind] == EOC)) {
+      ret_val = 0;
+      sendSerialOkMessage((Bluefruit.connected()) ? "TRUE" : "FALSE");
+    } else {
+      ret_val = FORMAT_PROBLEM;
+      sendSerialFailMessage("GET CONNECTED had formatting problem");
+    }     
     serial_read_ind = serial_write_ind;  //remove the message
   }  
 
   test_n_char = 7; //length of "VERSION"
   if (compareStringInSerialBuff("VERSION",test_n_char)) {
-    if ((serial_read_ind+test_n_char==serial_write_ind) || (serial_buff[serial_read_ind + test_n_char] == EOC)) {
+    int foo_ind = serial_read_ind+test_n_char;
+    while (foo_ind >= nRF52_AT_API_N_BUFFER) foo_ind -= nRF52_AT_API_N_BUFFER;
+    if ((foo_ind==serial_write_ind) || (serial_buff[foo_ind] == EOC)) {
+      ret_val = 0;
       sendSerialOkMessage(versionString);
-    }
+    } else {
+      ret_val = FORMAT_PROBLEM;
+      sendSerialFailMessage("GET VERSION had formatting problem");
+    }     
     serial_read_ind = serial_write_ind;  //remove the message
   }  
 
   // serach for another command
   //   anything?
+  if (ret_val == PARAMETER_NOT_KNOWN) {
+    sendSerialFailMessage("GET parameter not known");
+  }
 
   // give error message if message isn't known
   if (ret_val != 0) {
@@ -227,39 +396,84 @@ int nRF52_AT_API::processGetMessageInSerialBuff(void) {
   return ret_val;
 }
 
-//returns -1 if failed
+//returns OPERATION_FAILED if failed
 int nRF52_AT_API::setBleNameFromSerialBuff(void) {
   int end_ind = serial_read_ind;
-  while ((end_ind < serial_write_ind) && (serial_buff[end_ind] != EOC)) end_ind++; //see if there is an end-of-command character
-  if (end_ind != serial_write_ind) {
+  if (serial_buff[serial_read_ind] == EOC) {
+    //no name was given.  do nothing
+  } else {
+    //copy the new name, up to max characters, or until we hit EOC
     static const int max_len_name = 16;  //16 character max?? 
     char new_name[max_len_name+1]; //11 characters plus the null termination
-    int given_len_name = end_ind - serial_read_ind;
-    int new_len = min(max_len_name,given_len_name);  //choose the smaller of the given length or the max length
-    if (new_len > 0) {
-      //copy the name to a null-terminated buffer
-      for (int i=0;i < new_len; i++) new_name[i] = serial_buff[serial_read_ind + i]; //copy from the serial buffer
-      new_name[new_len] = '\0'; //add the null termination
-      if (DEBUG_VIA_USB) Serial.println("nRF52_AT_API: setBleNameFromSerialBuff: new_name = " + String(new_name));
-
-      //stop any advertising
-      //Bluefruit.Advertising.stop();
-
-      //send the new name to the module
-      Bluefruit.setName(new_name);
-
-      //restart advertising
-      //startAdv();
-
-      return 0;
-    } else {
-      //length of new name was zero.  So assume this was a fail?
+    bool done = false;
+    int targ_ind = 0;
+    while (!done) {
+      new_name[targ_ind++] = serial_buff[serial_read_ind++];
+      while (serial_read_ind >= nRF52_AT_API_N_BUFFER) serial_read_ind -= nRF52_AT_API_N_BUFFER;
+      if (targ_ind >= max_len_name) done = true;
+      if (serial_buff[serial_read_ind] == EOC) done = true;
+      if (serial_read_ind == serial_write_ind) done = true;
     }
-  } else {
-    //didn't find an EOC character.  This shouldn't happen.
+
+    //finish off the new name
+    if (targ_ind < max_len_name) {
+      for (int i=targ_ind; i < max_len_name+1; i++ ) new_name[i] = '\0';  //add the null termination
+    }
+    if (DEBUG_VIA_USB) Serial.println("nRF52_AT_API: setBleNameFromSerialBuff: new_name = " + String(new_name));
+
+    //prepare to set the new name...stop any advertising
+    Bluefruit.Advertising.stop();
+    Bluefruit.Advertising.clearData();
+    Bluefruit.ScanResponse.clearData(); // add this
+
+    //send the new name to the module
+    Bluefruit.setName(new_name);
+
+    //restart advertising
+    startAdv();
+
+    return 0;  //return OK
   }
-  return -1;
+
+  return OPERATION_FAILED;
 }
+
+int nRF52_AT_API::setAdvertisingFromSerialBuff(void) {
+  int ret_val = OPERATION_FAILED;
+  int read_ind = serial_read_ind;
+  if ((lengthSerialMessage() > 0) && (serial_buff[read_ind]==' ')) read_ind++; //remove leading whitespace
+  if (lengthSerialMessage() >= 2) {
+    int next_read_ind = read_ind+1;
+    while (next_read_ind >= nRF52_AT_API_N_BUFFER) next_read_ind -= nRF52_AT_API_N_BUFFER;
+    if ((serial_buff[read_ind]=='O') && (serial_buff[next_read_ind]=='N')) {  //look for ON
+      startAdv();
+      ret_val = 0;
+    } else if ((serial_buff[read_ind]=='O') && (serial_buff[next_read_ind]=='F')) {  //look for OFF
+      stopAdv();
+      ret_val = 0;
+    }
+  }
+  return ret_val;
+}
+
+
+int nRF52_AT_API::setLedModeFromSerialBuff(void) {
+  int ret_val = OPERATION_FAILED;
+  int read_ind = serial_read_ind;
+  if ((lengthSerialMessage() > 0) && (serial_buff[read_ind]==' ')) read_ind++; //remove leading whitespace
+  while (read_ind >= nRF52_AT_API_N_BUFFER) read_ind -= nRF52_AT_API_N_BUFFER;
+  if (lengthSerialMessage() >= 1) {
+    if (serial_buff[read_ind]=='0') {
+      led_control.disableLEDs();
+      ret_val = 0;
+    } else if (serial_buff[read_ind]=='1') {
+      led_control.setLedColor(led_control.red);
+      ret_val = 0;
+    }
+  }
+  return ret_val;
+}
+
 
 int nRF52_AT_API::bleWriteFromSerialBuff(void) {
   //copy the message from the circular buffer to the straight buffer
@@ -273,10 +487,11 @@ int nRF52_AT_API::bleWriteFromSerialBuff(void) {
 
   //if BLE is connected, fire off the message
   if (bleConnected) {
-    ble_ptr->write( BLEmessage, counter );
+    if (ble_ptr1) ble_ptr1->write( BLEmessage, counter );
+    if (ble_ptr2) ble_ptr2->write( BLEmessage, counter );
     return counter;
   }
-  return -1;
+  return NO_BLE_CONNECTION;
 }
 
 void nRF52_AT_API::sendSerialOkMessage(const char* reply_str) {
@@ -286,6 +501,11 @@ void nRF52_AT_API::sendSerialOkMessage(const char* reply_str) {
 }
 void nRF52_AT_API::sendSerialOkMessage(void) {
   serial_ptr->print("OK ");
+  serial_ptr->println(EOC);
+}
+void nRF52_AT_API::sendSerialFailMessage(const char* reply_str) {
+  serial_ptr->print("FAIL ");
+  serial_ptr->print(reply_str);
   serial_ptr->println(EOC);
 }
 

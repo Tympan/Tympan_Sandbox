@@ -19,7 +19,7 @@ uint8_t characteristicUUID[] = {  0x3C, 0xD9, 0xF7, 0x89, 0x37, 0x37, 0xAA, 0x8F
 BLECharacteristic myBleChar = BLECharacteristic(characteristicUUID, BLENotify | BLEWrite); //from #include <bluefruit.h>
 
 //   vvvvv  VERSION INDICATION  vvvvv
-const char versionString[] = "TympanBLE v0.1.0";
+const char versionString[] = "TympanBLE v0.2.4, nRF52840";
 char deviceName[] = "Tympan-TACO"; // gets modified with part of the uniqueID
 const char manufacturerName[] = "Flywheel Lab";
 
@@ -41,9 +41,10 @@ char bleInChar;  // incoming BLE char
 //Create the nRF52 BLE elements (the firmware on the nRF BLE Hardware itself)
 BLEDfu          bledfu;  // Adafruit's built-in OTA DFU service
 BLEDis          bledis;  // Adafruit's built-in device information service
-BLEUart         bleService_adafruitUART;  //Adafruit's built-in UART service
 BLEUart_Tympan  bleService_tympanUART;    //Tympan extension of the Adafruit UART service that allows us to change the Service and Characteristic UUIDs
-nRF52_AT_API    AT_interpreter(&bleService_tympanUART, &SERIAL_TO_TYMPAN);  //interpreter for the AT command set that we're inventing
+BLEUart         bleService_adafruitUART;  //Adafruit's built-in UART service
+//nRF52_AT_API    AT_interpreter(&bleService_tympanUART, &SERIAL_TO_TYMPAN);  //interpreter for the AT command set that we're inventing
+nRF52_AT_API    AT_interpreter(&bleService_tympanUART, &bleService_adafruitUART, &SERIAL_TO_TYMPAN);  //interpreter for the AT command set that we're inventing
 
 // callback invoked when central connects
 void connect_callback(uint16_t conn_handle)
@@ -172,7 +173,7 @@ void setupBLE(){
   bledis.begin();
 
   // Configure the standard Adafruit UART service
-  //bleService_adafruitUART.begin();
+  bleService_adafruitUART.begin();
 
   // Configure and Start our custom tympan-specific BLE Uart Service
   bleService_tympanUART.setUuid(serviceUUID);
@@ -211,6 +212,10 @@ void startAdv(void)
   Bluefruit.Advertising.setInterval(32, 244);    // in unit of 0.625 ms
   Bluefruit.Advertising.setFastTimeout(30);      // number of seconds in fast mode
   Bluefruit.Advertising.start(0);                // 0 = Don't stop advertising after n seconds
+}
+
+void stopAdv(void) {
+  Bluefruit.Advertising.stop();
 }
 
 

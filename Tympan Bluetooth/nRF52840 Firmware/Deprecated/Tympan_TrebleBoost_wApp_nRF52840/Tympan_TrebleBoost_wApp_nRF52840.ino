@@ -43,7 +43,7 @@ const int audio_block_samples = 32;     //do not make bigger than AUDIO_BLOCK_SA
 AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 
 //create audio library objects for handling the audio
-Tympan                    myTympan(TympanRev::E,audio_settings);     //do TympanRev::D or TympanRev::E (or TympanRev::F once added to Tympan_Library)
+Tympan                    myTympan(TympanRev::F,audio_settings);     //do TympanRev::D or TympanRev::E (or TympanRev::F once added to Tympan_Library)
 AudioInputI2S_F32         i2s_in(audio_settings);     //Digital audio in *from* the Teensy Audio Board ADC.
 AudioFilterBiquad_F32     hp_filt1(audio_settings);   //IIR filter doing a highpass filter.  Left.
 AudioFilterBiquad_F32     hp_filt2(audio_settings);   //IIR filter doing a highpass filter.  Right.
@@ -116,15 +116,8 @@ void loop() {
 
   //respond to BLE
   if (ble.available() > 0) {
-    //String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
-    //for (int i=0; i < msgLen; i++) serialManager.respondToByte(msgFromBle[i]);
     serialManager.respondToByte((char)ble.read()); //for the Tympan simulation, service any messages received form the BLE module
   }
-  // if ((myTympan.BT_Serial)->available()) {
-  //   char c = (myTympan.BT_Serial)->read();
-  //   Serial.print("Loop: received from BT Serial: " + String(c));
-  //   serialManager.respondToByte(c);
-  // }
 
   //periodically print the CPU and Memory Usage
   if (myState.printCPUtoGUI) {
@@ -197,7 +190,3 @@ void setBleName(const String &name) {
   Serial.println("setBleName: ret_val = " + String(ret_val) + " for name = " + name);
 }
 
-void getBleFirmwareVersion(void) {
-  bool printResponse = true;
-  int ret_val = ble.version(printResponse);
-}
