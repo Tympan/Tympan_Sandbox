@@ -35,15 +35,34 @@ void makePerBandAudioConnections(void) {
 // configure the processing for the octave-band filters
 void configOctaveBandProcessing(const int n_filter_bands, const int filter_order, const int time_const) {
     //choose the filter center frequencies...this line will give a compilation error if n_filter_bands isn't right.  good.
-    float center_Hz[n_filter_bands-2] = {125., 250., 500., 1000., 2000., 4000., 8000.};  
+    const int n_center_freqs = n_filter_bands - 2;  //see discussion a few lines below
+    float center_Hz[n_center_freqs] = {125., 250., 500., 1000., 2000., 4000., 8000.};  
 
-    //To setup the filters, we actually need the crossover frequencies, not the center frequencies.
-    //So, assuming that they are octave band filters, the crossovers should be related by sqrt(2)
-    float crossover_Hz[n_filter_bands];
-    for (int i=0; i<n_filter_bands-2; i++) crossover_Hz[i] = center_Hz[i]/sqrtf(2.0);
-    crossover_Hz[n_filter_bands-1] = center_Hz[n_filter_bands-1]*sqrtf(2.0); //set the crossover for the last filter
-    
-    //design the filters!
+    //Be aware that the filterbank class in the Tympan_Library assumes that you want to handle *ALL* frequencies,
+    //from DC up to Nyquist.  Therefore, if you tell the filterbank that you want N filters, it will use those
+    //N filters in the following way:
+    //   * One lowpass filter spanning from DC up to the first cross-over frequency.
+    //   * N-2 bandbass filters, each filter spanning between neighboring cross-over frequencies
+    //   * One highpass filter spannding from the last cross-over frequency up to Nyquist
+
+    //Since the point of our filterbank is to have those middle bandpass filters be octave-band filters,
+    //we need to specify the cross-over frequencies in-between our center frequencies.  Being one octave
+    //in width (ie, a factor of 2.0), the lower crossover frequency is center_freq[i]/sqrt(2) and the upper
+    //crossover frequency is center_freq[i]*sqrt(2) [which for octave-spaced center frequencies should be 
+    //the same as center_freq[i+1]/sqrt(2)]
+
+    //OK, given all that backaground, now lets compute the cross-over frequencies from the center frequencies
+    const int n_crossover_freqs = n_filter_bands - 1;
+    float crossover_Hz[n_crossover_freqs]; 
+    for (int i=0; i < n_center_freqs; i++) crossover_Hz[i] = center_Hz[i]/sqrtf(2.0); //loop over each center frequency
+    crossover_Hz[n_crossover_freqs-1] = center_Hz[n_center_freqs-1]*sqrtf(2.0); //set the last crossover for the last filter by scaling up from the last center frequency
+
+    //print some debugging info...
+    Serial.println("configOctaveBandProcessing: n_filter_bands = " + String(n_filter_bands));
+    Serial.print("configOctaveBandProcessing: center = "); for (int i=0; i < n_filter_bands-2; i++) {Serial.print(String(center_Hz[i],2) + ", "); }; Serial.println();
+    Serial.print("configOctaveBandProcessing: crossovers = "); for (int i=0; i < n_filter_bands-1; i++) {Serial.print(String(crossover_Hz[i],2) + ", "); }; Serial.println();
+
+    //have the filterbank class design the filters!
     int ret_val = filterbank.designFilters(n_filter_bands, filter_order, sample_rate_Hz, audio_block_samples, crossover_Hz);
     if (ret_val < 0) Serial.println("configOctaveBandProcessing: *** ERROR ***: the filters failed to be created.  Why??");
 
