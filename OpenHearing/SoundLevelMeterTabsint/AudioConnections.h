@@ -58,9 +58,9 @@ void configOctaveBandProcessing(const int n_filter_bands, const int filter_order
     crossover_Hz[n_crossover_freqs-1] = center_Hz[n_center_freqs-1]*sqrtf(2.0); //set the last crossover for the last filter by scaling up from the last center frequency
 
     //print some debugging info...
-    Serial.println("configOctaveBandProcessing: n_filter_bands = " + String(n_filter_bands));
-    Serial.print("configOctaveBandProcessing: center = "); for (int i=0; i < n_filter_bands-2; i++) {Serial.print(String(center_Hz[i],2) + ", "); }; Serial.println();
-    Serial.print("configOctaveBandProcessing: crossovers = "); for (int i=0; i < n_filter_bands-1; i++) {Serial.print(String(crossover_Hz[i],2) + ", "); }; Serial.println();
+    //Serial.println("configOctaveBandProcessing: n_filter_bands = " + String(n_filter_bands));
+    //Serial.print("configOctaveBandProcessing: center = "); for (int i=0; i < n_filter_bands-2; i++) {Serial.print(String(center_Hz[i],2) + ", "); }; Serial.println();
+    //Serial.print("configOctaveBandProcessing: crossovers = "); for (int i=0; i < n_filter_bands-1; i++) {Serial.print(String(crossover_Hz[i],2) + ", "); }; Serial.println();
 
     //have the filterbank class design the filters!
     int ret_val = filterbank.designFilters(n_filter_bands, filter_order, sample_rate_Hz, audio_block_samples, crossover_Hz);
