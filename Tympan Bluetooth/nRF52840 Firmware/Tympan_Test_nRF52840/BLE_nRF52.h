@@ -78,7 +78,7 @@ class BLE_nRF52 {
     unsigned long rx_timeout_millis = 2000UL;
     //bool simulated_Serial_to_nRF = true;
 
-    int PIN_IS_CONNECTED = 12;  //Tympan RevF
+    int PIN_IS_CONNECTED = 39;  //Tympan RevF
     enum GET_TYPE { GET_AUTO=0, GET_VIA_SOFTWARE, GET_VIA_GPIO};
   protected:
     const String EOC = String('\r');
