@@ -50,7 +50,7 @@ void setup() {
   (myTympan.BT_Serial)->begin(115200); //UART to BLE module.  For the nRF52840, we're having the nRF assume 115200.
   //Serial1.begin(115200);
   delay(1000);
-  Serial.println("TrebleBoost_wApp_nRF52840: Starting setup()...");
+  Serial.println("Tympan_Test_nRF52840: Starting setup()...");
 
   //allocate the dynamic memory for audio processing blocks
   AudioMemory_F32(10,audio_settings); 
