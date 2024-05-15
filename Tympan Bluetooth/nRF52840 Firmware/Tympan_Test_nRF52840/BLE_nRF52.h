@@ -41,7 +41,7 @@ class BLE_nRF52 {
     BLE_nRF52(HardwareSerial *sp_to_ble, HardwareSerial *sp_from_ble) : serialToBLE(sp_to_ble), serialFromBLE(sp_from_ble) {}
     BLE_nRF52(void) {} //uses default serial ports set down in the protected section
     
-    int begin(int doFactoryReset = 1) { if (PIN_IS_CONNECTED >= 0) { pinMode(PIN_IS_CONNECTED, OUTPUT); }; return 0; }; 
+    int begin(int doFactoryReset = 1) { if (PIN_IS_CONNECTED >= 0) { pinMode(PIN_IS_CONNECTED, INPUT); }; return 0; }; 
     void setupBLE(int BT_firmware = 7, bool printDebug = true) {};            //to be called from the Arduino sketch's setup() routine.  Includes factory reset.
     void setupBLE_noFactoryReset(int BT_firmware = 7, bool printDebug = true) {};  //to be called from the Arduino sketch's setup() routine.  Excludes factory reset.
     void setupBLE(int BT_firmware, bool printDebug, int doFactoryReset) {};  //to be called from the Arduino sketch's setup() routine.  Must define all params
