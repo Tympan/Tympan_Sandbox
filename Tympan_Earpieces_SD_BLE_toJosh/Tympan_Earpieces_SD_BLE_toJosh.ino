@@ -63,7 +63,7 @@ const int LEFT = 0, RIGHT = (LEFT+1);
 
 
 //control display and serial interaction
-BLE_UI          ble(&Serial1);           //create bluetooth BLE class
+BLE_UI&       ble = myTympan.getBLE_UI();  //myTympan owns the ble object, but we have a reference to it here
 SerialManager   serialManager(&ble);
 State           myState(&audio_settings, &myTympan);
 
@@ -147,7 +147,7 @@ void setup() {
   while (Serial1.available()) Serial1.read(); //clear the incoming Serial1 (BT) buffer
 
   //setup BLE
-  delay(500); ble.setupBLE(myTympan.getBTFirmwareRev()); delay(500); //Assumes the default Bluetooth firmware. You can override!
+  delay(500); myTympan.setupBLE(); delay(500); //Assumes the default Bluetooth firmware. You can override!
   
   //setup serial manager
   setupSerialManager();

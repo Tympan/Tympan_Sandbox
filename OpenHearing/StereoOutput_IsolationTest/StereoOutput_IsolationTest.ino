@@ -10,7 +10,7 @@
       * Access SD card from PC via MTP
 
    For Tympan Rev D, program in Arduino IDE as a Teensy 3.6.
-   For Tympan Rev E, program in Arduino IDE as a Teensy 4.1.
+   For Tympan Rev E/F, program in Arduino IDE as a Teensy 4.1.
 
    MIT License.  use at your own risk.
 */
@@ -72,7 +72,7 @@ AudioConnection_F32           patchcord22(sineTone, 0, audioSDWriter, 1);   //co
 // /////////// Create classes for controlling the system, espcially via USB Serial and via the App
 #include      "SerialManager.h"
 #include      "State.h"                
-BLE_UI        ble(&myTympan);           //create bluetooth BLE class
+BLE_UI&       ble = myTympan.getBLE_UI();  //myTympan owns the ble object, but we have a reference to it here
 SerialManager serialManager(&ble);     //create the serial manager for real-time control (via USB or App)
 State         myState(&audio_settings, &myTympan, &serialManager); //keeping one's state is useful for the App's GUI
 
@@ -123,7 +123,7 @@ void setup() {
   for (int Ichan=0; Ichan < myState.n_channels; Ichan++) activateTone(myState.is_tone_active[Ichan],Ichan);
 
   //setup BLE
-  //delay(250); ble.setupBLE(myTympan.getBTFirmwareRev()); delay(250); //Assumes the default Bluetooth firmware. You can override!
+  //delay(250); myTympan.getBLE(); delay(250); //Assumes the default Bluetooth firmware. You can override!
   
   //setup the serial manager
   setupSerialManager();

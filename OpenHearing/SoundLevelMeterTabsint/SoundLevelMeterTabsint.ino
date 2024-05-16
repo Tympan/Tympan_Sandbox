@@ -29,7 +29,7 @@ Tympan    myTympan(TympanRev::E);            //use TympanRev::E or TympanRev::D 
 #include "AudioConnections.h"
 
 //Create BLE and serialManager
-BLE ble(&myTympan); //&Serial1 is the serial connected to the Bluetooth module
+BLE& ble = myTympan.getBLE();   //myTympan owns the ble object, but we have a reference to it here
 SerialManager serialManager(&ble);
 State myState(&audio_settings, &myTympan);
 
@@ -77,11 +77,8 @@ void setup() {
   myTympan.println("Time Weighting: SLOW");
   setTimeAveragingType(State::TIME_SLOW);
 
-  
-
   // //////////// setup BLE
-  while (Serial1.available()) Serial1.read(); //clear the incoming Serial1 (BT) buffer
-  ble.setupBLE(myTympan.getBTFirmwareRev());
+  myTympan.setupBLE();
 
   myTympan.println("Setup complete.");
   serialManager.printHelp();

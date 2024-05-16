@@ -41,7 +41,7 @@ AudioConnection          patchCord2(playWav1, 1, audioOutput, 1);
 // /////////// Create classes for controlling the system, espcially via USB Serial and via the App
 #include      "SerialManager.h"
 #include      "State.h"                
-BLE_UI        ble(&myTympan);           //create bluetooth BLE class
+BLE_UI&       ble = myTympan.getBLE_UI();  //myTympan owns the ble object, but we have a reference to it here
 SerialManager serialManager(&ble);     //create the serial manager for real-time control (via USB or App)
 State         myState(&audio_settings, &myTympan, &serialManager); //keeping one's state is useful for the App's GUI
 
@@ -84,7 +84,7 @@ void setup() {
   }
 
   //setup BLE
-  //delay(250); ble.setupBLE(myTympan.getBTFirmwareRev()); delay(250); //Assumes the default Bluetooth firmware. You can override!
+  //delay(250); myTympan.setupBLE(); delay(250); //Assumes the default Bluetooth firmware. You can override!
   
   //setup the serial manager
   //setupSerialManager();

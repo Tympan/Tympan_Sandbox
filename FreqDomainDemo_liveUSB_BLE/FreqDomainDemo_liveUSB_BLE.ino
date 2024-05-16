@@ -48,7 +48,8 @@ AudioConnection          patchCord51(convertF32toI16, 0, i2s_out,         0);  /
 AudioConnection          patchCord52(convertF32toI16, 0, i2s_out,         1);  //right output ("1")
 
 //Create BLE
-BLE ble = BLE(&Serial1);
+BLE& ble = myTympan.getBLE();   //myTympan owns the ble object, but we have a reference to it here
+
 
 //control display and serial interaction
 SerialManager serialManager(&ble);
@@ -136,8 +137,7 @@ void setup() {
   myTympan.volume_dB(0); 
 
   //setup BLE
-  while (Serial1.available()) Serial1.read(); //clear the incoming Serial1 (BT) buffer
-  ble.setupBLE();
+  myTympan.setupBLE();
 
   //setup serial manager
   setupSerialManager();

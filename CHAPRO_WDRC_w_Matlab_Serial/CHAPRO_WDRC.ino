@@ -38,8 +38,8 @@ EarpieceShield   earpieceShield(TympanRev::E, AICShieldRev::A);  //Note that Ear
 // Create classes for controlling the system
 #include      "SerialManager.h"
 #include      "State.h"                            
-BLE_UI        ble(&myTympan);                                      //create bluetooth BLE
-SerialManager serialManager(&ble);                                 //create the serial manager for real-time control (via USB or App)
+BLE_UI&       ble = myTympan.getBLE_UI();        //myTympan owns the ble object, but we have a reference to it here                                    //create bluetooth BLE
+SerialManager serialManager(&ble);               //create the serial manager for real-time control (via USB or App)
 State         myState(&audio_settings, &myTympan, &serialManager); //keeping one's state is useful for the App's GUI
 
 void connectClassesToOverallState(void) {
@@ -131,7 +131,7 @@ void setup() { //this runs once at startup
   
   //setup BLE
   ble.setUseFasterBaudRateUponBegin(true); //speeds up baudrate to 115200.  ONLY WORKS FOR ANDROID.  If iOS, you must set to false.
-  delay(500); ble.setupBLE(myTympan.getBTFirmwareRev()); delay(500); //Assumes the default Bluetooth firmware. You can override!
+	delay(500); myTympan.setupBLE(); delay(500); //Assumes the default Bluetooth firmware. You can override!
 
   //finish setup
   Serial.println("Setup complete.");
