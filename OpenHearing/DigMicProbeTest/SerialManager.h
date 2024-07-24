@@ -56,7 +56,7 @@ void SerialManager::printHelp(void) {
   Serial.println("   d/D  : CHIRP  : Incr/decrease duration of chirp (cur = " + String(myState.chirp_dur_sec,1) + " sec)");
   Serial.println("   n    : CHIRP  : Start the chirp");
   Serial.println("   1-3  : SDPlay : Play files 1-3 from SD Card");
-  Serial.println("   q    : SDPlay : Stop any currnetly plying SD files");
+  Serial.println("   q    : SDPlay : Stop any currently plying SD files");
   Serial.println("   b    : AutoWrite : Start chirp and SD recording together");
   Serial.println("   4-6  : AutoWrite : Start files 1-3 from SD Card and SD recording together");
   Serial.println("   g/G  : OUTPUT : Incr/decrease DAC loudness (cur = " + String(myState.output_gain_dB,1) + " dB)");
