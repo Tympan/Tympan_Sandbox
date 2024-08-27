@@ -180,10 +180,10 @@ void setupBLE(){
   bleService_tympanUART.setCharacteristicUuid(myBleChar);
   bleService_tympanUART.begin();
 
-  // Start our custom service
-  myBleChar.setProperties(CHR_PROPS_NOTIFY);  //is this needed?
-  myBleChar.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS); //is this needed?
-  myBleChar.begin();
+  // Start our custom service ...this is all now done in bleService_tympanUART.begin();
+  //myBleChar.setProperties(CHR_PROPS_NOTIFY);  //is this needed?
+  //myBleChar.setPermission(SECMODE_OPEN, SECMODE_NO_ACCESS); //is this needed?
+  //myBleChar.begin();
 }
 
 void startAdv(void)
