@@ -19,7 +19,7 @@ uint8_t characteristicUUID[] = {  0x3C, 0xD9, 0xF7, 0x89, 0x37, 0x37, 0xAA, 0x8F
 BLECharacteristic myBleChar = BLECharacteristic(characteristicUUID, BLENotify | BLEWrite); //from #include <bluefruit.h>
 
 //   vvvvv  VERSION INDICATION  vvvvv
-const char versionString[] = "TympanBLE v0.2.4, nRF52840";
+const char versionString[] = "TympanBLE v0.3.0, nRF52840";
 char deviceName[] = "Tympan-TACO"; // gets modified with part of the uniqueID
 const char manufacturerName[] = "Flywheel Lab";
 
