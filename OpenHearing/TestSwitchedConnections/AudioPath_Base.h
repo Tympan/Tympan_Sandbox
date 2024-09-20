@@ -54,8 +54,12 @@ class AudioPath_Base {
     }
     virtual void setupHardware(void) {}  //override this as desired in your derived class
   
-    //Interfact to allow for any slower main-loop updates
+    //Interface to allow for any slower main-loop updates
     virtual int serviceMainLoop(void) { return 0; }  //Do nothing.  You can override in your derived class, if you want to do something in the main loop.
+
+    //Interface for use by SerialMonitor
+    virtual void printHelp(void) { Serial.println("    : (none)"); };  //print default message
+    virtual void respondToByte(char c) { };                           //default do nothing
 
     String name = "(unnamed)";   //human-readable name for your audio path.  You should override this in the constructor (or wherever) of your derived class.
   protected:

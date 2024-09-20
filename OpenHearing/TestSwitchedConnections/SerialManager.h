@@ -20,6 +20,7 @@ extern std::vector<AudioPath_Base *> allAudioPaths;
 extern void togglePrintMemoryAndCPU(void);
 extern void deactivateAllAudioPaths(void);
 extern int activateOneAudioPath(int index);
+AudioPath_Base *getActiveAudioPath(void);
 
 //now, define the Serial Manager class
 class SerialManager {
@@ -28,6 +29,7 @@ public:
 
   void respondToByte(char c);
   void printHelp(void);
+  bool interpretAsSwitchAudioPath(char c);
 private:
 };
 
@@ -45,7 +47,27 @@ void SerialManager::printHelp(void) {
     Serial.print(" (" + allAudioPaths[i]->name + ")");
     Serial.println();
   }
+
+  //add help from active audio path
+  AudioPath_Base *audio_path = getActiveAudioPath();
+  if (audio_path != NULL) {
+    Serial.println("  Commands for active Audiopath (" + audio_path->name + "):");
+    audio_path->printHelp();
+  }
   Serial.println();
+}
+
+//try to interpret byte as a command ("1"-"9") to switch the audio path
+bool SerialManager::interpretAsSwitchAudioPath(char c) {
+  bool was_switch_command = false;
+  int possible_audio_path_index = (int)(c - '1');
+  if ((possible_audio_path_index >= 0) && (possible_audio_path_index < (int)allAudioPaths.size())) {
+    Serial.print("SerialManager: Received "); Serial.print(c);
+    Serial.println(": switching to " + allAudioPaths[possible_audio_path_index]->name + "...");
+    activateOneAudioPath(possible_audio_path_index);  //de-activate all and then activate just the second audio path
+    was_switch_command = true;  
+  }
+  return was_switch_command;
 }
 
 //switch yard to determine the desired action
@@ -66,13 +88,10 @@ void SerialManager::respondToByte(char c) {
       break;
     default:
       {
-        //look to see if we were commanded to swtich audio paths (via "1" - "9")
-        int possible_audio_path_index = (int)(c - '1');
-        if ((possible_audio_path_index >= 0) && (possible_audio_path_index < (int)allAudioPaths.size())) {
-          Serial.print("SerialManager: Received "); Serial.print(c);
-          Serial.println(": switching to " + allAudioPaths[possible_audio_path_index]->name + "...");
-          activateOneAudioPath(possible_audio_path_index);  //de-activate all and then activate just the second audio path
-          break;  
+        bool was_switch_command = interpretAsSwitchAudioPath(c);
+        if (was_switch_command==false) {
+          AudioPath_Base *audio_path = getActiveAudioPath();
+          if (audio_path != NULL) audio_path->respondToByte(c);
         }
       }
   }

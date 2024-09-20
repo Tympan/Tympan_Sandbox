@@ -21,12 +21,12 @@ const float sample_rate_Hz    = 96000.0f ; //choose from 8kHz to 96kHz
 const int audio_block_samples = 128;        //do not make bigger than AUDIO_BLOCK_SAMPLES from AudioStream.h (which is 128)
 AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 
-#define USE_FOUR_CHANNELS (true)
+#define USE_FOUR_CHANNELS (false)
 
 //create audio library objects for handling the audio
 Tympan                     myTympan(TympanRev::E, audio_settings);   //do TympanRev::D or E or F
 #if USE_FOUR_CHANNELS
-  EarpieceShield           earpieceShield(myTympan.getTympanRev(), AICShieldRev::A);  //Note that EarpieceShield is defined in the Tympan_Libarary in AICShield.h 
+  EarpieceShield           earpieceShield(TympanRev::E, AICShieldRev::A);  //Note that EarpieceShield is defined in the Tympan_Libarary in AICShield.h 
   AudioInputI2SQuad_F32    *audioInput;            //create it later
   AudioOutputI2SQuad_F32   *audioOutput;           //create it later
 #else
@@ -154,6 +154,13 @@ int activateOneAudioPath(int index) {
     allAudioPaths[activeAudioPathIndex]->setActive(true);  //activate just the one
   }
   return activeAudioPathIndex;
+}
+
+AudioPath_Base *getActiveAudioPath(void) {
+  if (activeAudioPathIndex >= 0) {
+    return allAudioPaths[activeAudioPathIndex];
+  }
+  return NULL;
 }
 
 //Define other control, display and serial interactions

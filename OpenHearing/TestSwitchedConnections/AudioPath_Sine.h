@@ -54,8 +54,8 @@ class AudioPath_Sine : public AudioPath_Base {
 
     //setupAudioProcess: initialize the sine wave to the desired frequency and amplitude
     virtual void setupAudioProcessing(void) {
-      sineWave->frequency(1000.0f);
-      sineWave->amplitude(sine_amplitude);
+      setFrequency_Hz(freq_Hz);
+      setAmplitude(sine_amplitude);
       tone_active = true;
       gainSine->setGain_dB(0.0); //set to no gain for now
       lastChange_millis = millis();
@@ -68,18 +68,18 @@ class AudioPath_Sine : public AudioPath_Base {
         //tympan_ptr->inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); //Choose the desired input and set volume levels (on-board mics)
         //tympan_ptr->setInputGain_dB(input_gain_dB);       //set input volume, 0-47.5dB in 0.5dB setps
         tympan_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB); //set the DAC gain.  left and right
-        tympan_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right       
+        //tympan_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right       
         tympan_ptr->unmuteDAC();
-        tympan_ptr->unmuteHeadphone();
+        //tympan_ptr->unmuteHeadphone();
       }
       if (shield_ptr != NULL) {
         shield_ptr->muteDAC();
         //shield_ptr->inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); //Choose the desired input and set volume levels (on-board mics)
         //shield_ptr->setInputGain_dB(input_gain_dB);       //set input volume, 0-47.5dB in 0.5dB setps
         shield_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB);   //set the DAC gain.  left and right
-        shield_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right                    
+        //shield_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right                    
         shield_ptr->unmuteDAC();
-        shield_ptr->unmuteHeadphone();                     
+        //shield_ptr->unmuteHeadphone();                     
       }
     }
 
@@ -94,12 +94,12 @@ class AudioPath_Sine : public AudioPath_Base {
         if (tone_active) {
           //turn off the tone
           tone_active = false;
-          Serial.print("AudioPath_Sine: serviceMainLoop: setting tone amplitude to "); Serial.println(0.0f,3);
+          Serial.println("AudioPath_Sine: serviceMainLoop: Muting tone.");
           sineWave->amplitude(0.0f);
         } else {
           //turn on the tone
           tone_active = true;
-          Serial.print("AudioPath_Sine: serviceMainLoop: setting tone amplitude to "); Serial.println(sine_amplitude,3);
+          Serial.println("AudioPath_Sine: serviceMainLoop: Activating tone (" + String(20.f*log10f(sine_amplitude),1) + " dBFS)");
           sineWave->amplitude(sine_amplitude);
         }
         lastChange_millis = cur_millis;
@@ -109,10 +109,46 @@ class AudioPath_Sine : public AudioPath_Base {
       return 0;
     }
     
+    virtual void printHelp(void) {
+      Serial.println("   f/F: Increment/Decrement the tone frequency (cur = " + String(freq_Hz) + "Hz)");
+      Serial.println("   a/A: Increment/Decrement the tone amplitude (cur = " + String(20.f*log10f(sine_amplitude),1) + " dBFS");
+    }
+    virtual void respondToByte(char c) {
+      switch (c) {
+        case 'f':
+          setFrequency_Hz(freq_Hz*sqrt(2.0));
+          Serial.println(name + ": increased tone frequency to " + String(freq_Hz));
+          break;
+        case 'F':
+          setFrequency_Hz(freq_Hz/sqrt(2.0));
+          Serial.println(name + ": decreased tone frequency to " + String(freq_Hz));
+          break;
+        case 'a':
+          setAmplitude(sine_amplitude*sqrt(2.0));
+          Serial.println(name + ": increased tone amplitude to " + String(20.f*log10f(sine_amplitude),1) + " dBFS");
+          break;
+        case 'A':
+          setAmplitude(sine_amplitude/sqrt(2.0));
+          Serial.println(name + ": decreased tone amplitude to " + String(20.f*log10f(sine_amplitude),1) + " dBFS");
+          break;
+      }
+    }
+    float setFrequency_Hz(float _freq_Hz) {
+      freq_Hz = _freq_Hz;
+      sineWave->frequency(freq_Hz);
+      return freq_Hz;
+    }
+    float setAmplitude(float _amplitude) {
+      sine_amplitude = _amplitude;
+      if (tone_active) sineWave->amplitude(sine_amplitude);
+      return sine_amplitude;
+    }
+
   protected:
     AudioSynthWaveform_F32  *sineWave;  //if you use the audioObjects vector from AudioPathBase, any allocation to this pointer will get automatically deleted
     AudioEffectGain_F32     *gainSine;      //if you use the audioObjects vector from AudioPathBase, any allocation to this pointer will get automatically deleted
-    const float             sine_amplitude = 0.003f;
+    float                   freq_Hz = 1000.0f;
+    float                   sine_amplitude = sqrtf(pow10f(0.1*-50.0));
     unsigned long int       lastChange_millis = 0UL;
     const unsigned long int tone_dur_millis = 1000UL;
     const unsigned long int silence_dur_millis = 1000UL;
