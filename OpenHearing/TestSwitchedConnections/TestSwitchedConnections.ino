@@ -24,14 +24,14 @@ AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 #define USE_FOUR_CHANNELS (true)
 
 //create audio library objects for handling the audio
-Tympan                        myTympan(TympanRev::E, audio_settings);   //do TympanRev::D or E or F
+Tympan                     myTympan(TympanRev::E, audio_settings);   //do TympanRev::D or E or F
 #if USE_FOUR_CHANNELS
-  EarpieceShield              earpieceShield(myTympan.getTympanRev(), AICShieldRev::A);  //Note that EarpieceShield is defined in the Tympan_Libarary in AICShield.h 
-  AudioInputI2SQuad_F32       *audioInput;            //create it later
-  AudioOutputI2SQuad_F32      *audioOutput;           //create it later
+  EarpieceShield           earpieceShield(myTympan.getTympanRev(), AICShieldRev::A);  //Note that EarpieceShield is defined in the Tympan_Libarary in AICShield.h 
+  AudioInputI2SQuad_F32    *audioInput;            //create it later
+  AudioOutputI2SQuad_F32   *audioOutput;           //create it later
 #else
-  AudioInputI2S_F32       *audioInput;                //create it later
-  AudioOutputI2S_F32      *audioOutput;               //create it later
+  AudioInputI2S_F32        *audioInput;            //create it later
+  AudioOutputI2S_F32       *audioOutput;           //create it later
 #endif
 
 //create other audio-related items
@@ -57,7 +57,8 @@ Tympan *tympan_ptr = &myTympan;
 
 // Include your header files
 #include "AudioPath_Sine.h"
-#include "AudioPath_PassThruGain.h"
+#include "AudioPath_PassThruGain_Analog.h"
+#include "AudioPath_PassThruGain_PDM.h"
 
 // Create your AudioPath
 void createMyAudioPathObjects(AudioSettings_F32 &_audio_settings) {
@@ -65,8 +66,11 @@ void createMyAudioPathObjects(AudioSettings_F32 &_audio_settings) {
   //Add Audio Path: Sine wave generator
   allAudioPaths.push_back(new AudioPath_Sine(audio_settings, tympan_ptr, shield_ptr));  
 
-  //Add Audio Path: Audio pass-thru with gain
-  allAudioPaths.push_back(new AudioPath_PassThruGain(audio_settings, tympan_ptr, shield_ptr));
+  //Add Audio Path: Audio pass-thru with gain (analog)
+  allAudioPaths.push_back(new AudioPath_PassThruGain_Analog(audio_settings, tympan_ptr, shield_ptr));
+
+  //Add Audio Path: Audio pass-thru with gain (PDM mics)
+  allAudioPaths.push_back(new AudioPath_PassThruGain_PDM(audio_settings, tympan_ptr, shield_ptr));
 
   //Add Audio Path: Add yours here!
   //allAudioPaths.push_back(new myAudioPathClassName(audio_settings, tympan_ptr, shield_ptr)); 
@@ -89,7 +93,7 @@ void createAllAudioObjects(AudioSettings_F32 &_audio_settings) {
     audioInput = new AudioInputI2S_F32(audio_settings);
   #endif
 
-  //Next, instantiate all of the AudioPaths that we might ever decide to use
+  //Next, let the user instantiate all of the AudioPaths that they might ever decide to use
   createMyAudioPathObjects(_audio_settings);
 
   //Next, create the audio output mixers...one for Left0, Right0, Left1, Right1

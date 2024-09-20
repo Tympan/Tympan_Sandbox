@@ -1,5 +1,5 @@
-#ifndef AudioPath_PassThruGain_h
-#define AudioPath_PassThruGain_h
+#ifndef AudioPath_PassThruGain_Analog_h
+#define AudioPath_PassThruGain_Analog_h
 
 #include <vector>
 #include "AudioPath_Base.h"
@@ -12,11 +12,11 @@
 // ////////////////////////////////////////////////////////////////////////////
 
 
-// Here is another version of an AudioPath_Base.  This one takes the audio input (all four channels) and applies gain.
-class AudioPath_PassThruGain : public AudioPath_Base {
+// This AudioPath takes the audio input (all four channels) and applies gain.  This uses the analog inputs.
+class AudioPath_PassThruGain_Analog : public AudioPath_Base {
   public:
     //Constructor
-    AudioPath_PassThruGain(AudioSettings_F32 &_audio_settings, Tympan *_tympan_ptr, EarpieceShield *_shield_ptr)  : AudioPath_Base(_audio_settings, _tympan_ptr, _shield_ptr) 
+    AudioPath_PassThruGain_Analog(AudioSettings_F32 &_audio_settings, Tympan *_tympan_ptr, EarpieceShield *_shield_ptr)  : AudioPath_Base(_audio_settings, _tympan_ptr, _shield_ptr) 
     {
       //instantiate audio classes...we're only storing them in a vector so that it's easier to destroy them later (whenver destruction is allowed by AudioStream)
       for (int i=0; i<4; i++) {
@@ -31,7 +31,7 @@ class AudioPath_PassThruGain : public AudioPath_Base {
       setActive(false);  //setActive is in AudioPath_Base
 
       //choose a human-readable name for this audio path
-      name = "Audio Pass-Thru";  //"name" is defined as a String in AudioPath_Base
+      name = "Audio Pass-Thru Analog";  //"name" is defined as a String in AudioPath_Base
     }
 
     //~AudioPath_PassThruGain();  //using destructor from AudioPath_Base, which destorys everything in audioObjects and in patchCords
@@ -63,7 +63,7 @@ class AudioPath_PassThruGain : public AudioPath_Base {
     }
 
     //setupAudioProcess: initialize all gain blocks to a certain gain value
-    void setupAudioProcessing(void) {
+    virtual void setupAudioProcessing(void) {
       for (int i=0; i < (int)allGains.size(); i++) allGains[i]->setGain_dB(10.0);
     }
 

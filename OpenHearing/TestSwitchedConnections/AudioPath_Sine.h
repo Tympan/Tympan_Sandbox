@@ -12,7 +12,7 @@
 // ////////////////////////////////////////////////////////////////////////////
 
 
-// Here is one version of an AudioPath_Base.  This one creates a sine wave and toggles it on-and-off once per second.
+// This AudioPath creates a sine wave and toggles it on-and-off once per second.
 class AudioPath_Sine : public AudioPath_Base {
   public:
     //Constructor
@@ -53,7 +53,7 @@ class AudioPath_Sine : public AudioPath_Base {
     }
 
     //setupAudioProcess: initialize the sine wave to the desired frequency and amplitude
-    void setupAudioProcessing(void) {
+    virtual void setupAudioProcessing(void) {
       sineWave->frequency(1000.0f);
       sineWave->amplitude(sine_amplitude);
       tone_active = true;
