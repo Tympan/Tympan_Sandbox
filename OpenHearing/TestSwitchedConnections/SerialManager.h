@@ -1,4 +1,3 @@
-
 /* 
  *  SerialManager
  *  
@@ -10,14 +9,12 @@
  *  
  */
 
-
 #ifndef _SerialManager_h
 #define _SerialManager_h
 
-#include "AudioPaths.h"
-
 //variables in the main sketch that I want to call from here
 extern Tympan myTympan;
+extern std::vector<AudioPath_Base *> allAudioPaths;
 
 //functions in the main sketch that I want to call from here
 extern void togglePrintMemoryAndCPU(void);
@@ -40,8 +37,12 @@ void SerialManager::printHelp(void) {
   Serial.println("   h: Print this help");
   Serial.println("   C: Toggle printing of CPU and Memory usage");
   Serial.println("   0: De-activate all audio paths");
-  Serial.println("   1: Activate only Audio Path 1");
-  Serial.println("   2: Activate only Audio Path 2");
+  for (int i=0; i < (int)allAudioPaths.size(); i++) {
+    Serial.print("   ");  Serial.print(i+1); 
+    Serial.print(": Activate only Audio Path "); Serial.print(i+1);
+    Serial.print(" (" + allAudioPaths[i]->name + ")");
+    Serial.println();
+  }
   Serial.println();
 }
 
