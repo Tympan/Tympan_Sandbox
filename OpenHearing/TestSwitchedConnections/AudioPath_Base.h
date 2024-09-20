@@ -53,9 +53,9 @@ class AudioPath_Base {
     }
   
     //Interfact to allow for any slower main-loop updates
-    virtual int serviceMainLoop(void) { return 0; }
+    virtual int serviceMainLoop(void) { return 0; }  //Do nothing.  You can override in your derived class, if you want to do something in the main loop.
 
-    String name = "(unnamed)";
+    String name = "(unnamed)";   //human-readable name for your audio path.  You should override this in the constructor (or wherever) of your derived class.
   protected:
     std::vector<AudioConnection_F32 *> patchCords;
     std::vector<AudioStream_F32 *> audioObjects;
