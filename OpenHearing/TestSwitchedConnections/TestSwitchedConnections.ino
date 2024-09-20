@@ -43,7 +43,7 @@ int activeAudioPathIndex = -1;  //which audio path is active (counting from zero
 
 // ////////////////////////////////////////////////////////////////////////////////////////////////////
 // 
-// *************************** DEAR USER!!!!  Add or remove your AudioPath objects here!!!
+/// /////////// DEAR USER!!!!  Add or remove your AudioPath objects below!!!  /////////////////////////
 //
 // ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -53,14 +53,15 @@ int activeAudioPathIndex = -1;  //which audio path is active (counting from zero
 
 // Create your AudioPath
 void createMyAudioPathObjects(AudioSettings_F32 &_audio_settings) {
-  //Audio Path: Sine wave generator
-  allAudioPaths.push_back(new AudioPath_Sine(audio_settings));   //pass pointer to audioInput
+  
+  //Add Audio Path: Sine wave generator
+  allAudioPaths.push_back(new AudioPath_Sine(audio_settings));  
 
-  //Audio Path: Audio pass-thru with gain
-  allAudioPaths.push_back(new AudioPath_PassThruGain(audio_settings)); //pass pointer to audioInput
+  //Add Audio Path: Audio pass-thru with gain
+  allAudioPaths.push_back(new AudioPath_PassThruGain(audio_settings));
 
-  //Audio Path: Add yours here!
-  //allAudioPaths.push_back(new myAudioPathClassName(audio_settings)); //pass pointer to audioInput
+  //Add Audio Path: Add yours here!
+  //allAudioPaths.push_back(new myAudioPathClassName(audio_settings)); 
 }
 
 

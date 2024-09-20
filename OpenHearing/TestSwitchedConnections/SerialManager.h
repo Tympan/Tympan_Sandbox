@@ -37,6 +37,8 @@ void SerialManager::printHelp(void) {
   Serial.println("   h: Print this help");
   Serial.println("   C: Toggle printing of CPU and Memory usage");
   Serial.println("   0: De-activate all audio paths");
+
+  //auto-populate entries for the audio paths that have already been created
   for (int i=0; i < (int)allAudioPaths.size(); i++) {
     Serial.print("   ");  Serial.print(i+1); 
     Serial.print(": Activate only Audio Path "); Serial.print(i+1);
@@ -62,14 +64,17 @@ void SerialManager::respondToByte(char c) {
       Serial.println("SerialManager: Received 0: de-activating all audio paths...");
       deactivateAllAudioPaths(); //de-activate them all
       break;
-    case '1':
-      Serial.println("SerialManager: Received 1: switch to AudioPath_Sine...");
-      activateOneAudioPath(1-1);  //de-activate all and then activate just the first audio path
-      break;
-    case '2':
-      Serial.println("SerialManager: Received 2: switch to AudioPath_PassThruGain...");
-      activateOneAudioPath(2-1);  //de-activate all and then activate just the second audio path
-      break;
+    default:
+      {
+        //look to see if we were commanded to swtich audio paths (via "1" - "9")
+        int possible_audio_path_index = (int)(c - '1');
+        if ((possible_audio_path_index >= 0) && (possible_audio_path_index < (int)allAudioPaths.size())) {
+          Serial.print("SerialManager: Received "); Serial.print(c);
+          Serial.println(": switching to " + allAudioPaths[possible_audio_path_index]->name + "...");
+          activateOneAudioPath(possible_audio_path_index);  //de-activate all and then activate just the second audio path
+          break;  
+        }
+      }
   }
 }
 

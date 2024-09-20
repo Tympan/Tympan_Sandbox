@@ -38,7 +38,7 @@ class AudioPath_PassThruGain : public AudioPath_Base {
     virtual int connectToSource(AudioStream_F32 *src, const int source_index, const int audio_path_input_index)
     {
       if (src != NULL) {
-         if (audio_path_input_index < allGains.size()) {
+         if (audio_path_input_index < (int)allGains.size()) {
            patchCords.push_back( new AudioConnection_F32(*src, audio_path_input_index, *allGains[audio_path_input_index], 0) ); //arguments: source, output index of source, destination, output index of destination
            return 0;
          }
@@ -70,6 +70,7 @@ class AudioPath_PassThruGain : public AudioPath_Base {
       if ((cur_millis < lastChange_millis) || (cur_millis > targ_time_millis)) { //also catches wrap-around of millis()
         Serial.print("AudioPath_PassThruGain: serviceMainLoop: Gains (dB) = ");
         for (int i=0; i < (int)allGains.size(); i++) { Serial.print(allGains[i]->getGain_dB(),1);  Serial.print(", ");  }
+        Serial.println();
         lastChange_millis = cur_millis;
       }
       return 0;
@@ -78,7 +79,7 @@ class AudioPath_PassThruGain : public AudioPath_Base {
     protected:
       std::vector<AudioEffectGain_F32 *> allGains;  //if you use the audioObjects vector from AudioPathBase, any allocation to this pointer will get automatically deleted  
       unsigned long int       lastChange_millis = 0UL;
-      const unsigned long int update_period_millis = 1000UL;
+      const unsigned long int update_period_millis = 1000UL; //here's how often (milliseconds) we allow our main-loop update to execute
 };
 
 
