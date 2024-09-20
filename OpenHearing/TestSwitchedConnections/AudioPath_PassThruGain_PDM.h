@@ -31,16 +31,16 @@ class AudioPath_PassThruGain_PDM : public AudioPath_PassThruGain_Analog {
         tympan_ptr->enableDigitalMicInputs(true);             //switch to digital PDM inputs 
         //tympan_ptr->inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); //Choose the desired input (on-board mics)...does nothing when in PDM mode
         //tympan_ptr->setInputGain_dB(adc_gain_dB);           //set input gain, 0-47.5dB in 0.5dB setps...does nothing when in PDM mode
-        tympan_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB); //set the DAC gain.  left and right
+        tympan_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB);   //set the DAC gain.  left and right
         tympan_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right       
         tympan_ptr->unmuteDAC();
         tympan_ptr->unmuteHeadphone();
       }
       if (shield_ptr != NULL) {
-        shield_ptr->enableDigitalMicInputs(true);            //switch to analog inputs 
+        shield_ptr->enableDigitalMicInputs(true);               //switch to digital PDM inputs 
         //shield_ptr->inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); //Choose the desired input...does nothing when in PDM mode
         //shield_ptr->setInputGain_dB(adc_gain_dB);             //set input gain, 0-47.5dB in 0.5dB setps...does nothing when in PDM mode
-        shield_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB);   //set the DAC gain.  left and right
+        shield_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB);     //set the DAC gain.  left and right
         shield_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right                    
         shield_ptr->unmuteDAC();
         shield_ptr->unmuteHeadphone();                   
