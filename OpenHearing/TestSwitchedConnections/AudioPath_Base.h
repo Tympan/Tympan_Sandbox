@@ -24,7 +24,7 @@
 class AudioPath_Base {
   public:
     AudioPath_Base(void) {}
-    AudioPath_Base(AudioSettings_F32 &_audio_settings) {}
+    AudioPath_Base(AudioSettings_F32 &_audio_settings, Tympan *_tympan_ptr, EarpieceShield *_shield_ptr) : tympan_ptr(_tympan_ptr), shield_ptr(_shield_ptr) {}
     
     //Destructor: note that destroying Audio Objects is not a good idea because AudioStream (from Teensy)
     //does not currently support (as of Sept 9, 2024) having instances of AudioStream be destroyed.  The
@@ -47,16 +47,20 @@ class AudioPath_Base {
     //Loop through each audio object and set them all to the desired state of active or inactive.
     //Per the rules of AudioStream::update_all(), active = false should mean that the audio object
     //is not invoked, thereby saving CPU.
-    virtual bool setActive(bool _active) { 
+    virtual bool setActive(bool _active) {
+      if (_active == true) setupHardware();
       for (auto & audioObject : audioObjects) { audioObject->setActive(_active); } //iterate over each audio object and set whether it is active. (setting to zero reduces CPU)
       return _active;
     }
+    virtual void setupHardware(void) {}  //override this as desired in your derived class
   
     //Interfact to allow for any slower main-loop updates
     virtual int serviceMainLoop(void) { return 0; }  //Do nothing.  You can override in your derived class, if you want to do something in the main loop.
 
     String name = "(unnamed)";   //human-readable name for your audio path.  You should override this in the constructor (or wherever) of your derived class.
   protected:
+    Tympan *tympan_ptr = NULL;
+    EarpieceShield *shield_ptr = NULL;
     std::vector<AudioConnection_F32 *> patchCords;
     std::vector<AudioStream_F32 *> audioObjects;
 };

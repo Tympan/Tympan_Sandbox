@@ -4,6 +4,7 @@
 #include <vector>
 #include "AudioPath_Base.h"
 
+
 // ////////////////////////////////////////////////////////////////////////////
 //
 // For an explanation of AudioPaths, see the explanation in AudioPath_Base.h
@@ -15,7 +16,7 @@
 class AudioPath_Sine : public AudioPath_Base {
   public:
     //Constructor
-    AudioPath_Sine(AudioSettings_F32 &_audio_settings) : AudioPath_Base(_audio_settings) 
+    AudioPath_Sine(AudioSettings_F32 &_audio_settings, Tympan *_tympan_ptr, EarpieceShield *_shield_ptr)  : AudioPath_Base(_audio_settings, _tympan_ptr, _shield_ptr) 
     {
       //instantiate audio classes...we're only storing them in a vector so that it's easier to destroy them later (whenver destruction is allowed by AudioStream)
       audioObjects.push_back( sineWave = new AudioSynthWaveform_F32( _audio_settings ) );
@@ -26,6 +27,9 @@ class AudioPath_Sine : public AudioPath_Base {
 
       //setup the parameters of the audio processing
       setupAudioProcessing(); 
+
+      //initialize to being inactive
+      setActive(false);  //setActive is in AudioPath_Base
 
       //choose a human-readable name for this audio path
       name = "Sine Generator";  //"name" is defined as a String in AudioPath_Base
@@ -57,6 +61,26 @@ class AudioPath_Sine : public AudioPath_Base {
       lastChange_millis = millis();
     }
 
+    //setup the hardware.  This is called automatically by AudioPath_Base::setActive(flag_active) whenever flag_active = true
+    virtual void setupHardware(void) {
+      if (tympan_ptr != NULL) {
+        //tympan_ptr->inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); //Choose the desired input and set volume levels (on-board mics)
+        //tympan_ptr->setInputGain_dB(input_gain_dB);       //set input volume, 0-47.5dB in 0.5dB setps
+        tympan_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB); //set the DAC gain.  left and right
+        tympan_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right       
+        tympan_ptr->unmuteDAC();
+        tympan_ptr->unmuteHeadphone();
+      }
+      if (shield_ptr != NULL) {
+        //shield_ptr->inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); //Choose the desired input and set volume levels (on-board mics)
+        //shield_ptr->setInputGain_dB(input_gain_dB);       //set input volume, 0-47.5dB in 0.5dB setps
+        shield_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB);   //set the DAC gain.  left and right
+        shield_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right                    
+        shield_ptr->unmuteDAC();
+        shield_ptr->unmuteHeadphone();                     
+      }
+    }
+
     //The sine wave should toggle itself to be audible then silent then audible then silent, etc.
     //The serviceMainLoop implements this periodic on/off behavior.
     virtual int serviceMainLoop(void) {
@@ -85,12 +109,17 @@ class AudioPath_Sine : public AudioPath_Base {
     
   protected:
     AudioSynthWaveform_F32  *sineWave;  //if you use the audioObjects vector from AudioPathBase, any allocation to this pointer will get automatically deleted
-    AudioEffectGain_F32     *gainSine;      //if you use the audioObjects vector from AudioPathBase, any allocation to this pointer will get automatically deleted   
+    AudioEffectGain_F32     *gainSine;      //if you use the audioObjects vector from AudioPathBase, any allocation to this pointer will get automatically deleted
     const float             sine_amplitude = 0.003f;
     unsigned long int       lastChange_millis = 0UL;
     const unsigned long int tone_dur_millis = 1000UL;
     const unsigned long int silence_dur_millis = 1000UL;
     bool                    tone_active = false;
+
+    //settings for the audio hardware
+    //float adc_gain_dB = 0.0;            //set input gain, 0-47.5dB in 0.5dB setps
+    float dac_gain_dB = 0.0;            //set the DAC gain: -63.6 dB to +24 dB in 0.5dB steps.  
+    float headphone_amp_gain_dB = 0.0;  //set the headphone gain: -6 to +14 dB (I think)
 
 };
 

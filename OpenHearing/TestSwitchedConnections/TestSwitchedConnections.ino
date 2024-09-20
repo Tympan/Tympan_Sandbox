@@ -26,7 +26,7 @@ AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 //create audio library objects for handling the audio
 Tympan                        myTympan(TympanRev::E, audio_settings);   //do TympanRev::D or E or F
 #if USE_FOUR_CHANNELS
-  EarpieceShield              earpieceShield(TympanRev::E, AICShieldRev::A);  //Note that EarpieceShield is defined in the Tympan_Libarary in AICShield.h 
+  EarpieceShield              earpieceShield(myTympan.getTympanRev(), AICShieldRev::A);  //Note that EarpieceShield is defined in the Tympan_Libarary in AICShield.h 
   AudioInputI2SQuad_F32       *audioInput;            //create it later
   AudioOutputI2SQuad_F32      *audioOutput;           //create it later
 #else
@@ -39,6 +39,14 @@ std::vector<AudioMixer8_F32 *> allOutputMixers;         //fill it later
 std::vector<AudioPath_Base *> allAudioPaths;            //fill it later
 std::vector<AudioConnection_F32 *> otherPatchCords;     //fill it later
 int activeAudioPathIndex = -1;  //which audio path is active (counting from zero)
+
+//create items to help AudioPaths control the hardware
+Tympan *tympan_ptr = &myTympan;
+#if USE_FOUR_CHANNELS
+  EarpieceShield *shield_ptr = &earpieceShield;
+#else
+  EarpieceShield *shield_ptr = NULL;
+#endif
 
 
 // ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -55,13 +63,13 @@ int activeAudioPathIndex = -1;  //which audio path is active (counting from zero
 void createMyAudioPathObjects(AudioSettings_F32 &_audio_settings) {
   
   //Add Audio Path: Sine wave generator
-  allAudioPaths.push_back(new AudioPath_Sine(audio_settings));  
+  allAudioPaths.push_back(new AudioPath_Sine(audio_settings, tympan_ptr, shield_ptr));  
 
   //Add Audio Path: Audio pass-thru with gain
-  allAudioPaths.push_back(new AudioPath_PassThruGain(audio_settings));
+  allAudioPaths.push_back(new AudioPath_PassThruGain(audio_settings, tympan_ptr, shield_ptr));
 
   //Add Audio Path: Add yours here!
-  //allAudioPaths.push_back(new myAudioPathClassName(audio_settings)); 
+  //allAudioPaths.push_back(new myAudioPathClassName(audio_settings, tympan_ptr, shield_ptr)); 
 }
 
 

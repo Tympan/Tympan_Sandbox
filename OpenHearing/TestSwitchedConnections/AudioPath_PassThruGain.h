@@ -12,11 +12,11 @@
 // ////////////////////////////////////////////////////////////////////////////
 
 
-// Here is another version of an AudioPath.  This one takes the audio input (in stereo) and applies gain.
+// Here is another version of an AudioPath_Base.  This one takes the audio input (all four channels) and applies gain.
 class AudioPath_PassThruGain : public AudioPath_Base {
   public:
     //Constructor
-    AudioPath_PassThruGain(AudioSettings_F32 &_audio_settings) : AudioPath_Base(_audio_settings) 
+    AudioPath_PassThruGain(AudioSettings_F32 &_audio_settings, Tympan *_tympan_ptr, EarpieceShield *_shield_ptr)  : AudioPath_Base(_audio_settings, _tympan_ptr, _shield_ptr) 
     {
       //instantiate audio classes...we're only storing them in a vector so that it's easier to destroy them later (whenver destruction is allowed by AudioStream)
       for (int i=0; i<4; i++) {
@@ -26,6 +26,9 @@ class AudioPath_PassThruGain : public AudioPath_Base {
      
       //setup the parameters of the audio processing
       setupAudioProcessing();
+
+      //initialize to being inactive
+      setActive(false);  //setActive is in AudioPath_Base
 
       //choose a human-readable name for this audio path
       name = "Audio Pass-Thru";  //"name" is defined as a String in AudioPath_Base
@@ -64,6 +67,28 @@ class AudioPath_PassThruGain : public AudioPath_Base {
       for (int i=0; i < (int)allGains.size(); i++) allGains[i]->setGain_dB(10.0);
     }
 
+    //setup the hardware.  This is called automatically by AudioPath_Base::setActive(flag_active) whenever flag_active = true
+    virtual void setupHardware(void) {
+      if (tympan_ptr != NULL) {
+        tympan_ptr->enableDigitalMicInputs(false);          //switch to analog inputs 
+        tympan_ptr->inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); //Choose the desired input (on-board mics)
+        tympan_ptr->setInputGain_dB(adc_gain_dB);           //set input gain, 0-47.5dB in 0.5dB setps
+        tympan_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB); //set the DAC gain.  left and right
+        tympan_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right       
+        tympan_ptr->unmuteDAC();
+        tympan_ptr->unmuteHeadphone();
+      }
+      if (shield_ptr != NULL) {
+        shield_ptr->enableDigitalMicInputs(false);            //switch to analog inputs 
+        shield_ptr->inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); //Choose the desired input  (no on-board mics, so use pink input jack as line ine)
+        shield_ptr->setInputGain_dB(adc_gain_dB);             //set input gain, 0-47.5dB in 0.5dB setps
+        shield_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB);   //set the DAC gain.  left and right
+        shield_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right                    
+        shield_ptr->unmuteDAC();
+        shield_ptr->unmuteHeadphone();                   
+      }
+    }
+
     virtual int serviceMainLoop(void) {
       unsigned long int cur_millis = millis();
       unsigned long int targ_time_millis = lastChange_millis+update_period_millis;
@@ -76,10 +101,15 @@ class AudioPath_PassThruGain : public AudioPath_Base {
       return 0;
     }
 
-    protected:
-      std::vector<AudioEffectGain_F32 *> allGains;  //if you use the audioObjects vector from AudioPathBase, any allocation to this pointer will get automatically deleted  
-      unsigned long int       lastChange_millis = 0UL;
-      const unsigned long int update_period_millis = 1000UL; //here's how often (milliseconds) we allow our main-loop update to execute
+  protected:
+    std::vector<AudioEffectGain_F32 *> allGains;  //if you use the audioObjects vector from AudioPathBase, any allocation to this pointer will get automatically deleted  
+    unsigned long int       lastChange_millis = 0UL;
+    const unsigned long int update_period_millis = 1000UL; //here's how often (milliseconds) we allow our main-loop update to execute
+
+    //settings for the audio hardware
+    float adc_gain_dB = 0.0;            //set input gain, 0-47.5dB in 0.5dB setps
+    float dac_gain_dB = 0.0;            //set the DAC gain: -63.6 dB to +24 dB in 0.5dB steps.  
+    float headphone_amp_gain_dB = 0.0;  //set the headphone gain: -6 to +14 dB (I think)
 };
 
 
