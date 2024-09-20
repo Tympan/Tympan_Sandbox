@@ -70,6 +70,7 @@ class AudioPath_PassThruGain_Analog : public AudioPath_Base {
     //setup the hardware.  This is called automatically by AudioPath_Base::setActive(flag_active) whenever flag_active = true
     virtual void setupHardware(void) {
       if (tympan_ptr != NULL) {
+        tympan_ptr->muteDAC();
         tympan_ptr->enableDigitalMicInputs(false);          //switch to analog inputs 
         tympan_ptr->inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); //Choose the desired input (on-board mics)
         tympan_ptr->setInputGain_dB(adc_gain_dB);           //set input gain, 0-47.5dB in 0.5dB setps
@@ -79,6 +80,7 @@ class AudioPath_PassThruGain_Analog : public AudioPath_Base {
         tympan_ptr->unmuteHeadphone();
       }
       if (shield_ptr != NULL) {
+        shield_ptr->muteDAC();   
         shield_ptr->enableDigitalMicInputs(false);            //switch to analog inputs 
         shield_ptr->inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); //Choose the desired input  (no on-board mics, so use pink input jack as line ine)
         shield_ptr->setInputGain_dB(adc_gain_dB);             //set input gain, 0-47.5dB in 0.5dB setps
@@ -93,7 +95,8 @@ class AudioPath_PassThruGain_Analog : public AudioPath_Base {
       unsigned long int cur_millis = millis();
       unsigned long int targ_time_millis = lastChange_millis+update_period_millis;
       if ((cur_millis < lastChange_millis) || (cur_millis > targ_time_millis)) { //also catches wrap-around of millis()
-        Serial.print("AudioPath_PassThruGain: serviceMainLoop: Gains (dB) = ");
+        Serial.print(name);
+        Serial.print(": serviceMainLoop: Gains (dB) = ");
         for (int i=0; i < (int)allGains.size(); i++) { Serial.print(allGains[i]->getGain_dB(),1);  Serial.print(", ");  }
         Serial.println();
         lastChange_millis = cur_millis;

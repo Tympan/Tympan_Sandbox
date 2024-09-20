@@ -64,6 +64,7 @@ class AudioPath_Sine : public AudioPath_Base {
     //setup the hardware.  This is called automatically by AudioPath_Base::setActive(flag_active) whenever flag_active = true
     virtual void setupHardware(void) {
       if (tympan_ptr != NULL) {
+        tympan_ptr->muteDAC();
         //tympan_ptr->inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); //Choose the desired input and set volume levels (on-board mics)
         //tympan_ptr->setInputGain_dB(input_gain_dB);       //set input volume, 0-47.5dB in 0.5dB setps
         tympan_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB); //set the DAC gain.  left and right
@@ -72,6 +73,7 @@ class AudioPath_Sine : public AudioPath_Base {
         tympan_ptr->unmuteHeadphone();
       }
       if (shield_ptr != NULL) {
+        shield_ptr->muteDAC();
         //shield_ptr->inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); //Choose the desired input and set volume levels (on-board mics)
         //shield_ptr->setInputGain_dB(input_gain_dB);       //set input volume, 0-47.5dB in 0.5dB setps
         shield_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB);   //set the DAC gain.  left and right
