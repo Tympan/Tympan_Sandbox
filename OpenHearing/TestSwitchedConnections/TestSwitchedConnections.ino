@@ -178,12 +178,15 @@ SerialManager serialManager;
 const float input_gain_dB = 5.0f; //gain on the microphone
 void setup() {
   //begin the serial comms (for debugging)
+  while (!Serial && (millis() < 2000UL)) {
+    delay(1); //stall;
+  }
   Serial.println("TestSwitchedConnections: Starting setup()...");
 
   //Create all the audio objects and connections
   createAllAudioObjects(audio_settings);  //instantiates all of the audio objects and paths (in the best order for lowest latency)
   connectAllAudioObjects();               //connect all of the audio and audiopath objects
-  activateOneAudioPath(0);                //de-activate all the audiopaths and then activate just the first audio path
+  deactivateAllAudioPaths();             //de-activate all the audiopaths (they're probably already de-activated from their own constructors, but this makes sure)
 
   //allocate the audio memory
   AudioMemory_F32(100,audio_settings); //allocate memory
@@ -200,6 +203,9 @@ void setup() {
     earpieceShield.setInputGain_dB(input_gain_dB);           //set input volume, 0-47.5dB in 0.5dB setps
     earpieceShield.volume_dB(0);                             //set volume of headphone amplifier.  -63.6 to +24 dB in 0.5dB steps.
   #endif
+
+  //Activate just the audio path that we want to start with (this function first de-activates all audio paths)
+  if (1) activateOneAudioPath(1-1);                //must be after the Tympan and Earpiece shield are enabled or else the setupHardware() method within won't work.
 
   //End of setup
   Serial.println("Setup complete.");

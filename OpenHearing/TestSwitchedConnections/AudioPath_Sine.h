@@ -19,8 +19,8 @@ class AudioPath_Sine : public AudioPath_Base {
     AudioPath_Sine(AudioSettings_F32 &_audio_settings, Tympan *_tympan_ptr, EarpieceShield *_shield_ptr)  : AudioPath_Base(_audio_settings, _tympan_ptr, _shield_ptr) 
     {
       //instantiate audio classes...we're only storing them in a vector so that it's easier to destroy them later (whenver destruction is allowed by AudioStream)
-      audioObjects.push_back( sineWave = new AudioSynthWaveform_F32( _audio_settings ) );
-      audioObjects.push_back( gainSine = new AudioEffectGain_F32 ( _audio_settings ) );
+      audioObjects.push_back( sineWave = new AudioSynthWaveform_F32( _audio_settings ) ); sineWave->instanceName = String("Sine Wave");  //give a human readable name to help Chip's debugging of startup issues
+      audioObjects.push_back( gainSine = new AudioEffectGain_F32 ( _audio_settings ) ); gainSine->instanceName = String("Gain");   //give a human readable name to help Chip's debugging of startup issues
       
       // Make all audio connections, except the final one to the destiation...we're only storing them in a vector so that it's easier to destroy them later
       patchCords.push_back( new AudioConnection_F32(*sineWave, 0, *gainSine, 0)); //sine wave to gain module
@@ -64,22 +64,24 @@ class AudioPath_Sine : public AudioPath_Base {
     //setup the hardware.  This is called automatically by AudioPath_Base::setActive(flag_active) whenever flag_active = true
     virtual void setupHardware(void) {
       if (tympan_ptr != NULL) {
+        tympan_ptr->muteHeadphone();
         tympan_ptr->muteDAC();
         //tympan_ptr->inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); //Choose the desired input and set volume levels (on-board mics)
         //tympan_ptr->setInputGain_dB(input_gain_dB);       //set input volume, 0-47.5dB in 0.5dB setps
         tympan_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB); //set the DAC gain.  left and right
-        //tympan_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right       
+        tympan_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right     
         tympan_ptr->unmuteDAC();
-        //tympan_ptr->unmuteHeadphone();
+        tympan_ptr->unmuteHeadphone();
       }
       if (shield_ptr != NULL) {
+        shield_ptr->muteHeadphone();
         shield_ptr->muteDAC();
         //shield_ptr->inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); //Choose the desired input and set volume levels (on-board mics)
         //shield_ptr->setInputGain_dB(input_gain_dB);       //set input volume, 0-47.5dB in 0.5dB setps
         shield_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB);   //set the DAC gain.  left and right
-        //shield_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right                    
+        shield_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right      
         shield_ptr->unmuteDAC();
-        //shield_ptr->unmuteHeadphone();                     
+        shield_ptr->unmuteHeadphone();                     
       }
     }
 

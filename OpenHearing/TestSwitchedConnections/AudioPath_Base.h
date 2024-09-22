@@ -48,8 +48,12 @@ class AudioPath_Base {
     //Per the rules of AudioStream::update_all(), active = false should mean that the audio object
     //is not invoked, thereby saving CPU.
     virtual bool setActive(bool _active) {
-      if (_active == true) setupHardware();
-      for (auto & audioObject : audioObjects) { audioObject->setActive(_active); } //iterate over each audio object and set whether it is active. (setting to zero reduces CPU)
+      if (_active == true) setupHardware();  //calling this instance's setupHardware()
+      
+      for (auto & audioObject : audioObjects) { //iterate over each audio object 
+        //Serial.println("AudioPath_Base: setActive(" + String(_active) + "): calling setActive() for object " + audioObject->instanceName);
+        audioObject->setActive(_active);   // set whether it is active. (setting to False disables the algorithms and reduces CPU)
+      } 
       return _active;
     }
     virtual void setupHardware(void) {}  //override this as desired in your derived class

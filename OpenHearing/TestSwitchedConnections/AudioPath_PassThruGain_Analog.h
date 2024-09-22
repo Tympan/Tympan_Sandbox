@@ -20,7 +20,8 @@ class AudioPath_PassThruGain_Analog : public AudioPath_Base {
     {
       //instantiate audio classes...we're only storing them in a vector so that it's easier to destroy them later (whenver destruction is allowed by AudioStream)
       for (int i=0; i<4; i++) {
-        allGains.push_back( new AudioEffectGain_F32( _audio_settings ) );
+        allGains.push_back( new AudioEffectGain_F32( _audio_settings ) ); 
+        allGains[i]->instanceName = String("Gain" + String(i)); //give a human readable name to help Chip's debugging of startup issues
         audioObjects.push_back( allGains[i] );
       }
      
@@ -64,31 +65,29 @@ class AudioPath_PassThruGain_Analog : public AudioPath_Base {
 
     //setupAudioProcess: initialize all gain blocks to a certain gain value
     virtual void setupAudioProcessing(void) {
-      Serial.println("AudioPath_PassThruGain_Analog: setupAudioProcessing...");
+      //Serial.println("AudioPath_PassThruGain_Analog: setupAudioProcessing...");
       for (int i=0; i < (int)allGains.size(); i++) allGains[i]->setGain_dB(10.0);
     }
 
     //setup the hardware.  This is called automatically by AudioPath_Base::setActive(flag_active) whenever flag_active = true
     virtual void setupHardware(void) {
       if (tympan_ptr != NULL) {
-        tympan_ptr->muteDAC();
+        tympan_ptr->muteHeadphone(); tympan_ptr->muteDAC(); //try to silence the switching noise/pop...doesn't seem to work.
         tympan_ptr->enableDigitalMicInputs(false);          //switch to analog inputs 
         tympan_ptr->inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); //Choose the desired input (on-board mics)
         tympan_ptr->setInputGain_dB(adc_gain_dB);           //set input gain, 0-47.5dB in 0.5dB setps
-        tympan_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB); //set the DAC gain.  left and right
-        //tympan_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right       
-        tympan_ptr->unmuteDAC();
-        //tympan_ptr->unmuteHeadphone();
+        tympan_ptr->setDacGain_dB(dac_gain_dB, dac_gain_dB); //set the DAC gain.  left and right
+        tympan_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB, headphone_amp_gain_dB);  //set the headphone amp gain.  left and right       
+        tympan_ptr->unmuteDAC();  tympan_ptr->unmuteHeadphone();
       }
       if (shield_ptr != NULL) {
-        shield_ptr->muteDAC();   
+        shield_ptr->muteHeadphone(); shield_ptr->muteDAC(); //try to silence the switching noise/pop...doesn't seem to work. 
         shield_ptr->enableDigitalMicInputs(false);            //switch to analog inputs 
         shield_ptr->inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); //Choose the desired input  (no on-board mics, so use pink input jack as line ine)
         shield_ptr->setInputGain_dB(adc_gain_dB);             //set input gain, 0-47.5dB in 0.5dB setps
-        shield_ptr->setDacGain_dB(dac_gain_dB,dac_gain_dB);   //set the DAC gain.  left and right
-        //shield_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB,headphone_amp_gain_dB);  //set the headphone amp gain.  left and right                    
-        shield_ptr->unmuteDAC();
-        //shield_ptr->unmuteHeadphone();                   
+        shield_ptr->setDacGain_dB(dac_gain_dB, dac_gain_dB);   //set the DAC gain.  left and right
+        shield_ptr->setHeadphoneGain_dB(headphone_amp_gain_dB, headphone_amp_gain_dB);  //set the headphone amp gain.  left and right                    
+        shield_ptr->unmuteDAC();  shield_ptr->unmuteHeadphone();              
       }
     }
 
