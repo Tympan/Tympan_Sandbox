@@ -19,11 +19,17 @@ class AudioPath_PassThruGain_Analog : public AudioPath_Base {
     AudioPath_PassThruGain_Analog(AudioSettings_F32 &_audio_settings, Tympan *_tympan_ptr, EarpieceShield *_shield_ptr)  : AudioPath_Base(_audio_settings, _tympan_ptr, _shield_ptr) 
     {
       //instantiate audio classes...we're only storing them in a vector so that it's easier to destroy them later (whenver destruction is allowed by AudioStream)
-      for (int i=0; i<4; i++) {
+      audioObjects.push_back( startNode = new AudioSwitchMatrix4_F32( _audio_settings ) ); startNode->instanceName = String("Input Matrix"); //per AudioPath_Base, always have this first
+      for (int i=0; i  <4; i++) {
         allGains.push_back( new AudioEffectGain_F32( _audio_settings ) ); 
         allGains[i]->instanceName = String("Gain" + String(i)); //give a human readable name to help Chip's debugging of startup issues
         audioObjects.push_back( allGains[i] );
       }
+      audioObjects.push_back( endNode = new AudioSwitchMatrix4_F32( _audio_settings ) ); endNode->instanceName = String("Output Matrix"); //per AudioPath_Base, always have this last
+
+      //connect the audio classes
+      for (int I=0; I < (int)allGains.size(); I++)  patchCords.push_back( new AudioConnection_F32(*startNode,   I, *allGains[I], 0)); //connect inputs to the gain objects
+      for (int I=0; I < (int)allGains.size(); I++)  patchCords.push_back( new AudioConnection_F32(*allGains[I], 0, *endNode,     I)); //connect gain objects to the outputs
      
       //setup the parameters of the audio processing
       setupAudioProcessing();
@@ -37,31 +43,31 @@ class AudioPath_PassThruGain_Analog : public AudioPath_Base {
 
     //~AudioPath_PassThruGain();  //using destructor from AudioPath_Base, which destorys everything in audioObjects and in patchCords
 
-    //Connect the input of this AudioPath to the given source.
-    //For this AudioPath, the Nth input should be connected to the input of the Nth gain block
-    virtual int connectToSource(AudioStream_F32 *src, const int source_index, const int audio_path_input_index)
-    {
-      if (src != NULL) {
-         if (audio_path_input_index < (int)allGains.size()) {
-           patchCords.push_back( new AudioConnection_F32(*src, audio_path_input_index, *allGains[audio_path_input_index], 0) ); //arguments: source, output index of source, destination, output index of destination
-           return 0;
-         }
-      }
-      return -1;  
-    }
+    // //Connect the input of this AudioPath to the given source.
+    // //For this AudioPath, the Nth input should be connected to the input of the Nth gain block
+    // virtual int connectToSource(AudioStream_F32 *src, const int source_index, const int audio_path_input_index)
+    // {
+    //   if (src != NULL) {
+    //      if (audio_path_input_index < (int)allGains.size()) {
+    //        patchCords.push_back( new AudioConnection_F32(*src, audio_path_input_index, *allGains[audio_path_input_index], 0) ); //arguments: source, output index of source, destination, output index of destination
+    //        return 0;
+    //      }
+    //   }
+    //   return -1;  
+    // }
 
-    //Connct the output of this AudioPath to the given destiation.
-    //For this AudioPath, the Nth output should be connected to the output of the Nth gain block
-    virtual int connectToDestination(const int audio_path_output_index, AudioStream_F32 *dst, const int dest_index) 
-    {
-      if (dst != NULL) {
-        if (audio_path_output_index < (int)allGains.size()) {
-           patchCords.push_back( new AudioConnection_F32(*allGains[audio_path_output_index], 0, *dst, dest_index) ); //arguments: source, output index of source, destination, output index of destination
-           return 0;
-        }
-      }
-      return -1;    
-    }
+    // //Connct the output of this AudioPath to the given destiation.
+    // //For this AudioPath, the Nth output should be connected to the output of the Nth gain block
+    // virtual int connectToDestination(const int audio_path_output_index, AudioStream_F32 *dst, const int dest_index) 
+    // {
+    //   if (dst != NULL) {
+    //     if (audio_path_output_index < (int)allGains.size()) {
+    //        patchCords.push_back( new AudioConnection_F32(*allGains[audio_path_output_index], 0, *dst, dest_index) ); //arguments: source, output index of source, destination, output index of destination
+    //        return 0;
+    //     }
+    //   }
+    //   return -1;    
+    // }
 
     //setupAudioProcess: initialize all gain blocks to a certain gain value
     virtual void setupAudioProcessing(void) {

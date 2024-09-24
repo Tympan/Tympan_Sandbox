@@ -19,11 +19,12 @@ class AudioPath_Sine : public AudioPath_Base {
     AudioPath_Sine(AudioSettings_F32 &_audio_settings, Tympan *_tympan_ptr, EarpieceShield *_shield_ptr)  : AudioPath_Base(_audio_settings, _tympan_ptr, _shield_ptr) 
     {
       //instantiate audio classes...we're only storing them in a vector so that it's easier to destroy them later (whenver destruction is allowed by AudioStream)
+      audioObjects.push_back( startNode = new AudioSwitchMatrix4_F32( _audio_settings ) ); startNode->instanceName = String("Input Matrix"); //per AudioPath_Base, always have this first
       audioObjects.push_back( sineWave = new AudioSynthWaveform_F32( _audio_settings ) ); sineWave->instanceName = String("Sine Wave");  //give a human readable name to help Chip's debugging of startup issues
-      audioObjects.push_back( gainSine = new AudioEffectGain_F32 ( _audio_settings ) ); gainSine->instanceName = String("Gain");   //give a human readable name to help Chip's debugging of startup issues
+      audioObjects.push_back( endNode = new AudioSwitchMatrix4_F32( _audio_settings ) ); endNode->instanceName = String("Output Matrix"); //per AudioPath_Base, always have this last
       
       // Make all audio connections, except the final one to the destiation...we're only storing them in a vector so that it's easier to destroy them later
-      patchCords.push_back( new AudioConnection_F32(*sineWave, 0, *gainSine, 0)); //sine wave to gain module
+      for (int Ioutput=0; Ioutput < 4; Ioutput++)  patchCords.push_back( new AudioConnection_F32(*sineWave, 0, *endNode, Ioutput)); //same sine to all outputs
 
       //setup the parameters of the audio processing
       setupAudioProcessing(); 
@@ -37,27 +38,26 @@ class AudioPath_Sine : public AudioPath_Base {
 
     //~AudioPath_Sine();  //using destructor from AudioPath_Base, which destorys everything in audioObjects and in patchCords
 
-    //Connct the input of this AudioPath to the given source.
-    //This AudioPath just creates a sine tone, so no inputs are needed or used
-    virtual int connectToSource(AudioStream_F32 *src, const int source_index, const int audio_path_input_index)   {  return 0;  }
+    // //Connct the input of this AudioPath to the given source.
+    // //This AudioPath just creates a sine tone, so no inputs are needed or used
+    // virtual int connectToSource(AudioStream_F32 *src, const int source_index, const int audio_path_input_index)   {  return 0;  }
 
-    //Connect the output of this AudioPath to the given destiation.
-    //For this AudioPath, all outputs should come from our single sine generator
-    virtual int connectToDestination(const int audio_path_output_index, AudioStream_F32 *dst, const int dest_index) 
-    {
-      if (dst != NULL) {
-         patchCords.push_back( new AudioConnection_F32(*gainSine, 0, *dst, dest_index) ); //arguments: source, output index of source, destination, output index of destination
-         return 0;
-      }
-      return -1;    
-    }
+    // //Connect the output of this AudioPath to the given destiation.
+    // //For this AudioPath, all outputs should come from our single sine generator
+    // virtual int connectToDestination(const int audio_path_output_index, AudioStream_F32 *dst, const int dest_index) 
+    // {
+    //   if (dst != NULL) {
+    //      patchCords.push_back( new AudioConnection_F32(*gainSine, 0, *dst, dest_index) ); //arguments: source, output index of source, destination, output index of destination
+    //      return 0;
+    //   }
+    //   return -1;    
+    // }
 
     //setupAudioProcess: initialize the sine wave to the desired frequency and amplitude
     virtual void setupAudioProcessing(void) {
       setFrequency_Hz(freq_Hz);
       setAmplitude(sine_amplitude);
       tone_active = true;
-      gainSine->setGain_dB(0.0); //set to no gain for now
       lastChange_millis = millis();
     }
 
@@ -147,16 +147,18 @@ class AudioPath_Sine : public AudioPath_Base {
     }
 
   protected:
+    //data members for generating the sine wave
     AudioSynthWaveform_F32  *sineWave;  //if you use the audioObjects vector from AudioPathBase, any allocation to this pointer will get automatically deleted
-    AudioEffectGain_F32     *gainSine;      //if you use the audioObjects vector from AudioPathBase, any allocation to this pointer will get automatically deleted
     float                   freq_Hz = 1000.0f;
     float                   sine_amplitude = sqrtf(pow10f(0.1*-50.0));
-    unsigned long int       lastChange_millis = 0UL;
     const unsigned long int tone_dur_millis = 1000UL;
     const unsigned long int silence_dur_millis = 1000UL;
     bool                    tone_active = false;
 
-    //settings for the audio hardware
+    //data members for tracking last change in the sine wave amplitude
+    unsigned long int       lastChange_millis = 0UL;
+
+    //data members for the audio hardware
     //float adc_gain_dB = 0.0;            //set input gain, 0-47.5dB in 0.5dB setps
     float dac_gain_dB = 0.0;            //set the DAC gain: -63.6 dB to +24 dB in 0.5dB steps.  
     float headphone_amp_gain_dB = 0.0;  //set the headphone gain: -6 to +14 dB (I think)

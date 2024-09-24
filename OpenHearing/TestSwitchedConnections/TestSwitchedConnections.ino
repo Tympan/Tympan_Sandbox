@@ -37,7 +37,7 @@ Tympan                     myTympan(TympanRev::E, audio_settings);   //do Tympan
 //create other audio-related items
 std::vector<AudioMixer8_F32 *> allOutputMixers;         //fill it later
 std::vector<AudioPath_Base *> allAudioPaths;            //fill it later
-std::vector<AudioConnection_F32 *> otherPatchCords;     //fill it later
+std::vector<AudioConnection_F32 *> patchCords;     //fill it later
 int activeAudioPathIndex = -1;  //which audio path is active (counting from zero)
 
 //create items to help AudioPaths control the hardware
@@ -59,21 +59,25 @@ Tympan *tympan_ptr = &myTympan;
 #include "AudioPath_Sine.h"
 #include "AudioPath_PassThruGain_Analog.h"
 #include "AudioPath_PassThruGain_PDM.h"
+//include "AudioPath_Sine_wFFT.h"
 
 // Create your AudioPath
 void createMyAudioPathObjects(AudioSettings_F32 &_audio_settings) {
   
   //Add Audio Path: Sine wave generator
-  allAudioPaths.push_back(new AudioPath_Sine(audio_settings, tympan_ptr, shield_ptr));  
+  allAudioPaths.push_back( new AudioPath_Sine(audio_settings, tympan_ptr, shield_ptr) );  
 
   //Add Audio Path: Audio pass-thru with gain (analog)
-  allAudioPaths.push_back(new AudioPath_PassThruGain_Analog(audio_settings, tympan_ptr, shield_ptr));
+  allAudioPaths.push_back( new AudioPath_PassThruGain_Analog(audio_settings, tympan_ptr, shield_ptr) );
 
   //Add Audio Path: Audio pass-thru with gain (PDM mics)
-  allAudioPaths.push_back(new AudioPath_PassThruGain_PDM(audio_settings, tympan_ptr, shield_ptr));
+  allAudioPaths.push_back( new AudioPath_PassThruGain_PDM(audio_settings, tympan_ptr, shield_ptr) );
+
+  // //Add Audio Path: Sine wave generator with FFT analysis of the input
+  // allAudioPaths.push_back( new AudioPath_Sine_wFFT(audio_settings, tympan_ptr, shield_ptr) );
 
   //Add Audio Path: Add yours here!
-  //allAudioPaths.push_back(new myAudioPathClassName(audio_settings, tympan_ptr, shield_ptr)); 
+  //allAudioPaths.push_back( new myAudioPathClassName(audio_settings, tympan_ptr, shield_ptr) ); 
 }
 
 
@@ -111,13 +115,13 @@ void connectAllAudioObjects(void) {
   //Connect each AudioPath to the inputs
   for (int Ipath=0; Ipath < (int)allAudioPaths.size(); Ipath++) {  //loop over each AudioPath
     #if USE_FOUR_CHANNELS
-      allAudioPaths[Ipath]->connectToSource(audioInput, EarpieceShield::PDM_LEFT_FRONT,  0); //connect tympan/earpieceshield input X to path input 0 
-      allAudioPaths[Ipath]->connectToSource(audioInput, EarpieceShield::PDM_LEFT_REAR,   1); //connect tympan/earpieceshield input X to path input 1
-      allAudioPaths[Ipath]->connectToSource(audioInput, EarpieceShield::PDM_RIGHT_FRONT, 2); //connect tympan/earpieceshield input X to path input 2
-      allAudioPaths[Ipath]->connectToSource(audioInput, EarpieceShield::PDM_RIGHT_REAR,  3); //connect tympan/earpieceshield input X to path input 3
+      patchCords.push_back( new AudioConnection_F32(*audioInput, EarpieceShield::PDM_LEFT_FRONT,  *allAudioPaths[Ipath]->getStartNode(), 0) );
+      patchCords.push_back( new AudioConnection_F32(*audioInput, EarpieceShield::PDM_LEFT_REAR,   *allAudioPaths[Ipath]->getStartNode(), 1) );
+      patchCords.push_back( new AudioConnection_F32(*audioInput, EarpieceShield::PDM_RIGHT_FRONT, *allAudioPaths[Ipath]->getStartNode(), 2) );
+      patchCords.push_back( new AudioConnection_F32(*audioInput, EarpieceShield::PDM_RIGHT_REAR,  *allAudioPaths[Ipath]->getStartNode(), 3) );
     #else
-      allAudioPaths[Ipath]->connectToSource(audioInput, 0,  0); //connect Tympan input 0 to path input 0
-      allAudioPaths[Ipath]->connectToSource(audioInput, 1,  1); //connect Tympan input 1 to path input 0
+      patchCords.push_back( new AudioConnection_F32(*audioInput, 0,  *allAudioPaths[Ipath]->getStartNode(), 0) );
+      patchCords.push_back( new AudioConnection_F32(*audioInput, 1,  *allAudioPaths[Ipath]->getStartNode(), 1) );
     #endif
   }
 
@@ -126,19 +130,19 @@ void connectAllAudioObjects(void) {
     for (int Ipath=0; Ipath < (int)allAudioPaths.size(); Ipath++) {  //loop over each AudioPath
       int path_output_channel = Imixer;  //make it clearer what we're doing
       int mixer_input_chanenl = Ipath;   //make it clearer what we're doing
-      allAudioPaths[Ipath]->connectToDestination(path_output_channel, allOutputMixers[Imixer], mixer_input_chanenl); 
+      patchCords.push_back( new AudioConnection_F32(*allAudioPaths[Ipath]->getEndNode(), path_output_channel, *allOutputMixers[Imixer], mixer_input_chanenl) );
     }
   }
   
   //Connect the output mixers to the outputs
   #if USE_FOUR_CHANNELS
-    otherPatchCords.push_back( new AudioConnection_F32(*allOutputMixers[0], 0, *audioOutput, EarpieceShield::OUTPUT_LEFT_TYMPAN) );    //connect left0 mixer to output (needs actual references, not pointers)
-    otherPatchCords.push_back( new AudioConnection_F32(*allOutputMixers[1], 0, *audioOutput, EarpieceShield::OUTPUT_RIGHT_TYMPAN) );   //connect right0 mixer to output (needs actual references, not pointers)
-    otherPatchCords.push_back( new AudioConnection_F32(*allOutputMixers[2], 0, *audioOutput, EarpieceShield::OUTPUT_LEFT_EARPIECE) );  //connect left1 mixer to output (needs actual references, not pointers)
-    otherPatchCords.push_back( new AudioConnection_F32(*allOutputMixers[3], 0, *audioOutput, EarpieceShield::OUTPUT_RIGHT_EARPIECE) ); //connect right1 mixer to output (needs actual references, not pointers)
+    patchCords.push_back( new AudioConnection_F32(*allOutputMixers[0], 0, *audioOutput, EarpieceShield::OUTPUT_LEFT_TYMPAN) );    //connect left0 mixer to output (needs actual references, not pointers)
+    patchCords.push_back( new AudioConnection_F32(*allOutputMixers[1], 0, *audioOutput, EarpieceShield::OUTPUT_RIGHT_TYMPAN) );   //connect right0 mixer to output (needs actual references, not pointers)
+    patchCords.push_back( new AudioConnection_F32(*allOutputMixers[2], 0, *audioOutput, EarpieceShield::OUTPUT_LEFT_EARPIECE) );  //connect left1 mixer to output (needs actual references, not pointers)
+    patchCords.push_back( new AudioConnection_F32(*allOutputMixers[3], 0, *audioOutput, EarpieceShield::OUTPUT_RIGHT_EARPIECE) ); //connect right1 mixer to output (needs actual references, not pointers)
   #else
-    otherPatchCords.push_back( new AudioConnection_F32(*allOutputMixers[0], 0, *audioOutput, 0) ); //connect left0 mixer to output (needs actual references, not pointers)
-    otherPatchCords.push_back( new AudioConnection_F32(*allOutputMixers[1], 0, *audioOutput, 1) ); //connect right0 mixer to output (needs actual references, not pointers)
+    patchCords.push_back( new AudioConnection_F32(*allOutputMixers[0], 0, *audioOutput, 0) ); //connect left0 mixer to output (needs actual references, not pointers)
+    patchCords.push_back( new AudioConnection_F32(*allOutputMixers[1], 0, *audioOutput, 1) ); //connect right0 mixer to output (needs actual references, not pointers)
   #endif
 }
 
