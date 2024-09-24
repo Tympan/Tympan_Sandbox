@@ -43,33 +43,7 @@ class AudioPath_PassThruGain_Analog : public AudioPath_Base {
 
     //~AudioPath_PassThruGain();  //using destructor from AudioPath_Base, which destorys everything in audioObjects and in patchCords
 
-    // //Connect the input of this AudioPath to the given source.
-    // //For this AudioPath, the Nth input should be connected to the input of the Nth gain block
-    // virtual int connectToSource(AudioStream_F32 *src, const int source_index, const int audio_path_input_index)
-    // {
-    //   if (src != NULL) {
-    //      if (audio_path_input_index < (int)allGains.size()) {
-    //        patchCords.push_back( new AudioConnection_F32(*src, audio_path_input_index, *allGains[audio_path_input_index], 0) ); //arguments: source, output index of source, destination, output index of destination
-    //        return 0;
-    //      }
-    //   }
-    //   return -1;  
-    // }
-
-    // //Connct the output of this AudioPath to the given destiation.
-    // //For this AudioPath, the Nth output should be connected to the output of the Nth gain block
-    // virtual int connectToDestination(const int audio_path_output_index, AudioStream_F32 *dst, const int dest_index) 
-    // {
-    //   if (dst != NULL) {
-    //     if (audio_path_output_index < (int)allGains.size()) {
-    //        patchCords.push_back( new AudioConnection_F32(*allGains[audio_path_output_index], 0, *dst, dest_index) ); //arguments: source, output index of source, destination, output index of destination
-    //        return 0;
-    //     }
-    //   }
-    //   return -1;    
-    // }
-
-    //setupAudioProcess: initialize all gain blocks to a certain gain value
+     //setupAudioProcess: initialize all gain blocks to a certain gain value
     virtual void setupAudioProcessing(void) {
       //Serial.println("AudioPath_PassThruGain_Analog: setupAudioProcessing...");
       for (int i=0; i < (int)allGains.size(); i++) allGains[i]->setGain_dB(10.0);

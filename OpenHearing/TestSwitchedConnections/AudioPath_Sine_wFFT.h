@@ -68,30 +68,7 @@ class AudioPath_Sine_wFFT : public AudioPath_Base {
       }
     }
 
-    //Connect the input of this AudioPath to the given source.
-    //For this AudioPath, the Nth input should be connected to the input of the Nth record queue
-    virtual int connectToSource(AudioStream_F32 *src, const int source_index, const int audio_path_input_index)
-    {
-      if (src != NULL) {
-         if (audio_path_input_index < (int)allQueues.size()) {
-           patchCords.push_back( new AudioConnection_F32(*src, audio_path_input_index, *allQueues[audio_path_input_index], 0) ); //arguments: source, output index of source, destination, output index of destination
-           return 0;
-         }
-      }
-      return -1;  
-    }
-
-    //Connect the output of this AudioPath to the given destiation.
-    //For this AudioPath, all outputs should come from our single sine generator
-    virtual int connectToDestination(const int audio_path_output_index, AudioStream_F32 *dst, const int dest_index) 
-    {
-      if (dst != NULL) {
-         patchCords.push_back( new AudioConnection_F32(*sineWave1, 0, *dst, dest_index) ); //arguments: source, output index of source, destination, output index of destination
-         return 0;
-      }
-      return -1;    
-    }
-
+    
     //setupAudioProcess: initialize the sine wave to the desired frequency and amplitude
     virtual void setupAudioProcessing(void) {
       setFrequency_Hz(freq1_Hz);

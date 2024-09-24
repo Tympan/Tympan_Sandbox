@@ -42,12 +42,6 @@ class AudioPath_Base {
     virtual AudioSwitchMatrix4_F32* getStartNode(void) { if (startNode == NULL) Serial.println("AudioPath_Base (" + name + "): getStartNode: *** WARNING ***: Returning NULL pointer."); return startNode; }
     virtual AudioSwitchMatrix4_F32* getEndNode(void)   { if (endNode == NULL)   Serial.println("AudioPath_Base (" + name + "): getEndNode: *** WARNING ***: Returning NULL pointer.");   return endNode;   }
 
-    // //connect this AudioPath to the given source object...must be implemented yourself!
-    // virtual int connectToSource(AudioStream_F32 *src, const int source_index, const int audio_path_input_index) = 0;
-
-    // //connect this AudioPath to the given destination object...must be implemented yourself!
-    // virtual int connectToDestination(const int audio_path_output_index, AudioStream_F32 *dst, const int dest_index) = 0;
-
     //Loop through each audio object and set them all to the desired state of active or inactive.
     //Per the rules of AudioStream::update_all(), active = false should mean that the audio object
     //is not invoked, thereby saving CPU.

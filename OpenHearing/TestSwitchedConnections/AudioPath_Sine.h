@@ -38,21 +38,6 @@ class AudioPath_Sine : public AudioPath_Base {
 
     //~AudioPath_Sine();  //using destructor from AudioPath_Base, which destorys everything in audioObjects and in patchCords
 
-    // //Connct the input of this AudioPath to the given source.
-    // //This AudioPath just creates a sine tone, so no inputs are needed or used
-    // virtual int connectToSource(AudioStream_F32 *src, const int source_index, const int audio_path_input_index)   {  return 0;  }
-
-    // //Connect the output of this AudioPath to the given destiation.
-    // //For this AudioPath, all outputs should come from our single sine generator
-    // virtual int connectToDestination(const int audio_path_output_index, AudioStream_F32 *dst, const int dest_index) 
-    // {
-    //   if (dst != NULL) {
-    //      patchCords.push_back( new AudioConnection_F32(*gainSine, 0, *dst, dest_index) ); //arguments: source, output index of source, destination, output index of destination
-    //      return 0;
-    //   }
-    //   return -1;    
-    // }
-
     //setupAudioProcess: initialize the sine wave to the desired frequency and amplitude
     virtual void setupAudioProcessing(void) {
       setFrequency_Hz(freq_Hz);
