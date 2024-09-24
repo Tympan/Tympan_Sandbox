@@ -38,7 +38,7 @@ class AudioPath_Base {
       for (int i=(int)audioObjects.size()-1; i>=0; i--) delete audioObjects[i];       //destroy all the audio class instances (in reverse order...maybe less memroy fragmentation?)
     }
 
-    //get the starting and ending nodes to enable audio connections
+    //expose the starting and ending nodes to enable audio connections between this AudioPath and the rest of the world
     virtual AudioSwitchMatrix4_F32* getStartNode(void) { if (startNode == NULL) Serial.println("AudioPath_Base (" + name + "): getStartNode: *** WARNING ***: Returning NULL pointer."); return startNode; }
     virtual AudioSwitchMatrix4_F32* getEndNode(void)   { if (endNode == NULL)   Serial.println("AudioPath_Base (" + name + "): getEndNode: *** WARNING ***: Returning NULL pointer.");   return endNode;   }
 
@@ -48,7 +48,7 @@ class AudioPath_Base {
     virtual bool setActive(bool _active) {
       if (_active == true) setupHardware();  //calling this instance's setupHardware()
       
-      for (auto & audioObject : audioObjects) { //iterate over each audio object 
+      for (auto & audioObject : audioObjects) { //iterate over each audio object in the audioObjects vector
         //Serial.println("AudioPath_Base: setActive(" + String(_active) + "): calling setActive() for object " + audioObject->instanceName);
         audioObject->setActive(_active);   // set whether it is active. (setting to False disables the algorithms and reduces CPU)
       } 
@@ -64,6 +64,7 @@ class AudioPath_Base {
     virtual void respondToByte(char c) { };                           //default do nothing
 
     String name = "(unnamed)";   //human-readable name for your audio path.  You should override this in the constructor (or wherever) of your derived class.
+
   protected:
     AudioSwitchMatrix4_F32 *startNode = NULL; //instantiate as the first audio class in your AudioPath (even if you have no inputs)
     AudioSwitchMatrix4_F32 *endNode = NULL;   //instantiate as the last audio class in your AudioPath (even if you have no outputs)

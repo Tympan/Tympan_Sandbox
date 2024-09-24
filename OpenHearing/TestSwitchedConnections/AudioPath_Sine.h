@@ -19,9 +19,9 @@ class AudioPath_Sine : public AudioPath_Base {
     AudioPath_Sine(AudioSettings_F32 &_audio_settings, Tympan *_tympan_ptr, EarpieceShield *_shield_ptr)  : AudioPath_Base(_audio_settings, _tympan_ptr, _shield_ptr) 
     {
       //instantiate audio classes...we're only storing them in a vector so that it's easier to destroy them later (whenver destruction is allowed by AudioStream)
-      audioObjects.push_back( startNode = new AudioSwitchMatrix4_F32( _audio_settings ) ); startNode->instanceName = String("Input Matrix"); //per AudioPath_Base, always have this first
-      audioObjects.push_back( sineWave = new AudioSynthWaveform_F32( _audio_settings ) ); sineWave->instanceName = String("Sine Wave");  //give a human readable name to help Chip's debugging of startup issues
-      audioObjects.push_back( endNode = new AudioSwitchMatrix4_F32( _audio_settings ) ); endNode->instanceName = String("Output Matrix"); //per AudioPath_Base, always have this last
+      audioObjects.push_back( startNode = new AudioSwitchMatrix4_F32( _audio_settings ) ); startNode->instanceName = String("Input Matrix");  //per AudioPath_Base, always have this first
+      audioObjects.push_back( sineWave  = new AudioSynthWaveform_F32( _audio_settings ) ); sineWave->instanceName  = String("Sine Wave");     //give a human readable name to help Chip's debugging of startup issues
+      audioObjects.push_back( endNode   = new AudioSwitchMatrix4_F32( _audio_settings ) ); endNode->instanceName   = String("Output Matrix"); //per AudioPath_Base, always have this last
       
       // Make all audio connections, except the final one to the destiation...we're only storing them in a vector so that it's easier to destroy them later
       for (int Ioutput=0; Ioutput < 4; Ioutput++)  patchCords.push_back( new AudioConnection_F32(*sineWave, 0, *endNode, Ioutput)); //same sine to all outputs

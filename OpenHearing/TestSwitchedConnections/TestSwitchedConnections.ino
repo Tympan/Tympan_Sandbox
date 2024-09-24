@@ -59,7 +59,7 @@ Tympan *tympan_ptr = &myTympan;
 #include "AudioPath_Sine.h"
 #include "AudioPath_PassThruGain_Analog.h"
 #include "AudioPath_PassThruGain_PDM.h"
-//include "AudioPath_Sine_wFFT.h"
+#include "AudioPath_Sine_wFFT.h"
 
 // Create your AudioPath
 void createMyAudioPathObjects(AudioSettings_F32 &_audio_settings) {
@@ -73,8 +73,8 @@ void createMyAudioPathObjects(AudioSettings_F32 &_audio_settings) {
   //Add Audio Path: Audio pass-thru with gain (PDM mics)
   allAudioPaths.push_back( new AudioPath_PassThruGain_PDM(audio_settings, tympan_ptr, shield_ptr) );
 
-  // //Add Audio Path: Sine wave generator with FFT analysis of the input
-  // allAudioPaths.push_back( new AudioPath_Sine_wFFT(audio_settings, tympan_ptr, shield_ptr) );
+  //Add Audio Path: Sine wave generator with FFT analysis of the input
+  allAudioPaths.push_back( new AudioPath_Sine_wFFT(audio_settings, tympan_ptr, shield_ptr) );
 
   //Add Audio Path: Add yours here!
   //allAudioPaths.push_back( new myAudioPathClassName(audio_settings, tympan_ptr, shield_ptr) ); 
@@ -193,7 +193,7 @@ void setup() {
   deactivateAllAudioPaths();             //de-activate all the audiopaths (they're probably already de-activated from their own constructors, but this makes sure)
 
   //allocate the audio memory
-  AudioMemory_F32(100,audio_settings); //allocate memory
+  AudioMemory_F32(180,audio_settings); //allocate memory
 
   //configure the Tympan
   myTympan.enable();                               //Enable the Tympan to start the audio flowing!
