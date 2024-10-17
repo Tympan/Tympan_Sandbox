@@ -10,6 +10,7 @@
 extern Tympan myTympan;
 extern AudioSDWriter_F32_UI audioSDWriter;
 extern State myState;
+extern SDtoSerial SD_to_serial;
 
 
 //Extern Functions
@@ -42,6 +43,7 @@ class SerialManager : public SerialManagerBase  {  // see Tympan_Library for Ser
     void updateGUI_inputSelect(bool activeButtonsOnly = false);
 
     int gainIncrement_dB = 2.5;
+    int receiveFilename(String &filename,const unsigned long timeout_millis);
 
   private:
     TympanRemoteFormatter myGUI;  //Creates the GUI-writing class for interacting with TympanRemote App    
@@ -51,16 +53,23 @@ void SerialManager::printHelp(void) {
   Serial.println("SerialManager Help: Available Commands:");
   Serial.println(" General: No Prefix");
   Serial.println("   h    : Print this help");
-  Serial.println("   w/e/E: INPUT  : Switch to the PCB Mics, pink jacks, or digital mics");
+  Serial.println("   w/W/e/E: INPUT  : Switch to the PCB Mics / Pink Jack - Mic Bias / Pink Jack Line in / Digital mics");
   Serial.println("   k/K  : CHIRP  : Incr/decrease loudness of chirp (cur = " + String(myState.chirp_amp_dBFS,1) + " dBFS)");
   Serial.println("   d/D  : CHIRP  : Incr/decrease duration of chirp (cur = " + String(myState.chirp_dur_sec,1) + " sec)");
   Serial.println("   n    : CHIRP  : Start the chirp");
   Serial.println("   1-3  : SDPlay : Play files 1-3 from SD Card");
   Serial.println("   q    : SDPlay : Stop any currently plying SD files");
-  Serial.println("   b    : AutoWrite : Start chirp and SD recording together");
+  Serial.println("   c    : AutoWrite : Start chirp and SD recording together");
   Serial.println("   4-6  : AutoWrite : Start files 1-3 from SD Card and SD recording together");
   Serial.println("   g/G  : OUTPUT : Incr/decrease DAC loudness (cur = " + String(myState.output_gain_dB,1) + " dB)");
   Serial.println("   r/s  : SDWrite: Manually Start/Stop recording");
+  Serial.println("---------------------------------------------------");
+  Serial.println("   L    : List of the files on SD card");
+  Serial.println("   f    : Open the file from SD (will prompt you for filename)");
+  Serial.println("   b    : Get the size of the file in bytes");
+  Serial.println("   t    : Transfer the whole file from SD to Serial");
+
+  
   #if defined(USE_MTPDISK) || defined(USB_MTPDISK_SERIAL)  //detect whether "MTP Disk" or "Serial + MTP Disk" were selected in the Arduino IDEA
     Serial.println("   >    : SDUtil : Start MTP mode to read SD from PC");
   #endif
@@ -131,7 +140,7 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       Serial.println("Starting chirp...");
       startSignalWithDelay(0.0);  //no delay, start right away
       break;
-    case 'b':
+    case 'c':
       Serial.println("Received: start combination of chirp and SD recording...");
       if (myState.auto_sd_state != State::DISABLED) {
         Serial.println("   : ERROR : Already doing an auto-triggered SD recording.");
@@ -183,6 +192,37 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       Serial.println("Starting MTP service to access SD card (everything else will stop)");
       start_MTP();
       break;
+    case 'L':
+      Serial.print("Listing Files on SD:"); //don't include end-of-line
+      SD_to_serial.sendFilenames(','); //send file names seperated by commas
+      break;
+    case 'f':
+      {
+        Serial.println("SerialMonitor: Opening file: Send filename (ending with newline character) within 10 seconds");
+        String fname;  receiveFilename(fname, 10000);  //wait 10 seconds
+        if (SD_to_serial.open(fname)) {
+          Serial.println("SerialMonitor: " + fname + " successfully opened");
+        } else {
+          Serial.println("SerialMonitor: *** ERROR ***: " + fname + " could not be opened");
+        }
+      }
+      break;
+    case 'b':
+      if (SD_to_serial.isFileOpen()) {
+        SD_to_serial.sendFileSize();
+      } else {
+        Serial.println("SerialMonitor: *** ERROR ***: Cannot get file size because no file is open");
+      }
+      break;
+    case 't':
+      if (SD_to_serial.isFileOpen()) {
+        SD_to_serial.sendFile();
+        Serial.println();
+      } else {
+        Serial.println("SerialMonitor: *** ERROR ***: Cannot send file because no file is open");
+      }
+      break;
+
     default:
       ret_val = SerialManagerBase::processCharacter(c);  //in here, it automatically loops over the different UI elements
       break;
@@ -190,6 +230,15 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
   return ret_val;
 }
 
+
+int SerialManager::receiveFilename(String &filename,const unsigned long timeout_millis) {
+  Serial.setTimeout(timeout_millis);  //set timeout in milliseconds
+  filename.remove(0); //clear the string
+  filename += Serial.readStringUntil('\n');  //append the string
+  if (filename.length() == 0) filename += Serial.readStringUntil('\n');  //append the string
+  Serial.setTimeout(1000);  //return the timeout to the default
+  return 0;
+}
 
 
 // //////////////////////////////////  Methods for defining the GUI and transmitting it to the App

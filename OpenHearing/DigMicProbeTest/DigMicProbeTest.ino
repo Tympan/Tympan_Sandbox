@@ -29,9 +29,10 @@ AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 // /////////// Define audio objects...they are configured later
 
 // define classes to control the Tympan and the Earpiece shield
-Tympan           myTympan(TympanRev::F);                         //do TympanRev::D or TympanRev::E or TympanRev::F
+Tympan           myTympan(TympanRev::E);                         //do TympanRev::D or TympanRev::E or TympanRev::F
 EarpieceShield   earpieceShield(TympanRev::F, AICShieldRev::A);  //Note that EarpieceShield is defined in the Tympan_Libarary in AICShield.h 
 SdFs             sd;                                             //because we're doing both a player and recorder, explicitly create the signal SD resource
+SDtoSerial      SD_to_serial(&sd, &Serial);                     //transfers raw bytes of files on the sd over to Serial (part of Tympan Library)
 
 //create audio library objects for handling the audio
 AudioInputI2SQuad_F32      i2s_in(audio_settings);         //Bring audio in
