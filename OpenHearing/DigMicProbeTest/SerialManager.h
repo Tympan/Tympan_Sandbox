@@ -215,8 +215,9 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       }
       break;
     case 't':
+      SD_to_serial.setTransferBlockSize(8192);
       if (SD_to_serial.isFileOpen()) {
-        SD_to_serial.sendFile();
+        SD_to_serial.sendOneBlock();
         Serial.println();
       } else {
         Serial.println("SerialMonitor: *** ERROR ***: Cannot send file because no file is open");
