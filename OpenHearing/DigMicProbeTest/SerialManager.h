@@ -8,9 +8,9 @@
 
 //Extern variables from the main *.ino file
 extern Tympan myTympan;
+extern SdFileTransfer sdFileTransfer;
 extern AudioSDWriter_F32_UI audioSDWriter;
 extern State myState;
-extern SDtoSerial SD_to_serial;
 
 
 //Extern Functions
@@ -68,7 +68,8 @@ void SerialManager::printHelp(void) {
   Serial.println("   f    : Open the file from SD (will prompt you for filename)");
   Serial.println("   b    : Get the size of the file in bytes");
   Serial.println("   t    : Transfer the whole file from SD to Serial");
-
+  Serial.println("   u    : Manually transfer (1) block from SD to Serial");
+  //Serial.println("   T    : Transfer file from PC to Tympan SD via Serial");
   
   #if defined(USE_MTPDISK) || defined(USB_MTPDISK_SERIAL)  //detect whether "MTP Disk" or "Serial + MTP Disk" were selected in the Arduino IDEA
     Serial.println("   >    : SDUtil : Start MTP mode to read SD from PC");
@@ -82,8 +83,6 @@ void SerialManager::printHelp(void) {
   
   Serial.println();
 }
-
-
 
 
 //switch yard to determine the desired action
@@ -192,15 +191,17 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       Serial.println("Starting MTP service to access SD card (everything else will stop)");
       start_MTP();
       break;
+      
+    // Serial File Transfer
     case 'L':
       Serial.print("Listing Files on SD:"); //don't include end-of-line
-      SD_to_serial.sendFilenames(','); //send file names seperated by commas
+      sdFileTransfer.sendFilenames(','); //send file names seperated by commas
       break;
     case 'f':
       {
         Serial.println("SerialMonitor: Opening file: Send filename (ending with newline character) within 10 seconds");
         String fname;  receiveFilename(fname, 10000);  //wait 10 seconds
-        if (SD_to_serial.open(fname)) {
+        if (sdFileTransfer.openRead(fname)) {
           Serial.println("SerialMonitor: " + fname + " successfully opened");
         } else {
           Serial.println("SerialMonitor: *** ERROR ***: " + fname + " could not be opened");
@@ -208,24 +209,37 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       }
       break;
     case 'b':
-      if (SD_to_serial.isFileOpen()) {
-        SD_to_serial.sendFileSize();
+      if (sdFileTransfer.isFileOpen()) {
+        Serial.println( sdFileTransfer.getNumBytesToReadFromSD() );
       } else {
         Serial.println("SerialMonitor: *** ERROR ***: Cannot get file size because no file is open");
-      }
+      }      
       break;
     case 't':
-      SD_to_serial.setTransferBlockSize(8192);
-      if (SD_to_serial.isFileOpen()) {
-        SD_to_serial.sendOneBlock();
+      if (sdFileTransfer.isFileOpen()) {
+        sdFileTransfer.sendFile();
         Serial.println();
       } else {
         Serial.println("SerialMonitor: *** ERROR ***: Cannot send file because no file is open");
       }
       break;
-
+    case 'u':
+      //sdFileTransfer.setTransferBlockSize(8192);  //No longer exposed
+      if (sdFileTransfer.isFileOpen()) {
+        sdFileTransfer.sendOneBlock();
+        Serial.println();
+      } else {
+        Serial.println("SerialMonitor: *** ERROR ***: Cannot send file because no file is open");
+      }
+      break;
+    /*case 'T':
+      if ((Serial.peek() == '\n') || (Serial.peek() == '\r')) Serial.read();  //remove any trailing EOL character
+      sdFileTransfer.receiveFile_interactive();
+      break;
+    */
+    // Default:  Automatically loop over the different UI elements
     default:
-      ret_val = SerialManagerBase::processCharacter(c);  //in here, it automatically loops over the different UI elements
+      ret_val = SerialManagerBase::processCharacter(c);  
       break;
   }
   return ret_val;

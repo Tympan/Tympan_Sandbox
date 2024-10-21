@@ -16,9 +16,13 @@
    MIT License.  use at your own risk.
 */
 
-
+  
 // Include all the of the needed libraries
-#include <Tympan_Library.h>
+#include      <Tympan_Library.h>
+#include      "SdFat.h"  // included as part of the Teensy installation
+#include      "SerialManager.h"
+#include      "State.h"                
+
 
 //set the sample rate and block size
 const float sample_rate_Hz = 96000.0f ;  //Desired sample rate
@@ -29,10 +33,13 @@ AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 // /////////// Define audio objects...they are configured later
 
 // define classes to control the Tympan and the Earpiece shield
-Tympan           myTympan(TympanRev::E);                         //do TympanRev::D or TympanRev::E or TympanRev::F
-EarpieceShield   earpieceShield(TympanRev::F, AICShieldRev::A);  //Note that EarpieceShield is defined in the Tympan_Libarary in AICShield.h 
-SdFs             sd;                                             //because we're doing both a player and recorder, explicitly create the signal SD resource
-SDtoSerial      SD_to_serial(&sd, &Serial);                     //transfers raw bytes of files on the sd over to Serial (part of Tympan Library)
+Tympan          myTympan(TympanRev::F);                         //do TympanRev::D or TympanRev::E or TympanRev::F
+EarpieceShield  earpieceShield(TympanRev::F, AICShieldRev::A);  //Note that EarpieceShield is defined in the Tympan_Libarary in AICShield.h 
+
+// define classes to control serial communication and SD card 
+SdFs            sd;                             //This is the SD card.  SdFs is part of the Teensy install
+SdFileTransfer  sdFileTransfer(&sd, &Serial);   //Transfers raw bytes of files from Serial to the SD card.  Part of Tympan_Library
+SerialManager   serialManager;                  //create the serial manager for real-time control (via USB or App)
 
 //create audio library objects for handling the audio
 AudioInputI2SQuad_F32      i2s_in(audio_settings);         //Bring audio in
@@ -65,11 +72,8 @@ AudioConnection_F32           patchcord33(i2s_in, 3, audioSDWriter, 2);   //conn
 AudioConnection_F32           patchcord34(i2s_in, 2, audioSDWriter, 3);   //connect Raw audio to right channel of SD writer
 
 // /////////// Create classes for controlling the system, espcially via USB Serial and via the App
-#include      "SerialManager.h"
-#include      "State.h"                
 //BLE_UI&       ble = myTympan.getBLE_UI();  //myTympan owns the ble object, but we have a reference to it here
 //SerialManager serialManager(&ble);     //create the serial manager for real-time control (via USB or App)
-SerialManager serialManager;     //create the serial manager for real-time control (via USB or App)
 State         myState(&audio_settings, &myTympan, &serialManager); //keeping one's state is useful for the App's GUI
 
 /* Create the MTP servicing stuff so that one can access the SD card via USB */
