@@ -176,11 +176,11 @@ class TympanSerial:
                 buf += self.get_rx_buffer(timeout_s=timeout_s, num_bytes=peek_buf.index(eof_byte) + len(eof_byte))
                 found_eol_flag = True
 
+        # Check if the timeout expired
         if(time()>=last_time_s+timeout_s):
             print("Error: timeout")
 
-        # Decode buffer to u
-        return buf.decode("utf-8")
+        return buf
     
     def read_all(self):
         buf = self.get_rx_buffer()
