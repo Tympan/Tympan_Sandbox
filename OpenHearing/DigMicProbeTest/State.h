@@ -26,7 +26,7 @@ class State : public TympanStateBase_UI { // look in TympanStateBase or TympanSt
 
     //look in TympanStateBase for more state variables!  (like, bool flag_printCPUandMemory)
 
-    enum INP_SOURCE {INPUT_PCBMICS=0, INPUT_JACK_MIC, INPUT_JACK_LINE, INPUT_PDM_MICS};
+    enum INP_SOURCE {INPUT_PCBMICS=0, INPUT_JACK_MIC, INPUT_JACK_LINE, INPUT_PDM_MICS, INPUT_MIC_JACK_WTIH_PDM_MIC};
     int input_source = INPUT_PDM_MICS;
     
     //Put different gain settings (except those in the compressors) here to ease the updating of the GUI
