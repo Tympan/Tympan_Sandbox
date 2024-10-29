@@ -8,8 +8,10 @@
 
 //Extern variables from the main *.ino file
 extern Tympan myTympan;
-extern AudioSDWriter_F32_UI audioSDWriter;
+extern AudioSDPlayer_F32_logging audioSDPlayer;
+extern AudioSDWriter_F32_UI_logging audioSDWriter;
 extern State myState;
+
 
 
 //Extern Functions
@@ -20,6 +22,8 @@ extern float incrementChirpDuration(float);
 extern void startSignalWithDelay(float);
 extern float incrementOutputGain_dB(float increment_dB);
 extern void forceStopSDPlay(void);
+extern int openPlayFileOnSD(int file_ind);
+extern int playSD(void);
 
 
 //externals for MTP
@@ -28,8 +32,8 @@ extern void start_MTP(void);
 
 class SerialManager : public SerialManagerBase  {  // see Tympan_Library for SerialManagerBase for more functions!
   public:
-    //SerialManager(BLE *_ble) : SerialManagerBase(_ble) {};
-    SerialManager() : SerialManagerBase() {};
+    SerialManager(BLE *_ble) : SerialManagerBase(_ble) {};
+    //SerialManager() : SerialManagerBase() {};
 
     void printHelp(void);
     void createTympanRemoteLayout(void); 
@@ -51,17 +55,25 @@ void SerialManager::printHelp(void) {
   Serial.println("SerialManager Help: Available Commands:");
   Serial.println(" General: No Prefix");
   Serial.println("   h    : Print this help");
+  Serial.println("   c/C  : Start/Stop printing of CPU and memory usage");
   Serial.println("   w/W/e/E/o: INPUT  : Switch to the PCB Mics / Pink Jack - Mic Bias / Pink Jack Line in / Digital mics / Hybrid");
   Serial.println("   k/K  : CHIRP  : Incr/decrease loudness of chirp (cur = " + String(myState.chirp_amp_dBFS,1) + " dBFS)");
   Serial.println("   d/D  : CHIRP  : Incr/decrease duration of chirp (cur = " + String(myState.chirp_dur_sec,1) + " sec)");
   Serial.println("   n    : CHIRP  : Start the chirp");
-  Serial.println("   1-3  : SDPlay : Play files 1-3 from SD Card");
+  Serial.println("   1-3  : SDPlay : Open and Play files 1-3 from SD Card");
   Serial.println("   q    : SDPlay : Stop any currently plying SD files");
   Serial.println("   b    : AutoWrite : Start chirp and SD recording together");
   Serial.println("   4-6  : AutoWrite : Start files 1-3 from SD Card and SD recording together");
   Serial.println("   g/G  : OUTPUT : Incr/decrease DAC loudness (cur = " + String(myState.output_gain_dB,1) + " dB)");
   Serial.println("   r/s  : SDWrite: Manually Start/Stop recording");
+  Serial.println(" Lower-level SD control:");
+  Serial.println("   a    : SD: Activate SD player and SD Writer classes");
+  Serial.println("   !/@/#: SD: Open files 1/2/3 from SD Card as prep for playing");
+  Serial.println("   p    : SD: Play the already-opened file from the SD");
+  Serial.println("   R    : SD: Open and arm a file for recording");
+  Serial.println("   P    : SD: Start Play+Record together, using the already-opened files on the SD");  
   #if defined(USE_MTPDISK) || defined(USB_MTPDISK_SERIAL)  //detect whether "MTP Disk" or "Serial + MTP Disk" were selected in the Arduino IDEA
+    Serial.println(" MTP Mode for Accesing SD from PC")
     Serial.println("   >    : SDUtil : Start MTP mode to read SD from PC");
   #endif
   
@@ -86,7 +98,15 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       break;
     case 'J': case 'j':           //The TympanRemote app sends a 'J' to the Tympan when it connects
       printTympanRemoteLayout();  //in resonse, the Tympan sends the definition of the GUI that we'd like
-      break;      
+      break;   
+    case 'c':
+      Serial.println("SerialManager: start printing CPU and Memory usage...");
+      myState.flag_printCPUandMemory = true;
+      break;
+    case 'C':
+      Serial.println("SerialManager: stop printing CPU and Memory usage...");
+      myState.flag_printCPUandMemory = false;
+      break;
     case 'w':
       Serial.println("Received: Switch input to PCB Mics");
       setConfiguration(State::INPUT_PCBMICS);
@@ -165,12 +185,49 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
         Serial.println("   : ERROR : Already doing an auto-triggered SD recording.");
         Serial.println("           : Ignoring the last command.");
       } else {
+        audioSDWriter.resetLog();
         audioSDWriter.startRecording();
         myState.autoPlay_signal_type = c - ((int)'4') + State::PLAY_CHIRP + 1;  //This is me *computing* my way into the enum instead of a switch block.  Not recommended, but whatever.
         startSignalWithDelay(myState.auto_SD_start_stop_delay_sec);
         myState.auto_sd_state = State::WAIT_START_SIGNAL;
       }
-      break; 
+      break;
+    case 'a':
+      Serial.println("SerialManager: Activating 1 of 2: Activating SD player...");
+      audioSDPlayer.begin();
+      Serial.println("SerialManager: Activating 2 of 2 Activating SD writer...");
+      audioSDWriter.begin();
+      break;
+    case '!':
+      //Open file 1 as preparation for playing
+      Serial.println("SerialManager: Opening play file 1 on SD...");
+      if (openPlayFileOnSD(1)) myState.autoPlay_signal_type = State::PLAY_CHIRP + 1;
+      Serial.println("SerialManager: opening complete.");
+      break;
+    case '@':
+      //Open file 2 as prep for playing
+      Serial.println("SerialManager: Opening play file 2 on SD...");
+      if (openPlayFileOnSD(2)) myState.autoPlay_signal_type = State::PLAY_CHIRP + 2;
+      break;
+    case '#':
+      //Open file 3 as prep for playing
+      Serial.println("SerialManager: Opening play file 3 on SD...");
+      if (openPlayFileOnSD(3)) myState.autoPlay_signal_type = State::PLAY_CHIRP + 3;
+      break;
+    case 'p':
+      //play the already-opened file
+      Serial.println("SerialManager: Starting to play the already-opened file on SD...");
+      playSD();
+      break;
+    case 'R':
+      //Open and arm a file for recording
+      break;
+    case 'P':
+      //Start play and recording together
+      break;
+
+
+
     case 'r':
       audioSDWriter.startRecording();
       Serial.println("Starting recording to SD file " + audioSDWriter.getCurrentFilename());

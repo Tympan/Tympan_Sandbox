@@ -40,8 +40,12 @@ class State : public TympanStateBase_UI { // look in TympanStateBase or TympanSt
     float chirp_amp_dBFS = 0.0;   // limit to less than 0.0 dB
     
     //controls for chirp and chirp+SD modes
+    enum PLAY_FILE_STATES {PLAY_FILE_CLOSED=0,PLAY_FILE_OPEN=1};
+    enum REC_FILE_STATES {REC_FILE_CLOSED=0,REC_FILE_OPEN=1};
     enum AUTO_SD_STATES {DISABLED=0, WAIT_START_SIGNAL, WAIT_END_SIGNAL, WAIT_STOP_SD};
     enum AUTO_SD_SIGNAL {PLAY_CHIRP=0, PLAY_SD1, PLAY_SD2, PLAY_SD3};
+    int play_file_state = PLAY_FILE_CLOSED;
+    int rec_file_state = REC_FILE_CLOSED;
     int auto_sd_state = DISABLED;
     int autoPlay_signal_type = PLAY_CHIRP;
     float auto_SD_start_stop_delay_sec = 0.250; //when linking SD to the chirp, how much time before/after chirp to start/stop SD?

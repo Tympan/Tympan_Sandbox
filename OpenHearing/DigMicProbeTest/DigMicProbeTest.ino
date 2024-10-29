@@ -16,9 +16,11 @@
    MIT License.  use at your own risk.
 */
 
+#define USE_BLE 0  //set to zero to disable bluetooth 
 
 // Include all the of the needed libraries
 #include <Tympan_Library.h>
+#include "AudioSD_logging.h"
 #include      "SerialManager.h"
 #include      "State.h"       
 
@@ -36,42 +38,15 @@ EarpieceShield  earpieceShield(TympanRev::E, AICShieldRev::A);  //Note that Earp
 // define classes to control serial communication and SD card 
 SdFs            sd;                             //This is the SD card.  SdFs is part of the Teensy install
 SdFileTransfer  sdFileTransfer(&sd, &Serial);   //Transfers raw bytes of files from Serial to the SD card.  Part of Tympan_Library
-SerialManager   serialManager;                  //create the serial manager for real-time control (via USB or App)
 
 //create audio library objects for handling the audio
-AudioInputI2SQuad_F32      i2s_in(audio_settings);         //Bring audio in
-AudioSynthToneSweepExp_F32 chirp(audio_settings);          //from the Tympan_Library (synth_tonesweep_F32.h)
-AudioSDPlayer_F32          sdPlayer(&sd, audio_settings);  //from the Tympan_Library
-AudioMixer4_F32            audioMixerL(audio_settings);    //from the Tympan_Library
-AudioMixer4_F32            audioMixerR(audio_settings);    //from the Tympan_Library
-AudioOutputI2SQuad_F32     i2s_out(audio_settings);        //Send audio out
-AudioSDWriter_F32_UI       audioSDWriter(&sd, audio_settings);  //Write audio to the SD card (if activated)
+#include "AudioSetup.h"
 
-//Connect the signal sources to the audio mixer
-AudioConnection_F32           patchcord1(chirp,    0, audioMixerL, 0);   //chirp is mono, so simply send to left channel mixer
-AudioConnection_F32           patchcord2(sdPlayer, 0, audioMixerL, 1);   //left channel of SD to left channel mixer
-AudioConnection_F32           patchcord3(chirp,    0, audioMixerR, 0);   //chirp is mono, so simply send it to right channel mixer too
-AudioConnection_F32           patchcord4(sdPlayer, 1, audioMixerR, 1);   //right channel of SD to right channel mixer
-
-//Connect inputs to outputs...let's just connect the first two mics to the black jack on the Tympan
-AudioConnection_F32           patchcord11(i2s_in, 1, i2s_out, 0);    //Left input to left output
-AudioConnection_F32           patchcord12(i2s_in, 0, i2s_out, 1);    //Right input to right output
-
-//Connect audio mixer to the earpieces and to the black jack on the Earpiece shield
-AudioConnection_F32           patchcord21(audioMixerL, 0, i2s_out, 2);  //connect chirp to left output on earpiece shield
-AudioConnection_F32           patchcord22(audioMixerR, 0, i2s_out, 3);  //connect chirp to right output on earpiece shield
-
-//Connect all four mics to SD logging
-#define NUM_SD_CHAN 4
-AudioConnection_F32           patchcord31(i2s_in, 1, audioSDWriter, 0);   //connect Raw audio to left channel of SD writer
-AudioConnection_F32           patchcord32(i2s_in, 0, audioSDWriter, 1);   //connect Raw audio to right channel of SD writer
-AudioConnection_F32           patchcord33(i2s_in, 3, audioSDWriter, 2);   //connect Raw audio to left channel of SD writer
-AudioConnection_F32           patchcord34(i2s_in, 2, audioSDWriter, 3);   //connect Raw audio to right channel of SD writer
 
 // /////////// Create classes for controlling the system, espcially via USB Serial and via the App
          
-//BLE_UI&       ble = myTympan.getBLE_UI();  //myTympan owns the ble object, but we have a reference to it here
-//SerialManager serialManager(&ble);     //create the serial manager for real-time control (via USB or App)
+BLE_UI&       ble = myTympan.getBLE_UI();  //myTympan owns the ble object, but we have a reference to it here
+SerialManager serialManager(&ble);     //create the serial manager for real-time control (via USB or App)
 State         myState(&audio_settings, &myTympan, &serialManager); //keeping one's state is useful for the App's GUI
 
 /* Create the MTP servicing stuff so that one can access the SD card via USB */
@@ -87,67 +62,6 @@ void setupSerialManager(void) {
   serialManager.add_UI_element(&audioSDWriter);
 }
 
-
-// /////////// Functions for configuring the system
-float setInputGain_dB(float val_dB) {
-  myState.input_gain_dB = myTympan.setInputGain_dB(val_dB);
-  return earpieceShield.setInputGain_dB(myState.input_gain_dB);
-}
-
-void setConfiguration(int config) {
-  myState.input_source = config;
-  const float default_mic_gain_dB = 0.0f;
-
-  switch (config) {
-    case State::INPUT_PCBMICS:
-      //Select Input and set gain
-      myState.input_source = config;
-      myTympan.enableDigitalMicInputs(false); earpieceShield.enableDigitalMicInputs(false);
-      myTympan.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the on-board microphones
-      earpieceShield.inputSelect(TYMPAN_INPUT_ON_BOARD_MIC); // use the on-board microphones
-      setInputGain_dB(default_mic_gain_dB);
-      break;
-
-    case State::INPUT_JACK_MIC:
-      //Select Input and set gain
-      myState.input_source = config;
-      myTympan.enableDigitalMicInputs(false); earpieceShield.enableDigitalMicInputs(false);
-      myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_MIC); // use the mic jack
-      earpieceShield.inputSelect(TYMPAN_INPUT_JACK_AS_MIC); // use the on-board microphones
-      myTympan.setEnableStereoExtMicBias(true);  //put the mic bias on both channels
-      earpieceShield.setEnableStereoExtMicBias(true);  //put the mic bias on both channels
-      setInputGain_dB(default_mic_gain_dB);
-      break;
-      
-    case State::INPUT_JACK_LINE:
-      //Select Input and set gain
-      myState.input_source = config;
-      myTympan.enableDigitalMicInputs(false); earpieceShield.enableDigitalMicInputs(false);
-      myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the line-input through holes
-      earpieceShield.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the line-input through holes
-      setInputGain_dB(0.0);
-      break;
-
-    case State::INPUT_PDM_MICS:
-      myState.input_source = config;
-      myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the line-input through holes
-      earpieceShield.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the line-input through holes
-      myTympan.enableDigitalMicInputs(true);
-      earpieceShield.enableDigitalMicInputs(true);
-      setInputGain_dB(0.0);
-      break;
-
-    // Use MIC_JACK on Tympan main board, and digital mics on Earpiece Shield
-    case State::INPUT_MIC_JACK_WTIH_PDM_MIC:
-      myState.input_source = config;
-      myTympan.enableDigitalMicInputs(false);
-      myTympan.inputSelect(TYMPAN_INPUT_JACK_AS_MIC); // use the line-input through holes
-      earpieceShield.inputSelect(TYMPAN_INPUT_JACK_AS_LINEIN); // use the line-input through holes
-      earpieceShield.enableDigitalMicInputs(true);
-      setInputGain_dB(0.0);
-      break;
-  }
-}
 
 // ///////////////// Main setup() and loop() as required for all Arduino programs
 
@@ -196,7 +110,7 @@ void setup() {
   }
 
   //setup BLE
-  //delay(500); myTympan.setupBLE(); delay(500); //Assumes the default Bluetooth firmware. You can override!
+  if (USE_BLE) { delay(500); myTympan.setupBLE(); delay(500); } //Assumes the default Bluetooth firmware. You can override!
   
   //setup the serial manager
   setupSerialManager();
@@ -204,8 +118,16 @@ void setup() {
   //prepare the SD writer for the format that we want and any error statements
   audioSDWriter.setSerial(&myTympan);
   audioSDWriter.setNumWriteChannels(NUM_SD_CHAN);             //four channels for this quad recorder, but you could set it to 2
-  Serial.println("SD configured for " + String(audioSDWriter.getNumWriteChannels()) + " channels.");
+  Serial.println("setup: SD configured to write to " + String(audioSDWriter.getNumWriteChannels()) + " channels.");
 
+  //let's allocate some extra RAM for the read and write buffers to reduce hiccups...make sure you don't use of all the RAM (RAM2)
+  int ret_val;
+  ret_val = audioSDPlayer.allocateBuffer((2*2*64)*512);  //set the RAM buffer (bytes) for playing (default is 32*512).  2*2*64*512 = 131072; 131072 / (2chan*2bytes*96000) = 341 msec
+  Serial.println("setup: allocated RAM for play buffer.  Size after allocation = " + String(ret_val));
+  ret_val = audioSDWriter.allocateBuffer(2*(2*2*64)*512);  //set the RAM buffer (bytes) for recording. default is 150000. 4*2*64*512 = 262/144; 262144 / (4chan*2bytes*96000) = 341 msec 
+  Serial.println("setup: alloacted RAM for write buffer.  Allocation return val = " + String(ret_val));
+
+\
   //Set the state of the LEDs
   myTympan.setRedLED(HIGH); myTympan.setAmberLED(LOW);
 
@@ -221,17 +143,17 @@ void loop() {
   //respond to Serial commands
   if (Serial.available()) serialManager.respondToByte((char)Serial.read());   //USB Serial
 
-  #if 0
-  //respond to BLE
-  if (ble.available() > 0) {
-    String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
-    for (int i=0; i < msgLen; i++) serialManager.respondToByte(msgFromBle[i]);
+  if (USE_BLE) { 
+    //respond to BLE
+    if (ble.available() > 0) {
+      String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
+      for (int i=0; i < msgLen; i++) serialManager.respondToByte(msgFromBle[i]);
+    }
   }
-  #endif
-
-  //service the SD recording
-  audioSDWriter.serviceSD_withWarnings(i2s_in); //For the warnings, it asks the i2s_in class for some info
-
+  
+  //service the SD
+  service_SD_read_write();
+  
   //service the automatic SD starting and stopping based on the playing of the chirp / SD
   serviceAutoSdStartStop();
  
@@ -242,17 +164,11 @@ void loop() {
   
   } else { //do everything else!
 
-    #if 0
-      //service the BLE advertising state
-      ble.updateAdvertising(millis(),5000); //check every 5000 msec to ensure it is advertising (if not connected)
-    #endif 
+    if (USE_BLE) ble.updateAdvertising(millis(),5000); //check every 5000 msec to ensure it is advertising (if not connected)
      
     //service the LEDs...blink slow normally, blink fast if recording
     myTympan.serviceLEDs(millis(),audioSDWriter.getState() == AudioSDWriter::STATE::RECORDING); 
 
-    //service the SD player to refill the play buffer
-    sdPlayer.serviceSD();
-  
   }
  
   //periodically print the CPU and Memory Usage
@@ -264,6 +180,29 @@ void loop() {
 
 // //////////////////////////////////// Servicing routines not otherwise embedded in other classes
 
+//For the SD cards, it needs to periodically read bytes from the SD card into the SDplayer's read buffer.
+//Similarly, it needs to periodically write bytes from the SDwriter's write buffer to the SD card.
+//In this function, we look to see which one is closest to running out of buffer, and we service its
+//needs first.
+int service_SD_read_write(void) {
+  uint32_t writeBuffer_empty_msec = 9999;
+  if (audioSDWriter.isFileOpen()) writeBuffer_empty_msec = audioSDWriter.getNumUnfilledSamplesInBuffer_msec();
+
+  uint32_t playBuffer_full_msec = 9999;
+  if (audioSDPlayer.isFileOpen()) playBuffer_full_msec = audioSDPlayer.getNumBytesInBuffer_msec();
+
+  if (playBuffer_full_msec < writeBuffer_empty_msec) {
+    //service the player first as its buffer is closest to being out
+    audioSDPlayer.serviceSD();   
+    audioSDWriter.serviceSD_withWarnings(i2s_in); //For the warnings, it asks the i2s_in class for some info
+  } else { 
+    //service the writer first, as its buffer is closest to being out
+    audioSDWriter.serviceSD_withWarnings(i2s_in); //For the warnings, it asks the i2s_in class for some info
+    audioSDPlayer.serviceSD();   
+  }
+  return 0;
+}
+
 int playChirp(void) {
   chirp.play( sqrtf(powf(10.0f, 0.1f*myState.chirp_amp_dBFS)),
               myState.chirp_start_Hz,
@@ -273,28 +212,85 @@ int playChirp(void) {
   return 0;
 }
 
-int playSD(int file_ind) {
+int openPlayFileOnSD(int file_ind) {
+  Serial.println("openPlayFileOnSD: file_ind = " + String(file_ind));
   //check the inputs
   if (file_ind < 0) {
-    Serial.println("playSD: *** ERROR ***: file_ind is " + String(file_ind) + ", which cannot be negative.");
+    Serial.println("openPlaySD: *** ERROR ***: file_ind is " + String(file_ind) + ", which cannot be negative.");
     Serial.println("    : ignoring and returning.");
     return -1;
   }
+
+  Serial.println("openPlayFileOnSD: play_file_state = " + String(myState.play_file_state));
+  if (myState.play_file_state != State::PLAY_FILE_CLOSED) {
+    Serial.println("openPlayFileOnSD: stopping the player...");
+    audioSDPlayer.stop();
+    myState.play_file_state = State::PLAY_FILE_CLOSED;
+  } 
 
   //compose the filename
   String fname = "PLAY";
   fname += String(file_ind);
   fname += ".WAV";
+  Serial.println("openPlayFileOnSD: fname = " + String(fname));
 
   //confirm that it exists
-  // if (!sd.exists(fname)) {
-  //   Serial.println("playSD: *** ERROR ***: file " + fname + " does not exist on SD.");
-  //   Serial.println("    : ignoring and returning...");
-  //   return -1;
-  // }
+  if (!sd.exists(fname)) {
+    Serial.println("openPlayFileOnSD: *** ERROR ***: file " + fname + " does not exist on SD.");
+    Serial.println("    : ignoring and returning...");
+    return -1;
+  }
 
-  //play the file
-  sdPlayer.play(fname);
+  //open the file
+  Serial.println("openPlayFileOnSD: opening " + fname);
+  audioSDPlayer.resetLog();
+  bool success = audioSDPlayer.open(fname);
+  Serial.println("openPlayFileOnSD: success = " + String(success));
+  if (success == myState.play_file_state) {
+    myState.play_file_state = State::PLAY_FILE_OPEN;  
+  }
+
+
+  return success;
+}
+
+//play a file that has already been opened
+int playSD(void) { return playSD(-1); } //assumes that the file has already been opened, manually
+
+//open a file and play it
+int playSD(int file_ind) {  
+
+  if (myState.play_file_state == State::PLAY_FILE_CLOSED) {
+
+    //check the inputs
+    if (file_ind < 0) {
+      Serial.println("playSD: *** ERROR ***: file_ind is " + String(file_ind) + ", which cannot be negative.");
+      Serial.println("    : ignoring and returning.");
+      return -1;
+    }
+
+    //compose the filename
+    String fname = "PLAY";
+    fname += String(file_ind);
+    fname += ".WAV";
+
+    //confirm that it exists
+    // if (!sd.exists(fname)) {
+    //   Serial.println("playSD: *** ERROR ***: file " + fname + " does not exist on SD.");
+    //   Serial.println("    : ignoring and returning...");
+    //   return -1;
+    // }
+
+    //play the file
+    audioSDPlayer.resetLog();
+    bool success = audioSDPlayer.play(fname);
+    if (success == myState.play_file_state) myState.play_file_state = State::PLAY_FILE_OPEN;
+
+  } else {
+    //play file that has already been opened
+    Serial.println("playSD: starting to play already-opened file...");
+    audioSDPlayer.play();
+  }
   return 0;
 }
 
@@ -327,7 +323,7 @@ void serviceAutoSdStartStop(void) {
   }
 
   //Is the signal playing
-  if (chirp.isPlaying() || sdPlayer.isPlaying()) {
+  if (chirp.isPlaying() || audioSDPlayer.isPlaying()) {
 
     //is it time to print a status message to the serial monitor?
     if (millis() >= nextUpdate_millis) {
@@ -340,6 +336,8 @@ void serviceAutoSdStartStop(void) {
     if (myState.has_signal_been_playing == true) {
       //signal just stopped playing
       Serial.println("serviceChirpStartStop: Chirp or SD has finished.");
+      myState.play_file_state = State::PLAY_FILE_CLOSED;
+      Serial.println("serviceAudioSdStartStop: wrote log file to SD: " + audioSDPlayer.writeLogToSD()); 
 
       if (myState.auto_sd_state == State::WAIT_END_SIGNAL) {
         myState.auto_sd_state = State::WAIT_STOP_SD;
@@ -355,10 +353,14 @@ void serviceAutoSdStartStop(void) {
     if (millis() >= myState.stop_SD_at_millis) {
       Serial.println("Auto-stopping SD recording of " + audioSDWriter.getCurrentFilename());
       audioSDWriter.stopRecording();
+      Serial.println("serviceAudioSdStartStop: wrote log file to SD: " + audioSDWriter.writeLogToSD()); 
       myState.auto_sd_state = State::DISABLED;
+      myState.rec_file_state = State::REC_FILE_CLOSED;
     }
   }
 }
+
+
 
 // //////////////////////////////////// Control the audio processing from the SerialManager
 
@@ -388,5 +390,6 @@ void startSignalWithDelay(float delay_sec) {
   myState.start_signal_at_millis = millis()+ (unsigned int)round(max(0.0,1000.0*delay_sec));
 }
 void forceStopSDPlay(void) {
-  sdPlayer.stop();
+  audioSDPlayer.stop();
+  myState.play_file_state = State::REC_FILE_CLOSED;
 }
