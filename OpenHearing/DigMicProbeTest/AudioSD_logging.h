@@ -21,7 +21,7 @@ class LogEntry {
 
 class SD_Log {
   public:
-    constexpr static uint32_t N_LOG = 3000;
+    constexpr static uint32_t N_LOG = 5000;
     uint32_t write_ind = 0;
     LogEntry log_array[N_LOG];
 
