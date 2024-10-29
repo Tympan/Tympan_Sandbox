@@ -23,7 +23,7 @@
 #include      "State.h"       
 
 // To enable 4-channel audio recordings, #define EN_4_SD_CHAN 4
-//#define EN_4_SD_CHAN 1
+#define EN_4_SD_CHAN 1
 
 // To enable bluetooth, uncomment:
 //#define EN_BLE 1
