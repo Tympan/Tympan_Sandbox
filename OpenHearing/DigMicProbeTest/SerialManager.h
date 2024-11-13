@@ -51,7 +51,7 @@ void SerialManager::printHelp(void) {
   Serial.println("SerialManager Help: Available Commands:");
   Serial.println(" General: No Prefix");
   Serial.println("   h    : Print this help");
-  Serial.println("   w/e/E: INPUT  : Switch to the PCB Mics, pink jacks, or digital mics");
+  Serial.println("   w/W/e/E/o: INPUT  : Switch to the PCB Mics / Pink Jack - Mic Bias / Pink Jack Line in / Digital mics / Hybrid");
   Serial.println("   k/K  : CHIRP  : Incr/decrease loudness of chirp (cur = " + String(myState.chirp_amp_dBFS,1) + " dBFS)");
   Serial.println("   d/D  : CHIRP  : Incr/decrease duration of chirp (cur = " + String(myState.chirp_dur_sec,1) + " sec)");
   Serial.println("   n    : CHIRP  : Start the chirp");
@@ -111,6 +111,14 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       updateGUI_inputSelect();
       updateGUI_inputGain(); //changing inputs changes the input gain, too
       break;
+    case 'o':
+      Serial.println("Received: Switch input to hybrid: Tympan-Mic_Jack and Shield-PDM Mics");
+      setConfiguration(State::INPUT_MIC_JACK_WTIH_PDM_MIC);
+      updateGUI_inputSelect();
+      updateGUI_inputGain(); //changing inputs changes the input gain, too
+      break;
+
+
     case 'k':
       incrementChirpLoudness(3.0);
       Serial.println("Increased chirp loudness to " + String(myState.chirp_amp_dBFS,1) + " dBFS");
@@ -183,6 +191,7 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       Serial.println("Starting MTP service to access SD card (everything else will stop)");
       start_MTP();
       break;
+    // Default:  Automatically loop over the different UI elements
     default:
       ret_val = SerialManagerBase::processCharacter(c);  //in here, it automatically loops over the different UI elements
       break;
@@ -209,6 +218,7 @@ void SerialManager::createTympanRemoteLayout(void) {
           card_h->addButton("Jack as Mic",    "W", "configMIC",   12);  //displayed string (blank for now), command (blank), button ID, button width (out of 12)
           card_h->addButton("Jack as Line-In","e", "configLINE",  12);  //displayed string, command, button ID, button width (out of 12) 
           card_h->addButton("Digital Mics"   ,"E", "configPDM",  12);  //displayed string, command, button ID, button width (out of 12) 
+          card_h->addButton("Mic Jack w/ PDM","o", "configMicJackPDM",  12);  //displayed string, command, button ID, button width (out of 12) 
 
       //Add a button group for SD recording...use a button set that is built into AudioSDWriter_F32_UI for you!
       card_h = audioSDWriter.addCard_sdRecord(page_h);
@@ -258,6 +268,7 @@ void SerialManager::updateGUI_inputSelect(bool activeButtonsOnly) {
     setButtonState("configMIC",false);
     setButtonState("configLINE",false);
     setButtonState("configPDM",false);
+    setButtonState("configMicJackPDM",false);
   }
   switch (myState.input_source) {
     case (State::INPUT_PCBMICS):
@@ -272,6 +283,10 @@ void SerialManager::updateGUI_inputSelect(bool activeButtonsOnly) {
     case (State::INPUT_PDM_MICS): 
       setButtonState("configPDM",true);
       break;
+    case (State::INPUT_MIC_JACK_WTIH_PDM_MIC): 
+      setButtonState("configMicJackPDM",true);
+      break;
+
   }
 }
 
