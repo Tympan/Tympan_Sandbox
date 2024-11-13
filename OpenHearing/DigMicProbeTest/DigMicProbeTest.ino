@@ -261,7 +261,7 @@ void setup() {
   audioSDWriter.setSerial(&myTympan);
   
   // Increase the RAM buffer allocated to audio SD writer.
-  if (audioSDWriter.allocateBuffer(300000) == 0) {
+  if (audioSDWriter.allocateBuffer(300000) < 512) {       //Must be greater than 512 bytes to trigger SD writing
     Serial.println("setup: *** ERROR ***: SD Could Not Allocate RAM Buffer!");  
   }
 
