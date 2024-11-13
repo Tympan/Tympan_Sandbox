@@ -10,6 +10,15 @@
       * Record audio from all four digital mics to SD card
       * Access SD card via "MTP Disk" mode
 
+  Switches:
+      * To enable 4-channel audio, #define EN_4_SD_CHAN 1.  For 2-channel audio, comment this line out.
+        - In 2-channel mode, the inputs are recorded to SD, and audio mixer (SD and Chirp) is sent to the output
+      * To enable BLE (untested), #define EN_BLE 1.  Othewise, comment out.  May affect robust recordings. 
+
+  Serial Commands
+      * See help by sending 'h'.  Note that new hybrid input ('o') sets INPUT_MIC_JACK_WTIH_PDM_MIC
+        - This sets the tympan to Mic Jack with Bias, and the shield to PDM Mics.
+
    For Tympan Rev D, program in Arduino IDE as a Teensy 3.6.
    For Tympan Rev E, program in Arduino IDE as a Teensy 4.1.
 
@@ -22,7 +31,7 @@
 #include      "SerialManager.h"
 #include      "State.h"       
 
-// To enable 4-channel audio recordings, #define EN_4_SD_CHAN 4
+// To enable 4-channel audio recordings, #define EN_4_SD_CHAN 1
 #define EN_4_SD_CHAN 1
 
 // To enable bluetooth, uncomment:
