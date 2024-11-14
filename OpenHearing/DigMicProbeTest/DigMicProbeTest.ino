@@ -64,6 +64,8 @@ AudioSynthToneSweepExp_F32 chirp(audio_settings);          //from the Tympan_Lib
 AudioSDPlayer_F32          sdPlayer(&sd, audio_settings);  //from the Tympan_Library
 AudioMixer4_F32            audioMixerL(audio_settings);    //for mixing outputs from SD player and Chirp
 AudioMixer4_F32            audioMixerR(audio_settings);    //for mixing outputs from SD player and Chirp
+AudioCalcLeq_F32           calcInputLevel_L(audio_settings); //use this to measure the input signal level
+AudioCalcLeq_F32           calcInputLevel_R(audio_settings); //use this to measure the input signal level
 AudioOutputI2SQuad_F32     i2s_out(audio_settings);        //Send audio out
 AudioSDWriter_F32_UI       audioSDWriter(&sd, audio_settings);  //Write audio to the SD card (if activated)
 
@@ -99,6 +101,11 @@ AudioConnection_F32         patchcord32(i2s_in, 0, audioSDWriter, 1);   //connec
   AudioConnection_F32       patchcord33(i2s_in, 3, audioSDWriter, 2);   //connect Raw audio to left channel of SD writer
   AudioConnection_F32       patchcord34(i2s_in, 2, audioSDWriter, 3);   //connect Raw audio to right channel of SD writer
 #endif
+
+//Connect Tympan Left and Right Input to level meter
+AudioConnection_F32        patchcord41(i2s_in, 0, calcInputLevel_L, 0);    //Left input to the level monitor
+AudioConnection_F32        patchcord42(i2s_in, 1, calcInputLevel_R, 0);    //Left input to the level monitor
+
 
 // create BLE object, if enabled
 #ifdef EN_BLE
@@ -141,6 +148,10 @@ void setup() {
   audioMixerL.mute(); audioMixerR.mute();  //set all channels to zero (I think that this is defualt, but let's do this just to be sure!)
   audioMixerL.gain(0,1.0);  audioMixerL.gain(1,1.0);  //mix together the chirp and SD player (though prob only one will be playing at a time)
   audioMixerR.gain(0,1.0);  audioMixerR.gain(1,1.0);  //mix together the chirp and SD player (though prob only one will be playing at a time)
+
+  //Set window for calculating sound level
+  calcInputLevel_L.setTimeWindow_sec(0.125);  //average over 0.125 seconds
+  calcInputLevel_R.setTimeWindow_sec(0.125);  //average over 0.125 seconds
 
   //Select the gain for the output DAC
   setOutputGain_dB(myState.output_gain_dB);
@@ -239,6 +250,10 @@ void loop() {
   //periodically print the CPU and Memory Usage
   if (myState.flag_printCPUandMemory) myState.printCPUandMemory(millis(), 3000); //print every 3000msec  (method is built into TympanStateBase.h, which myState inherits from)
   if (myState.flag_printCPUandMemory) myState.printCPUtoGUI(millis(), 3000);     //send to App every 3000msec (method is built into TympanStateBase.h, which myState inherits from)
+
+  //periodically print the input signal levels
+  if (myState.flag_PrintInputLevel) printInputSignalLevels(millis(),500);  //print every 500 msec
+
 } //end loop()
 
 
@@ -413,6 +428,21 @@ void serviceAutoSdStartStop(void) {
     }
   }
 }
+
+// Print Tympan right and level input level in dBFS
+void printInputSignalLevels(unsigned long cur_millis, unsigned long updatePeriod_millis) {
+  static unsigned long lastUpdate_millis = 0UL;
+
+  if ( (cur_millis < lastUpdate_millis) || (cur_millis >= lastUpdate_millis + updatePeriod_millis) ) {
+    Serial.print( "Input level: (" + String(calcInputLevel_L.getCurrentLevel_dB(),2) + ", " );
+    Serial.println( String(calcInputLevel_R.getCurrentLevel_dB(),2) + ") dBFS");
+		//setButtonText("cpuValue", String(getCPUUsage(),1));
+    
+    //reset timer
+    lastUpdate_millis = cur_millis;    
+  }
+}
+
 
 // //////////////////////////////////// Control the audio processing from the SerialManager
 

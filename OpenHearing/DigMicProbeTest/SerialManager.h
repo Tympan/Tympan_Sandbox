@@ -22,7 +22,6 @@ extern void startSignalWithDelay(float);
 extern float incrementOutputGain_dB(float increment_dB);
 extern void forceStopSDPlay(void);
 
-
 //externals for MTP
 extern void start_MTP(void);
 //extern void stop_MTP(void);
@@ -60,6 +59,8 @@ void SerialManager::printHelp(void) {
   Serial.println("   4-6  : AutoWrite : Start files 1-3 from SD Card and SD recording together");
   Serial.println("   g/G  : OUTPUT : Incr/decrease DAC loudness (cur = " + String(myState.output_gain_dB,1) + " dB)");
   Serial.println("   r/s  : SDWrite: Manually Start/Stop recording");
+  Serial.println("   l    : Toggle level meter");
+  
   #if defined(USE_MTPDISK) || defined(USB_MTPDISK_SERIAL)  //detect whether "MTP Disk" or "Serial + MTP Disk" were selected in the Arduino IDEA
     Serial.println("   >    : SDUtil : Start MTP mode to read SD from PC");
   #endif
@@ -107,7 +108,6 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       updateGUI_inputSelect();
       updateGUI_inputGain(); //changing inputs changes the input gain, too
       break;
-
 
     case 'k':
       incrementChirpLoudness(3.0);
@@ -176,6 +176,15 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
     case 'G':
       incrementOutputGain_dB(-3.0);
       Serial.println("Decreased DAC loudness to " + String(myState.output_gain_dB,1) + " dBFS");
+      break;
+    case 'l':
+      //Toggle flag for the level meter.
+      myState.flag_PrintInputLevel = !myState.flag_PrintInputLevel;
+      if(myState.flag_PrintInputLevel) {
+        Serial.println("Level Meter enabled");
+      } else {
+        Serial.println("Level Meter disabled");
+      }
       break;
     case '>':
       Serial.println("Starting MTP service to access SD card (everything else will stop)");

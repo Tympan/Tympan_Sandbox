@@ -49,6 +49,7 @@ class State : public TympanStateBase_UI { // look in TympanStateBase or TympanSt
     unsigned long start_signal_at_millis = 0;   //DON'T CHANGE THIS.  main loop() will start the signal at (or after) this time
     unsigned long stop_SD_at_millis = 0;       //DON'T CHANGE THIS.  main loop() will stop the SD at (or after) this time
     bool has_signal_been_playing = false;      //DON'T CHANGE THIS.  
+    bool flag_PrintInputLevel = false;
 };
 
 #endif
