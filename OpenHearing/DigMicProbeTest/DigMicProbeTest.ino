@@ -28,14 +28,18 @@
 
 // Include all the of the needed libraries
 #include <Tympan_Library.h>
-#include      "SerialManager.h"
-#include      "State.h"       
+#include "SerialManager.h"
+#include "State.h"       
 
-// To enable 4-channel audio recordings, #define EN_4_SD_CHAN 1
+/* Create the MTP servicing stuff so that one can access the SD card via USB */
+/* If you want this, be sure to set the USB mode via the Arduino IDE,  Tools Menu -> USB Type -> Serial + MTP (experimental) */
+#include "setup_MTP.h"  //put this line sometime after the audioSDWriter has been instantiated
+
+// To enable 4-channel audio recordings, #define EN_4_SD_CHAN 1; otherwise for 2-channel, comment out.
 #define EN_4_SD_CHAN 1
 
 // To enable bluetooth, uncomment:
-//#define EN_BLE 1
+#define EN_BLE 1
 
 //set the sample rate and block size
 const float sample_rate_Hz = 96000.0f ;  //Desired sample rate
@@ -45,77 +49,197 @@ AudioSettings_F32 audio_settings(sample_rate_Hz, audio_block_samples);
 
 // /////////// Define audio objects...they are configured later
 // define classes to control the Tympan and the Earpiece shield
-Tympan          myTympan(TympanRev::F);                         //do TympanRev::D or TympanRev::E or TympanRev::F
+Tympan myTympan(TympanRev::F, audio_settings);  //do TympanRev::D or TympanRev::E or TympanRev::F
 #ifdef EN_4_SD_CHAN
-  EarpieceShield  earpieceShield(TympanRev::F, AICShieldRev::A);  //Note that EarpieceShield is defined in the Tympan_Libarary in AICShield.h 
+  EarpieceShield earpieceShield(TympanRev::F, AICShieldRev::A, audio_settings);  //Note that EarpieceShield is defined in the Tympan_Libarary in AICShield.h 
 #endif
 
 // define classes to control serial communication and SD card 
-SdFs            sd;                             //This is the SD card.  SdFs is part of the Teensy install
-SdFileTransfer  sdFileTransfer(&sd, &Serial);   //Transfers raw bytes of files from Serial to the SD card.  Part of Tympan_Library
-SerialManager   serialManager;                  //create the serial manager for real-time control (via USB or App)
+SdFs                        sd;                             //This is the SD card.  SdFs is part of the Teensy install
+SdFileTransfer              sdFileTransfer(&sd, &Serial);   //Transfers raw bytes of files from Serial to the SD card.  Part of Tympan_Library
 
 //create audio library objects for handling the audio
 AudioInputI2SQuad_F32      i2s_in(audio_settings);         //Bring audio in
 AudioSynthToneSweepExp_F32 chirp(audio_settings);          //from the Tympan_Library (synth_tonesweep_F32.h)
 AudioSDPlayer_F32          sdPlayer(&sd, audio_settings);  //from the Tympan_Library
-AudioMixer4_F32            audioMixerL(audio_settings);    //from the Tympan_Library
-AudioMixer4_F32            audioMixerR(audio_settings);    //from the Tympan_Library
+AudioMixer4_F32            audioMixerL(audio_settings);    //for mixing outputs from SD player and Chirp
+AudioMixer4_F32            audioMixerR(audio_settings);    //for mixing outputs from SD player and Chirp
 AudioOutputI2SQuad_F32     i2s_out(audio_settings);        //Send audio out
 AudioSDWriter_F32_UI       audioSDWriter(&sd, audio_settings);  //Write audio to the SD card (if activated)
 
 //Connect the signal sources to the audio mixer
-AudioConnection_F32           patchcord1(chirp,    0, audioMixerL, 0);   //chirp is mono, so simply send to left channel mixer
-AudioConnection_F32           patchcord2(sdPlayer, 0, audioMixerL, 1);   //left channel of SD to left channel mixer
-AudioConnection_F32           patchcord3(chirp,    0, audioMixerR, 0);   //chirp is mono, so simply send it to right channel mixer too
-AudioConnection_F32           patchcord4(sdPlayer, 1, audioMixerR, 1);   //right channel of SD to right channel mixer
+AudioConnection_F32        patchcord1(chirp,    0, audioMixerL, 0);   //chirp is mono, so simply send to left channel mixer
+AudioConnection_F32        patchcord2(sdPlayer, 0, audioMixerL, 1);   //left channel of SD to left channel mixer
+AudioConnection_F32        patchcord3(chirp,    0, audioMixerR, 0);   //chirp is mono, so simply send it to right channel mixer too
+AudioConnection_F32        patchcord4(sdPlayer, 1, audioMixerR, 1);   //right channel of SD to right channel mixer
 
 //If 4 channel audio... 
 #ifdef EN_4_SD_CHAN
-  //Connect inputs to outputs...let's just connect the first two mics to the black jack on the Tympan
-  AudioConnection_F32           patchcord11(i2s_in, 1, i2s_out, 0);    //Left input to left output
-  AudioConnection_F32           patchcord12(i2s_in, 0, i2s_out, 1);    //Right input to right output
+//Connect Tympan Inputs to Tympan outputs (black headphone jack)
+AudioConnection_F32        patchcord11(i2s_in, 1, i2s_out, 0);    //Left input to left output
+AudioConnection_F32        patchcord12(i2s_in, 0, i2s_out, 1);    //Right input to right output
 
-//Connect audio mixer to the earpieces and to the black jack on the Earpiece shield
-  AudioConnection_F32           patchcord21(audioMixerL, 0, i2s_out, 2);  //connect chirp to left output on earpiece shield
-  AudioConnection_F32           patchcord22(audioMixerR, 0, i2s_out, 3);  //connect chirp to right output on earpiece shield
+//Connect audio mixer (containing SD play and chirp) to the output on the Earpiece Shield (both earpiece ports and black headphone jack)
+AudioConnection_F32        patchcord21(audioMixerL, 0, i2s_out, 2);  //connect chirp to left output on earpiece shield
+AudioConnection_F32        patchcord22(audioMixerR, 0, i2s_out, 3);  //connect chirp to right output on earpiece shield
 
 //ELSE 2-channel audio
 #else
-  //Connect output to audioMixer (the chirp and SD player)
-  AudioConnection_F32           patchcord21(audioMixerL, 0, i2s_out, 0);
-  AudioConnection_F32           patchcord22(audioMixerR, 0, i2s_out, 1);
+//Connect audio mixer (containing SD play and chirp) to the output on the Tympan
+  AudioConnection_F32       patchcord21(audioMixerL, 0, i2s_out, 0);
+ AudioConnection_F32        patchcord22(audioMixerR, 0, i2s_out, 1);
 #endif
 
-//Connect all four mics to SD logging
-AudioConnection_F32           patchcord31(i2s_in, 1, audioSDWriter, 0);   //connect Raw audio to left channel of SD writer
-AudioConnection_F32           patchcord32(i2s_in, 0, audioSDWriter, 1);   //connect Raw audio to right channel of SD writer
+//Connect Tympan Inputs to SD recording
+AudioConnection_F32         patchcord31(i2s_in, 1, audioSDWriter, 0);   //connect Raw audio to left channel of SD writer
+AudioConnection_F32         patchcord32(i2s_in, 0, audioSDWriter, 1);   //connect Raw audio to right channel of SD writer
 
+//IF 4-Channel Audio, connect Earpiece Shield inputs to SD recorder
 #ifdef EN_4_SD_CHAN
-  AudioConnection_F32           patchcord33(i2s_in, 3, audioSDWriter, 2);   //connect Raw audio to left channel of SD writer
-  AudioConnection_F32           patchcord34(i2s_in, 2, audioSDWriter, 3);   //connect Raw audio to right channel of SD writer
+  AudioConnection_F32       patchcord33(i2s_in, 3, audioSDWriter, 2);   //connect Raw audio to left channel of SD writer
+  AudioConnection_F32       patchcord34(i2s_in, 2, audioSDWriter, 3);   //connect Raw audio to right channel of SD writer
 #endif
-// /////////// Create classes for controlling the system, espcially via USB Serial and via the App
 
+// create BLE object, if enabled
 #ifdef EN_BLE
-  BLE_UI &ble = myTympan.getBLE_UI();  //myTympan owns the ble object, but we have a reference to it here
-  SerialManager serialManager(&ble);     //create the serial manager for real-time control (via USB or App)
+BLE_UI          &ble = myTympan.getBLE_UI();                         //myTympan owns the ble object, but we have a reference to it here
+#endif
+SerialManager   serialManager(&ble);                          //create the serial manager for real-time control
+State           myState(&audio_settings, &myTympan, &serialManager);  //keeping one's state is useful for the App's GUI
+
+
+//~~~~Main setup()~~~~ 
+void setup() {
+
+  // Begin Bluetooth and serial comms
+  #ifdef EN_BLE
+  myTympan.beginBothSerial(); //should use the correct Serial port and the correct baud rate
+  #endif
+  
+  while (!Serial) {
+    ; // wait for serial port to connect. Needed for native USB port only
+  }
+  
+  Serial.print(CrashReport);
+  Serial.println("DigMicProbeTest: setup():...");
+  Serial.println("Sample Rate (Hz): " + String(audio_settings.sample_rate_Hz));
+  Serial.println("Audio Block Size (samples): " + String(audio_settings.audio_block_samples));
+
+  //allocate the dynamically re-allocatable audio memory
+  AudioMemory_F32(100, audio_settings); 
+
+  //Enable the Tympan and AIC shields to start the audio flowing!
+  myTympan.enable(); 
+  #ifdef EN_4_SD_CHAN
+    earpieceShield.enable();
+  #endif
+
+  //Select the input that we will use 
+  setConfiguration(myState.input_source);  //the initial value is set in State.h
+  
+  //Configure the mixer for the audio sources
+  audioMixerL.mute(); audioMixerR.mute();  //set all channels to zero (I think that this is defualt, but let's do this just to be sure!)
+  audioMixerL.gain(0,1.0);  audioMixerL.gain(1,1.0);  //mix together the chirp and SD player (though prob only one will be playing at a time)
+  audioMixerR.gain(0,1.0);  audioMixerR.gain(1,1.0);  //mix together the chirp and SD player (though prob only one will be playing at a time)
+
+  //Select the gain for the output DAC
+  setOutputGain_dB(myState.output_gain_dB);
+
+// IF BLE enabled, set it up
+#ifdef EN_BLE
+  myTympan.setupBLE(); delay(500);
+
+  // Add preset UI elements
+  serialManager.add_UI_element(&audioSDWriter);
 #endif
 
-State         myState(&audio_settings, &myTympan, &serialManager); //keeping one's state is useful for the App's GUI
+  //FOR DEBUGGING ONLY 
+  #if 0
+  //Debug my software zeroing signals going to right channel
+  Serial.println("Zeroing mixer gains for right channel...");
+  audioMixerR.gain(0,0.0);  audioMixerR.gain(1,0.0);  //mix together the chirp and SD player (though prob only one will be playing at a time)
 
-/* Create the MTP servicing stuff so that one can access the SD card via USB */
-/* If you want this, be sure to set the USB mode via the Arduino IDE,  Tools Menu -> USB Type -> Serial + MTP (experimental) */
-#include "setup_MTP.h"  //put this line sometime after the audioSDWriter has been instantiated
+  //debug by muting one side of the DAC to test for audio leakage
+  Serial.println("Muting Right DAC...");
+  myTympan.muteDAC(RIGHT_CHAN); 
+  #ifdef EN_4_SD_CHAN
+    earpieceShield.muteDAC(RIGHT_CHAN); 
+  #endif
+
+  //debug by muting one side of the Headphone Driver to test for audio leakage
+  delay(1000); //let stuff settle
+  Serial.println("Muting Right Headphone Driver...");
+  myTympan.muteHeadphone(RIGHT_CHAN); 
+  #ifdef EN_4_SD_CHAN
+    earpieceShield.muteHeadphone(RIGHT_CHAN);
+  #endif //EN_4_SD_CHAN
+  #endif
+
+  //prepare the SD writer for the format that we want and any error statements
+  audioSDWriter.setSerial(&myTympan);
+  
+  // Increase the RAM buffer allocated to audio SD writer.
+  if (audioSDWriter.allocateBuffer(300000) < 512) {       //Must be greater than 512 bytes to trigger SD writing
+    Serial.println("setup: *** ERROR ***: SD Could Not Allocate RAM Buffer!");  
+  }
+
+  // Set # of recording channels
+  #ifdef EN_4_SD_CHAN
+    audioSDWriter.setNumWriteChannels(4);
+  #else
+    audioSDWriter.setNumWriteChannels(2);       
+  #endif
+  Serial.println("SD configured for " + String(audioSDWriter.getNumWriteChannels()) + " channels.");
+
+//Set the state of the LEDs
+  myTympan.setRedLED(HIGH); myTympan.setAmberLED(LOW);
+
+  Serial.println("Setup: complete."); 
+  serialManager.printHelp();
+} //end setup()
 
 
-//set up the serial manager
-void setupSerialManager(void) {
-  //register all the UI elements here
-  //serialManager.add_UI_element(&myState);
-  //serialManager.add_UI_element(&ble);
-  serialManager.add_UI_element(&audioSDWriter);
-}
+
+//~~~~Main loop()~~~~ 
+void loop() {
+  //respond to Serial commands
+  while (Serial.available()) {
+    serialManager.respondToByte( (char)Serial.read() ); 
+  }
+
+#if EN_BLE
+  //respond to BLE
+  if (ble.available() > 0) {
+    String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
+    for (int i=0; i < msgLen; i++) serialManager.respondToByte(msgFromBle[i]);
+  }
+
+  //service the BLE advertising state
+  ble.updateAdvertising(millis(),5000); //check every 5000 msec to ensure it is advertising (if not connected)
+#endif
+
+  //service the SD recording
+  audioSDWriter.serviceSD_withWarnings(i2s_in); //For the warnings, it asks the i2s_in class for some info
+
+  //service the automatic SD starting and stopping based on the playing of the chirp / SD
+  serviceAutoSdStartStop();
+ 
+  // Did the user activate MTP mode?  If so, service the MTP and nothing else
+  if (use_MTP) {   //service MTP (ie, the SD card appearing as a drive on your PC/Mac
+     service_MTP();  //Find in Setup_MTP.h 
+  
+  } else { //do everything else!
+    //service the LEDs...blink slow normally, blink fast if recording
+    myTympan.serviceLEDs(millis(),audioSDWriter.getState() == AudioSDWriter::STATE::RECORDING); 
+
+    //service the SD player to refill the play buffer
+    sdPlayer.serviceSD();
+  }
+ 
+  //periodically print the CPU and Memory Usage
+  if (myState.flag_printCPUandMemory) myState.printCPUandMemory(millis(), 3000); //print every 3000msec  (method is built into TympanStateBase.h, which myState inherits from)
+  if (myState.flag_printCPUandMemory) myState.printCPUtoGUI(millis(), 3000);     //send to App every 3000msec (method is built into TympanStateBase.h, which myState inherits from)
+} //end loop()
 
 
 // /////////// Functions for configuring the system
@@ -194,142 +318,6 @@ void setConfiguration(int config) {
   }
 }
 
-// ///////////////// Main setup() and loop() as required for all Arduino programs
-
-// define the setup() function, the function that is called once when the device is booting
-void setup() {
-  //myTympan.beginBothSerial(); //only needed if using bluetooth
-  delay(500);
-  Serial.println("DigMicProbeTest: setup():...");
-  Serial.println("Sample Rate (Hz): " + String(audio_settings.sample_rate_Hz));
-  Serial.println("Audio Block Size (samples): " + String(audio_settings.audio_block_samples));
-
-  //allocate the dynamically re-allocatable audio memory
-  AudioMemory_F32(100, audio_settings); 
-
-  //Enable the Tympan and AIC shields to start the audio flowing!
-  myTympan.enable(); 
-  #ifdef EN_4_SD_CHAN
-    earpieceShield.enable();
-  #endif
-
-  //Select the input that we will use 
-  setConfiguration(myState.input_source);  //the initial value is set in State.h
-  
-  //Configure the mixer for the audio sources
-  audioMixerL.mute(); audioMixerR.mute();  //set all channels to zero (I think that this is defualt, but let's do this just to be sure!)
-  audioMixerL.gain(0,1.0);  audioMixerL.gain(1,1.0);  //mix together the chirp and SD player (though prob only one will be playing at a time)
-  audioMixerR.gain(0,1.0);  audioMixerR.gain(1,1.0);  //mix together the chirp and SD player (though prob only one will be playing at a time)
-
-  //debug my software zeroing signals going to right channel
-  if (0) {
-    Serial.println("Zeroing mixer gains for right channel...");
-    audioMixerR.gain(0,0.0);  audioMixerR.gain(1,0.0);  //mix together the chirp and SD player (though prob only one will be playing at a time)
-  }
-
-  //Select the gain for the output DAC
-  setOutputGain_dB(myState.output_gain_dB);
-
-  //debug by muting one side of the DAC to test for audio leakage
-  if (0) {
-    Serial.println("Muting Right DAC...");
-    myTympan.muteDAC(RIGHT_CHAN); 
-    #ifdef EN_4_SD_CHAN
-        earpieceShield.muteDAC(RIGHT_CHAN); 
-    #endif
-  }
-
-  //debug by muting one side of the Headphone Driver to test for audio leakage
-  if (0) {
-    delay(1000); //let stuff settle
-    Serial.println("Muting Right Headphone Driver...");
-    myTympan.muteHeadphone(RIGHT_CHAN); 
-    #ifdef EN_4_SD_CHAN
-      earpieceShield.muteHeadphone(RIGHT_CHAN);
-    #endif
-  }
-
-  //setup BLE
-  #if EN_BLE
-    delay(500); myTympan.setupBLE(); delay(500); //Assumes the default Bluetooth firmware. You can override!
-  #endif
-
-  //setup the serial manager
-  setupSerialManager();
-
-  //prepare the SD writer for the format that we want and any error statements
-  audioSDWriter.setSerial(&myTympan);
-  
-  // Increase the RAM buffer allocated to audio SD writer.
-  if (audioSDWriter.allocateBuffer(300000) < 512) {       //Must be greater than 512 bytes to trigger SD writing
-    Serial.println("setup: *** ERROR ***: SD Could Not Allocate RAM Buffer!");  
-  }
-
-  #ifdef EN_4_SD_CHAN
-    audioSDWriter.setNumWriteChannels(4);             //four channels for this quad recorder, but you could set it to 2lse
-  #else
-    audioSDWriter.setNumWriteChannels(2);       
-  #endif
-  
-  Serial.println("SD configured for " + String(audioSDWriter.getNumWriteChannels()) + " channels.");
-
-    //Set the state of the LEDs
-  myTympan.setRedLED(HIGH); myTympan.setAmberLED(LOW);
-
-  Serial.println("Setup: complete."); 
-  //End of setup
-  serialManager.printHelp();
-
-} //end setup()
-
-// define the loop() function, the function that is repeated over and over for the life of the device
-void loop() {
-
-  //respond to Serial commands
-  if (Serial.available()) serialManager.respondToByte((char)Serial.read());   //USB Serial
-
-  #if EN_BLE
-  //respond to BLE
-    if (ble.available() > 0) {
-      String msgFromBle; int msgLen = ble.recvBLE(&msgFromBle);
-      for (int i=0; i < msgLen; i++) serialManager.respondToByte(msgFromBle[i]);
-    }
-  #endif
-
-  //service the SD recording
-  audioSDWriter.serviceSD_withWarnings(i2s_in); //For the warnings, it asks the i2s_in class for some info
-
-  //service the automatic SD starting and stopping based on the playing of the chirp / SD
-  serviceAutoSdStartStop();
- 
-  // Did the user activate MTP mode?  If so, service the MTP and nothing else
-  if (use_MTP) {   //service MTP (ie, the SD card appearing as a drive on your PC/Mac
-     
-     service_MTP();  //Find in Setup_MTP.h 
-  
-  } else { //do everything else!
-
-    #if EN_BLE
-      //service the BLE advertising state
-      ble.updateAdvertising(millis(),5000); //check every 5000 msec to ensure it is advertising (if not connected)
-    #endif 
-     
-    //service the LEDs...blink slow normally, blink fast if recording
-    myTympan.serviceLEDs(millis(),audioSDWriter.getState() == AudioSDWriter::STATE::RECORDING); 
-
-    //service the SD player to refill the play buffer
-    sdPlayer.serviceSD();
-  
-  }
- 
-  //periodically print the CPU and Memory Usage
-  if (myState.flag_printCPUandMemory) myState.printCPUandMemory(millis(), 3000); //print every 3000msec  (method is built into TympanStateBase.h, which myState inherits from)
-  if (myState.flag_printCPUandMemory) myState.printCPUtoGUI(millis(), 3000);     //send to App every 3000msec (method is built into TympanStateBase.h, which myState inherits from)
-
-
-} //end loop()
-
-// //////////////////////////////////// Servicing routines not otherwise embedded in other classes
 
 int playChirp(void) {
   chirp.play( sqrtf(powf(10.0f, 0.1f*myState.chirp_amp_dBFS)),
@@ -369,7 +357,6 @@ void serviceAutoSdStartStop(void) {
   static unsigned long nextUpdate_millis = 0UL;
   static unsigned long updatePeriod_millis = 1000UL;
 
-  
   // Is it time to start a signal?
   if ((myState.signal_start_armed==true) || (myState.auto_sd_state == State::WAIT_START_SIGNAL)) {
     if (millis() >= myState.start_signal_at_millis) {

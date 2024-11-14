@@ -10,6 +10,7 @@
 extern Tympan myTympan;
 extern AudioSDWriter_F32_UI audioSDWriter;
 extern State myState;
+extern AudioSDWriter_F32_UI audioSDWriter;
 
 
 //Extern Functions
@@ -26,23 +27,21 @@ extern void forceStopSDPlay(void);
 extern void start_MTP(void);
 //extern void stop_MTP(void);
 
-class SerialManager : public SerialManagerBase  {  // see Tympan_Library for SerialManagerBase for more functions!
+class SerialManager : public SerialManagerBase  {  // see Tympan_Library SerialManagerBase for more functions!
   public:
-    //SerialManager(BLE *_ble) : SerialManagerBase(_ble) {};
-    SerialManager() : SerialManagerBase() {};
+    SerialManager(BLE *_ble) : SerialManagerBase(_ble) {};
 
     void printHelp(void);
     void createTympanRemoteLayout(void); 
     void printTympanRemoteLayout(void); 
+    void setFullGUIState(bool activeButtonsOnly = false);
     bool processCharacter(char c);  //this is called automatically by SerialManagerBase.respondToByte(char c)
 
     //method for updating the GUI on the App
-    void setFullGUIState(bool activeButtonsOnly = false);
     void updateGUI_inputGain(bool activeButtonsOnly = false);
     void updateGUI_inputSelect(bool activeButtonsOnly = false);
 
-    int gainIncrement_dB = 2.5;
-
+    int gainIncrement_dB = 2.5f;
   private:
     TympanRemoteFormatter myGUI;  //Creates the GUI-writing class for interacting with TympanRemote App    
 };
@@ -64,17 +63,8 @@ void SerialManager::printHelp(void) {
   #if defined(USE_MTPDISK) || defined(USB_MTPDISK_SERIAL)  //detect whether "MTP Disk" or "Serial + MTP Disk" were selected in the Arduino IDEA
     Serial.println("   >    : SDUtil : Start MTP mode to read SD from PC");
   #endif
-  
-  //Add in the printHelp() that is built-into the other UI-enabled system components.
-  //The function call below loops through all of the UI-enabled classes that were
-  //attached to the serialManager in the setupSerialManager() function used back
-  //in the main *.ino file.
-  SerialManagerBase::printHelp();  ////in here, it automatically loops over the different UI elements issuing printHelp()
-  
   Serial.println();
 }
-
-
 
 
 //switch yard to determine the desired action
@@ -193,7 +183,7 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
       break;
     // Default:  Automatically loop over the different UI elements
     default:
-      ret_val = SerialManagerBase::processCharacter(c);  //in here, it automatically loops over the different UI elements
+      ret_val = false;  //in here, it automatically loops over the different UI elements
       break;
   }
   return ret_val;
@@ -205,7 +195,6 @@ bool SerialManager::processCharacter(char c) { //this is called by SerialManager
 
 //define the GUI for the App
 void SerialManager::createTympanRemoteLayout(void) {
-  
   // Create some temporary variables
   TR_Page *page_h;  //dummy handle for a page
   TR_Card *card_h;  //dummy handle for a card
@@ -240,19 +229,17 @@ void SerialManager::printTympanRemoteLayout(void) {
     if (myGUI.get_nPages() < 1) createTympanRemoteLayout();  //create the GUI, if it hasn't already been created
     String s = myGUI.asString();
     Serial.println(s);
-    if (ble != NULL) ble->sendMessage(s); //ble is held by SerialManagerBase
+    ble->sendMessage(s); //ble is held by SerialManagerBase
     setFullGUIState();
 }
 
 // //////////////////////////////////  Methods for updating the display on the GUI
 
 void SerialManager::setFullGUIState(bool activeButtonsOnly) {  //the "activeButtonsOnly" isn't used here, so don't worry about it
-  
   updateGUI_inputGain(activeButtonsOnly);
   updateGUI_inputSelect(activeButtonsOnly);
 
-  //Then, let's have the system automatically update all of the individual UI elements that we attached
-  //to the serialManager via the setupSerialManager() function used back in the main *.ino file.
+  //update all of the individual UI elements
   SerialManagerBase::setFullGUIState(activeButtonsOnly); //in here, it automatically loops over the different UI elements
 
 }
