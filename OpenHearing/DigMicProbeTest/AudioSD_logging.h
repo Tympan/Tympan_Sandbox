@@ -11,11 +11,11 @@ class LogEntry {
     uint32_t time_msec = 0UL;
     uint32_t buff_bytes_before = 0;
     uint32_t buff_bytes_after = 0;
-    uint16_t dur_msec = 0;
+    uint16_t dur_msec_x10 = 0;
     uint16_t bytes_transferred = 0;
  
     String toString(void) {
-      return String(time_msec) + ", " + String(dur_msec) + ", " + String(buff_bytes_before) + ", " + String(bytes_transferred) + ", " + String(buff_bytes_after);
+      return String(time_msec) + ", " + String(dur_msec_x10) + ", " + String(buff_bytes_before) + ", " + String(bytes_transferred) + ", " + String(buff_bytes_after);
     }
 };
 
@@ -28,7 +28,7 @@ class SD_Log {
     void resetLog(void) { write_ind = 0; 
       for (uint32_t i = 0; i < N_LOG; i++) {
         log_array[write_ind].time_msec = 0;
-        log_array[write_ind].dur_msec = 0;
+        log_array[write_ind].dur_msec_x10 = 0;
         log_array[write_ind].buff_bytes_before = 0;
         log_array[write_ind].bytes_transferred = 0;
         log_array[write_ind].buff_bytes_after = 0;      
@@ -36,10 +36,10 @@ class SD_Log {
     }
 
     //add entry at current write index
-    int addEntry(const uint32_t _time_msec, const uint16_t _dur_msec, uint32_t _buff_bytes_before, uint16_t _bytes_transferred, const unsigned long _buff_bytes_after) {
+    int addEntry(const uint32_t _time_msec, const uint16_t _dur_msec_x10, uint32_t _buff_bytes_before, uint16_t _bytes_transferred, const unsigned long _buff_bytes_after) {
       if (write_ind < (N_LOG-1)) {
         log_array[write_ind].time_msec = _time_msec;
-        log_array[write_ind].dur_msec = _dur_msec;
+        log_array[write_ind].dur_msec_x10 = _dur_msec_x10;
         log_array[write_ind].buff_bytes_before = _buff_bytes_before;
         log_array[write_ind].bytes_transferred = _bytes_transferred;
         log_array[write_ind].buff_bytes_after = _buff_bytes_after;
@@ -110,9 +110,9 @@ class AudioSDPlayer_F32_logging : public AudioSDPlayer_F32 {
       unsigned long cur_millis = millis();
       unsigned long start_micros = micros();
       int ret_val = AudioSDPlayer_F32::serviceSD();
-      uint32_t dur_msec = (micros() - start_micros)/1000UL;
+      uint32_t dur_msec_x10 = (micros() - start_micros)/(1000UL/10UL);
       uint32_t bytes_read = AudioSDPlayer_F32::getNBytesLastReadFromSD();
-      if (bytes_read > 0) sd_log.addEntry((uint32_t)cur_millis, (uint16_t)dur_msec, buffBytesBefore, (uint16_t)bytes_read, getNumBuffBytes());
+      if (bytes_read > 0) sd_log.addEntry((uint32_t)cur_millis, (uint16_t)dur_msec_x10, buffBytesBefore, (uint16_t)bytes_read, getNumBuffBytes());
       return ret_val;
     }
 
@@ -132,8 +132,8 @@ class AudioSDWriter_F32_UI_logging : public AudioSDWriter_F32_UI {
       unsigned long cur_millis = millis();
       unsigned long start_micros = micros();
       int bytes_written = AudioSDWriter_F32_UI::serviceSD_withWarnings(i2s_in);
-      uint32_t dur_msec = (micros() - start_micros)/1000UL;
-      if (bytes_written > 0) sd_log.addEntry((uint32_t)cur_millis,(uint16_t)dur_msec, bytes_before,  (uint16_t)bytes_written, getNumUnfilledSamplesInBuffer()*2);
+      uint32_t dur_msec_x10 = (micros() - start_micros)/(1000UL/10UL);
+      if (bytes_written > 0) sd_log.addEntry((uint32_t)cur_millis,(uint16_t)dur_msec_x10, bytes_before,  (uint16_t)bytes_written, getNumUnfilledSamplesInBuffer()*2);
       return bytes_written;
     }
 

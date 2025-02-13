@@ -126,6 +126,9 @@ void setup() {
   Serial.println("setup: allocated RAM for play buffer.  Size after allocation = " + String(ret_val));
   ret_val = audioSDWriter.allocateBuffer(2*(2*2*64)*512);  //set the RAM buffer (bytes) for recording. default is 150000. 4*2*64*512 = 262/144; 262144 / (4chan*2bytes*96000) = 341 msec 
   Serial.println("setup: alloacted RAM for write buffer.  Allocation return val = " + String(ret_val));
+  constexpr uint32_t bytes_per_second = 4*2*96000;
+  constexpr uint32_t file_preAllocation_seconds = 60;
+  audioSDWriter.setSDPreAllocationSizeBytes(bytes_per_second * file_preAllocation_seconds);
 
 \
   //Set the state of the LEDs
