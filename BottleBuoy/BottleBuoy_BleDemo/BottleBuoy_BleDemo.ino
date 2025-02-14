@@ -30,8 +30,7 @@ AudioConnection_F32       patchCord1(i2s_in, 0, i2s_out, 0);     //connect left 
 AudioConnection_F32       patchCord2(i2s_in, 1, i2s_out, 1);     //connect right input to right output
 
 // Create classes for controlling the system
-#include      "SerialManager.h"
-#include      "State.h"                            
+#include      "SerialManager.h"                        
 BLE_nRF52&    ble_nRF52 = myTympan.getBLE_nRF52(); //get BLE object for the nRF52840 (RevF only!)
 SerialManager serialManager(&ble_nRF52);                 //create the serial manager for real-time control (via USB or App)
 
